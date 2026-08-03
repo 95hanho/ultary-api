@@ -49,8 +49,8 @@ server:
 # MyBatis 설정
 # ==============================
 mybatis:
-  mapper-locations: classpath:mappers/*.xml
-  type-aliases-package: me._hanho
+  mapper-locations: classpath:mappers/**/*.xml
+  type-aliases-package: me._hanho.ultary.domain
   configuration:
     jdbc-type-for-null: 'null'
     map-underscore-to-camel-case: true
