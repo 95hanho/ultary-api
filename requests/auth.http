@@ -1,0 +1,43 @@
+@baseUrl = http://localhost:9377
+@accessToken = {{login.response.body.$.data.accessToken}}
+@refreshToken = {{login.response.body.$.data.refreshToken}}
+
+### 1. Login
+# @name login
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "loginId": "testuser1",
+  "password": "Test1234!"
+}
+
+### 2. Me (인증 필요)
+GET {{baseUrl}}/api/v1/auth/me
+Authorization: Bearer {{accessToken}}
+
+### 3. Refresh
+# @name refresh
+POST {{baseUrl}}/api/v1/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+### 4. Me with refreshed access token
+GET {{baseUrl}}/api/v1/auth/me
+Authorization: Bearer {{refresh.response.body.$.data.accessToken}}
+
+### 5. Logout
+POST {{baseUrl}}/api/v1/auth/logout
+Authorization: Bearer {{refresh.response.body.$.data.accessToken}}
+
+### 6. Login failed (wrong password)
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "loginId": "testuser1",
+  "password": "wrong-password"
+}

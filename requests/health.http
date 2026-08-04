@@ -1,0 +1,7 @@
+@baseUrl = http://localhost:9377
+
+### Health
+GET {{baseUrl}}/api/v1/health
+
+### DB Health
+GET {{baseUrl}}/api/v1/health/db

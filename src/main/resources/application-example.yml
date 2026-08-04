@@ -72,10 +72,25 @@ logging:
 # ==============================
 jwt:
   secret:
-    refresh: ${JWT_REFRESH_SECRET}
     user: ${JWT_USER_SECRET}
+    refresh: ${JWT_REFRESH_SECRET}
+    admin: ${JWT_ADMIN_SECRET}
     phoneauth: ${JWT_PHONEAUTH_SECRET}
     phoneauth-complete: ${JWT_PHONEAUTH_COMPLETE_SECRET}
     pwdchange: ${JWT_PWDCHANGE_SECRET}
-    seller: ${JWT_SELLER_SECRET}
-    admin: ${JWT_ADMIN_SECRET}
+
+  # 만료 시간 (초 단위)
+  # - 운영 기본값 사용
+  # - 재발급/만료 테스트 시 아래 TEST 값으로 바꿔서 사용
+  expiration:
+    access: 1800                 # 30분
+    refresh: 1209600             # 14일
+    phoneauth: 300               # 5분
+    phoneauth-complete: 600      # 10분
+    pwdchange: 600               # 10분
+    # ---- TEST (만료/재발급 테스트용) ----
+    # access: 10                 # 10초
+    # refresh: 60                # 1분
+    # phoneauth: 30              # 30초
+    # phoneauth-complete: 60     # 1분
+    # pwdchange: 60              # 1분

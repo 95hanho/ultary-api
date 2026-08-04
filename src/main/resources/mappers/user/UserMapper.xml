@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="me._hanho.ultary.domain.user.mapper.UserMapper">
+
+	<select id="findByLoginId" resultType="me._hanho.ultary.domain.user.model.User">
+		SELECT
+			user_no,
+			login_id,
+			password,
+			name,
+			nickname,
+			email,
+			phone,
+			profile_file_id,
+			bio,
+			region_sido,
+			region_sigungu,
+			created_at,
+			updated_at,
+			withdrawal_status,
+			withdrawal_requested_at,
+			withdrawal_completed_at
+		FROM ultary_user
+		WHERE login_id = #{loginId}
+	</select>
+
+	<select id="findActiveByUserNo" resultType="me._hanho.ultary.domain.user.model.User">
+		SELECT
+			user_no,
+			login_id,
+			password,
+			name,
+			nickname,
+			email,
+			phone,
+			profile_file_id,
+			bio,
+			region_sido,
+			region_sigungu,
+			created_at,
+			updated_at,
+			withdrawal_status,
+			withdrawal_requested_at,
+			withdrawal_completed_at
+		FROM ultary_user
+		WHERE user_no = #{userNo}
+		  AND withdrawal_status = 'ACTIVE'
+	</select>
+
+</mapper>

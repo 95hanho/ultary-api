@@ -3,10 +3,12 @@ package me._hanho.ultary.domain.health.service;
 import org.springframework.stereotype.Service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.exception.BusinessException;
 import me._hanho.ultary.common.exception.ErrorCode;
 import me._hanho.ultary.domain.health.mapper.HealthMapper;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class HealthService {
@@ -23,6 +25,7 @@ public class HealthService {
 		} catch (BusinessException ex) {
 			throw ex;
 		} catch (Exception ex) {
+			log.error("Database health check failed", ex);
 			throw new BusinessException(ErrorCode.DB_CONNECTION_FAILED);
 		}
 	}
