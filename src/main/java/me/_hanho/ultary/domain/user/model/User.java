@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import lombok.Getter;
 import lombok.Setter;
 
+/** ultary_user */
 @Getter
 @Setter
 public class User {
