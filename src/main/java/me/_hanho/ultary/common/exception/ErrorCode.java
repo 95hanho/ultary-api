@@ -18,7 +18,8 @@ public enum ErrorCode {
 	LOGIN_FAILED("LOGIN_FAILED", "아이디 또는 비밀번호가 올바르지 않습니다.", HttpStatus.UNAUTHORIZED),
 	USER_INACTIVE("USER_INACTIVE", "이용할 수 없는 계정입니다.", HttpStatus.FORBIDDEN),
 	TOKEN_EXPIRED("TOKEN_EXPIRED", "토큰이 만료되었습니다.", HttpStatus.UNAUTHORIZED),
-	INVALID_TOKEN("INVALID_TOKEN", "유효하지 않은 토큰입니다.", HttpStatus.UNAUTHORIZED);
+	INVALID_TOKEN("INVALID_TOKEN", "유효하지 않은 토큰입니다.", HttpStatus.UNAUTHORIZED),
+	NOT_IMPLEMENTED("NOT_IMPLEMENTED", "아직 구현되지 않은 API입니다.", HttpStatus.NOT_IMPLEMENTED);
 
 	private final String code;
 	private final String message;

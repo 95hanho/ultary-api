@@ -40,8 +40,21 @@ public class SecurityConfig {
 						.authenticationEntryPoint(jwtAuthenticationEntryPoint)
 						.accessDeniedHandler(jwtAccessDeniedHandler))
 				.authorizeHttpRequests(auth -> auth
-						.requestMatchers("/api/v1/health/**").permitAll()
-						.requestMatchers("/api/v1/auth/login", "/api/v1/auth/refresh").permitAll()
+						.requestMatchers(
+								"/api/v1/health/**",
+								"/api/v1/auth/login",
+								"/api/v1/auth/refresh",
+								"/api/v1/auth/signup",
+								"/api/v1/auth/login-id/check",
+								"/api/v1/auth/phone",
+								"/api/v1/auth/phone/verify",
+								"/api/v1/auth/password",
+								"/api/v1/auth/password/token",
+								"/api/v1/auth/social/google",
+								"/api/v1/auth/social/google/callback",
+								"/api/v1/auth/social/kakao",
+								"/api/v1/auth/social/kakao/callback")
+						.permitAll()
 						.requestMatchers("/api/v1/**").authenticated()
 						.anyRequest().permitAll())
 				.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

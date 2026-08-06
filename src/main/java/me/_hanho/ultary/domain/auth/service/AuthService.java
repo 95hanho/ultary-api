@@ -11,6 +11,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import me._hanho.ultary.common.exception.BusinessException;
 import me._hanho.ultary.common.exception.ErrorCode;
+import me._hanho.ultary.common.exception.NotImplemented;
 import me._hanho.ultary.domain.auth.dto.request.LoginRequest;
 import me._hanho.ultary.domain.auth.dto.request.RefreshTokenRequest;
 import me._hanho.ultary.domain.auth.dto.response.MeResponse;
@@ -84,6 +85,62 @@ public class AuthService {
 				.loginId(user.getLoginId())
 				.nickname(user.getNickname())
 				.build();
+	}
+
+	public void updateMe(UserPrincipal principal) {
+		NotImplemented.yet();
+	}
+
+	public void withdraw(UserPrincipal principal) {
+		NotImplemented.yet();
+	}
+
+	public void signup() {
+		NotImplemented.yet();
+	}
+
+	public void checkLoginId(String loginId) {
+		NotImplemented.yet();
+	}
+
+	public void requestPhoneAuth() {
+		NotImplemented.yet();
+	}
+
+	public void verifyPhoneAuth() {
+		NotImplemented.yet();
+	}
+
+	public void createPasswordToken() {
+		NotImplemented.yet();
+	}
+
+	public void changePassword() {
+		NotImplemented.yet();
+	}
+
+	public void startGoogleLogin() {
+		NotImplemented.yet();
+	}
+
+	public void googleCallback() {
+		NotImplemented.yet();
+	}
+
+	public void startKakaoLogin() {
+		NotImplemented.yet();
+	}
+
+	public void kakaoCallback() {
+		NotImplemented.yet();
+	}
+
+	public void linkSocial(UserPrincipal principal) {
+		NotImplemented.yet();
+	}
+
+	public void unlinkSocial(UserPrincipal principal, String provider) {
+		NotImplemented.yet();
 	}
 
 	private TokenResponse issueTokens(User user, HttpServletRequest httpRequest) {
