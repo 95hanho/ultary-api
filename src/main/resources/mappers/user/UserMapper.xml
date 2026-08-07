@@ -1,53 +1,114 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper
 		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
-		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+		"https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="me._hanho.ultary.domain.user.mapper.UserMapper">
 
-	<select id="findByLoginId" resultType="me._hanho.ultary.domain.user.model.User">
-		SELECT
-			user_no,
-			login_id,
-			password,
-			name,
-			nickname,
-			email,
-			phone,
-			profile_file_id,
-			bio,
-			region_sido,
-			region_sigungu,
-			created_at,
-			updated_at,
-			withdrawal_status,
-			withdrawal_requested_at,
-			withdrawal_completed_at
-		FROM ultary_user
-		WHERE login_id = #{loginId}
-	</select>
+	<sql id="userColumns">
+		user_no,
+		password,
+		name,
+		nickname,
+		is_default_nickname,
+		email,
+		phone,
+		profile_file_id,
+		bio,
+		region_sido,
+		region_sigungu,
+		created_at,
+		updated_at,
+		withdrawal_status,
+		withdrawal_requested_at,
+		withdrawal_completed_at
+	</sql>
 
 	<select id="findActiveByUserNo" resultType="me._hanho.ultary.domain.user.model.User">
-		SELECT
-			user_no,
-			login_id,
-			password,
-			name,
-			nickname,
-			email,
-			phone,
-			profile_file_id,
-			bio,
-			region_sido,
-			region_sigungu,
-			created_at,
-			updated_at,
-			withdrawal_status,
-			withdrawal_requested_at,
-			withdrawal_completed_at
+		SELECT <include refid="userColumns"/>
 		FROM ultary_user
 		WHERE user_no = #{userNo}
 		  AND withdrawal_status = 'ACTIVE'
 	</select>
+
+	<select id="findByPhone" resultType="me._hanho.ultary.domain.user.model.User">
+		SELECT <include refid="userColumns"/>
+		FROM ultary_user
+		WHERE phone = #{phone}
+		  AND withdrawal_status = 'ACTIVE'
+		LIMIT 1
+	</select>
+
+	<select id="findByEmail" resultType="me._hanho.ultary.domain.user.model.User">
+		SELECT <include refid="userColumns"/>
+		FROM ultary_user
+		WHERE email = #{email}
+		  AND withdrawal_status = 'ACTIVE'
+		LIMIT 1
+	</select>
+
+	<select id="countByNickname" resultType="int">
+		SELECT COUNT(1)
+		FROM ultary_user
+		WHERE nickname = #{nickname}
+		<if test="excludeUserNo != null">
+			AND user_no != #{excludeUserNo}
+		</if>
+	</select>
+
+	<insert id="insert" useGeneratedKeys="true" keyProperty="userNo" keyColumn="user_no">
+		INSERT INTO ultary_user (
+			password,
+			name,
+			nickname,
+			is_default_nickname,
+			email,
+			phone,
+			withdrawal_status
+		) VALUES (
+			#{password},
+			#{name},
+			#{nickname},
+			#{isDefaultNickname},
+			#{email},
+			#{phone},
+			'ACTIVE'
+		)
+	</insert>
+
+	<update id="updateProfile">
+		UPDATE ultary_user
+		SET
+			nickname = #{nickname},
+			is_default_nickname = #{isDefaultNickname},
+			name = #{name},
+			email = #{email},
+			bio = #{bio},
+			region_sido = #{regionSido},
+			region_sigungu = #{regionSigungu}
+		WHERE user_no = #{userNo}
+		  AND withdrawal_status = 'ACTIVE'
+	</update>
+
+	<update id="updatePassword">
+		UPDATE ultary_user
+		SET password = #{password}
+		WHERE user_no = #{userNo}
+		  AND withdrawal_status = 'ACTIVE'
+	</update>
+
+	<update id="updateWithdrawalStatus">
+		UPDATE ultary_user
+		SET withdrawal_status = #{withdrawalStatus},
+			withdrawal_requested_at = CASE
+				WHEN #{withdrawalStatus} = 'REQUESTED' THEN NOW()
+				ELSE withdrawal_requested_at
+			END,
+			withdrawal_completed_at = CASE
+				WHEN #{withdrawalStatus} = 'WITHDRAWN' THEN NOW()
+				ELSE withdrawal_completed_at
+			END
+		WHERE user_no = #{userNo}
+	</update>
 
 </mapper>

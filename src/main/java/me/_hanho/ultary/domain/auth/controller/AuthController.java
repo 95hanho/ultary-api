@@ -17,15 +17,27 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.response.ApiResponse;
+import me._hanho.ultary.domain.auth.dto.request.ChangePasswordRequest;
 import me._hanho.ultary.domain.auth.dto.request.LoginRequest;
+import me._hanho.ultary.domain.auth.dto.request.PasswordTokenRequest;
+import me._hanho.ultary.domain.auth.dto.request.PhoneAuthRequest;
+import me._hanho.ultary.domain.auth.dto.request.PhoneVerifyRequest;
 import me._hanho.ultary.domain.auth.dto.request.RefreshTokenRequest;
+import me._hanho.ultary.domain.auth.dto.request.SignupRequest;
+import me._hanho.ultary.domain.auth.dto.request.SocialLoginRequest;
+import me._hanho.ultary.domain.auth.dto.request.UpdateMeRequest;
 import me._hanho.ultary.domain.auth.dto.response.MeResponse;
+import me._hanho.ultary.domain.auth.dto.response.PasswordTokenResponse;
+import me._hanho.ultary.domain.auth.dto.response.PhoneAuthResponse;
+import me._hanho.ultary.domain.auth.dto.response.PhoneVerifyResponse;
+import me._hanho.ultary.domain.auth.dto.response.SocialLoginResponse;
 import me._hanho.ultary.domain.auth.dto.response.TokenResponse;
 import me._hanho.ultary.domain.auth.service.AuthService;
 import me._hanho.ultary.security.principal.UserPrincipal;
 
 /**
  * 경로 원본: ultary-web springEndpoints.auth / docs/api-memo.md §1
+ * 소셜 OAuth(시작/콜백)는 FE/BFF 담당. BE는 DB 조회·가입·연동만 처리.
  */
 @Slf4j
 @Validated
@@ -36,12 +48,43 @@ public class AuthController {
 
 	private final AuthService authService;
 
-	// 로그인
+	// 소셜 로그인 (가입 포함) — FE/BFF가 providerUserId 전달
+	@PostMapping("/social/login")
+	public ApiResponse<SocialLoginResponse> socialLogin(
+			@Valid @RequestBody SocialLoginRequest request,
+			HttpServletRequest httpRequest) {
+		log.info("[socialLogin] provider={}", request.getProvider());
+		return ApiResponse.ok(authService.socialLogin(request, httpRequest));
+	}
+
+	// 소셜 계정 연동
+	@PostMapping("/social/link")
+	public ApiResponse<Void> socialLink(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@Valid @RequestBody SocialLoginRequest request) {
+		log.info("[socialLink] provider={}", request.getProvider());
+		authService.linkSocial(principal, request);
+		return ApiResponse.ok();
+	}
+
+	// 소셜 계정 연동 해제
+	@DeleteMapping("/social/unlink")
+	public ApiResponse<Void> socialUnlink(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@RequestParam String provider) {
+		log.info("[socialUnlink] provider={}", provider);
+		authService.unlinkSocial(principal, provider);
+		return ApiResponse.ok();
+	}
+
+	// 로그인 (email 또는 phone + password)
 	@PostMapping("/login")
 	public ApiResponse<TokenResponse> login(
 			@Valid @RequestBody LoginRequest request,
 			HttpServletRequest httpRequest) {
-		log.info("[login] loginId={}", request.getLoginId());
+		log.info("[login] emailPresent={} phonePresent={}",
+				request.getEmail() != null && !request.getEmail().isBlank(),
+				request.getPhone() != null && !request.getPhone().isBlank());
 		return ApiResponse.ok(authService.login(request, httpRequest));
 	}
 
@@ -71,10 +114,11 @@ public class AuthController {
 
 	// 회원정보 변경
 	@PatchMapping("/me")
-	public ApiResponse<Void> updateMe(@AuthenticationPrincipal UserPrincipal principal) {
+	public ApiResponse<MeResponse> updateMe(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@Valid @RequestBody UpdateMeRequest request) {
 		log.info("[updateMe]");
-		authService.updateMe(principal);
-		return ApiResponse.ok();
+		return ApiResponse.ok(authService.updateMe(principal, request));
 	}
 
 	// 회원탈퇴
@@ -85,101 +129,40 @@ public class AuthController {
 		return ApiResponse.ok();
 	}
 
-	// 회원가입
+	// 회원가입 (휴대폰 인증 + 비밀번호)
 	@PostMapping("/signup")
-	public ApiResponse<Void> signup() {
+	public ApiResponse<Void> signup(@Valid @RequestBody SignupRequest request) {
 		log.info("[signup]");
-		authService.signup();
-		return ApiResponse.ok();
-	}
-
-	// 아이디 중복확인
-	@GetMapping("/login-id/check")
-	public ApiResponse<Void> checkLoginId(@RequestParam String loginId) {
-		log.info("[checkLoginId] loginId={}", loginId);
-		authService.checkLoginId(loginId);
+		authService.signup(request);
 		return ApiResponse.ok();
 	}
 
 	// 휴대폰 인증
 	@PostMapping("/phone")
-	public ApiResponse<Void> phone() {
-		log.info("[phone]");
-		authService.requestPhoneAuth();
-		return ApiResponse.ok();
+	public ApiResponse<PhoneAuthResponse> phone(@Valid @RequestBody PhoneAuthRequest request) {
+		log.info("[phone] phone={}", request.getPhone());
+		return ApiResponse.ok(authService.requestPhoneAuth(request));
 	}
 
 	// 휴대폰 인증 확인
 	@PostMapping("/phone/verify")
-	public ApiResponse<Void> phoneVerify() {
+	public ApiResponse<PhoneVerifyResponse> phoneVerify(@Valid @RequestBody PhoneVerifyRequest request) {
 		log.info("[phoneVerify]");
-		authService.verifyPhoneAuth();
-		return ApiResponse.ok();
+		return ApiResponse.ok(authService.verifyPhoneAuth(request));
 	}
 
-	// 비밀번호 변경 토큰 생성
+	// 비밀번호 변경/설정 토큰 생성
 	@PostMapping("/password/token")
-	public ApiResponse<Void> passwordToken() {
-		log.info("[passwordToken]");
-		authService.createPasswordToken();
-		return ApiResponse.ok();
+	public ApiResponse<PasswordTokenResponse> passwordToken(@Valid @RequestBody PasswordTokenRequest request) {
+		log.info("[passwordToken] phone={}", request.getPhone());
+		return ApiResponse.ok(authService.createPasswordToken(request));
 	}
 
-	// 비밀번호 변경
+	// 비밀번호 변경/설정
 	@PutMapping("/password")
-	public ApiResponse<Void> password() {
+	public ApiResponse<Void> password(@Valid @RequestBody ChangePasswordRequest request) {
 		log.info("[password]");
-		authService.changePassword();
-		return ApiResponse.ok();
-	}
-
-	// 구글 소셜 로그인 시작
-	@GetMapping("/social/google")
-	public ApiResponse<Void> google() {
-		log.info("[google]");
-		authService.startGoogleLogin();
-		return ApiResponse.ok();
-	}
-
-	// 구글 소셜 콜백
-	@GetMapping("/social/google/callback")
-	public ApiResponse<Void> googleCallback() {
-		log.info("[googleCallback]");
-		authService.googleCallback();
-		return ApiResponse.ok();
-	}
-
-	// 카카오 소셜 로그인 시작
-	@GetMapping("/social/kakao")
-	public ApiResponse<Void> kakao() {
-		log.info("[kakao]");
-		authService.startKakaoLogin();
-		return ApiResponse.ok();
-	}
-
-	// 카카오 소셜 콜백
-	@GetMapping("/social/kakao/callback")
-	public ApiResponse<Void> kakaoCallback() {
-		log.info("[kakaoCallback]");
-		authService.kakaoCallback();
-		return ApiResponse.ok();
-	}
-
-	// 소셜 계정 연동
-	@PostMapping("/social/link")
-	public ApiResponse<Void> socialLink(@AuthenticationPrincipal UserPrincipal principal) {
-		log.info("[socialLink]");
-		authService.linkSocial(principal);
-		return ApiResponse.ok();
-	}
-
-	// 소셜 계정 연동 해제
-	@DeleteMapping("/social/unlink")
-	public ApiResponse<Void> socialUnlink(
-			@AuthenticationPrincipal UserPrincipal principal,
-			@RequestParam(required = false) String provider) {
-		log.info("[socialUnlink] provider={}", provider);
-		authService.unlinkSocial(principal, provider);
+		authService.changePassword(request);
 		return ApiResponse.ok();
 	}
 }

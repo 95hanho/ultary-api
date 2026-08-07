@@ -2,6 +2,8 @@ package me._hanho.ultary.security.jwt;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 
 import javax.crypto.SecretKey;
 
@@ -25,6 +27,7 @@ public class JwtTokenProvider {
 
 	private static final String CLAIM_OWNER_TYPE = "ownerType";
 	private static final String CLAIM_TOKEN_TYPE = "tokenType";
+	private static final String CLAIM_PHONE = "phone";
 
 	private final JwtProperties jwtProperties;
 
@@ -34,7 +37,8 @@ public class JwtTokenProvider {
 				TokenOwnerType.USER,
 				JwtTokenType.ACCESS,
 				jwtProperties.getSecret().getUser(),
-				jwtProperties.getExpiration().getAccess());
+				jwtProperties.getExpiration().getAccess(),
+				null);
 	}
 
 	public String createRefreshToken(Long ownerNo, TokenOwnerType ownerType) {
@@ -43,7 +47,42 @@ public class JwtTokenProvider {
 				ownerType,
 				JwtTokenType.REFRESH,
 				jwtProperties.getSecret().getRefresh(),
-				jwtProperties.getExpiration().getRefresh());
+				jwtProperties.getExpiration().getRefresh(),
+				null);
+	}
+
+	public String createPhoneAuthToken(String phone) {
+		Map<String, Object> extra = new HashMap<>();
+		extra.put(CLAIM_PHONE, phone);
+		return createToken(
+				phone,
+				null,
+				JwtTokenType.PHONE_AUTH,
+				jwtProperties.getSecret().getPhoneauth(),
+				jwtProperties.getExpiration().getPhoneauth(),
+				extra);
+	}
+
+	public String createPhoneAuthCompleteToken(String phone) {
+		Map<String, Object> extra = new HashMap<>();
+		extra.put(CLAIM_PHONE, phone);
+		return createToken(
+				phone,
+				null,
+				JwtTokenType.PHONE_AUTH_COMPLETE,
+				jwtProperties.getSecret().getPhoneauthComplete(),
+				jwtProperties.getExpiration().getPhoneauthComplete(),
+				extra);
+	}
+
+	public String createPasswordChangeToken(Long userNo) {
+		return createToken(
+				String.valueOf(userNo),
+				TokenOwnerType.USER,
+				JwtTokenType.PASSWORD_CHANGE,
+				jwtProperties.getSecret().getPwdchange(),
+				jwtProperties.getExpiration().getPwdchange(),
+				null);
 	}
 
 	public long getAccessTokenExpiresInSeconds() {
@@ -66,8 +105,34 @@ public class JwtTokenProvider {
 		return claims;
 	}
 
+	public Claims parsePhoneAuthToken(String token) {
+		Claims claims = parseClaims(token, jwtProperties.getSecret().getPhoneauth());
+		validateClaims(claims, null, JwtTokenType.PHONE_AUTH);
+		return claims;
+	}
+
+	public Claims parsePhoneAuthCompleteToken(String token) {
+		Claims claims = parseClaims(token, jwtProperties.getSecret().getPhoneauthComplete());
+		validateClaims(claims, null, JwtTokenType.PHONE_AUTH_COMPLETE);
+		return claims;
+	}
+
+	public Claims parsePasswordChangeToken(String token) {
+		Claims claims = parseClaims(token, jwtProperties.getSecret().getPwdchange());
+		validateClaims(claims, TokenOwnerType.USER, JwtTokenType.PASSWORD_CHANGE);
+		return claims;
+	}
+
 	public Long getSubjectAsLong(Claims claims) {
 		return Long.valueOf(claims.getSubject());
+	}
+
+	public String getPhone(Claims claims) {
+		String phone = claims.get(CLAIM_PHONE, String.class);
+		if (phone == null || phone.isBlank()) {
+			throw new BusinessException(ErrorCode.INVALID_TOKEN);
+		}
+		return phone;
 	}
 
 	public TokenOwnerType getOwnerType(Claims claims) {
@@ -79,16 +144,25 @@ public class JwtTokenProvider {
 			TokenOwnerType ownerType,
 			JwtTokenType tokenType,
 			String secret,
-			long expirationSeconds) {
+			long expirationSeconds,
+			Map<String, Object> extraClaims) {
 		Date now = new Date();
 		Date expiresAt = new Date(now.getTime() + (expirationSeconds * 1000));
 
-		return Jwts.builder()
+		var builder = Jwts.builder()
 				.setSubject(subject)
-				.claim(CLAIM_OWNER_TYPE, ownerType.name())
 				.claim(CLAIM_TOKEN_TYPE, tokenType.name())
 				.setIssuedAt(now)
-				.setExpiration(expiresAt)
+				.setExpiration(expiresAt);
+
+		if (ownerType != null) {
+			builder.claim(CLAIM_OWNER_TYPE, ownerType.name());
+		}
+		if (extraClaims != null) {
+			extraClaims.forEach(builder::claim);
+		}
+
+		return builder
 				.signWith(secretKey(secret), SignatureAlgorithm.HS256)
 				.compact();
 	}

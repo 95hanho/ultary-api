@@ -11,10 +11,11 @@ import lombok.Setter;
 public class User {
 
 	private Long userNo;
-	private String loginId;
 	private String password;
 	private String name;
 	private String nickname;
+	/** 1=소셜 자동 닉네임(변경 유도), 0=사용자 변경 완료 */
+	private Boolean isDefaultNickname;
 	private String email;
 	private String phone;
 	private Integer profileFileId;

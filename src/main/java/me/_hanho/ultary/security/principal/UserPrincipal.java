@@ -15,7 +15,6 @@ import lombok.RequiredArgsConstructor;
 public class UserPrincipal implements UserDetails {
 
 	private final Long userNo;
-	private final String loginId;
 	private final String nickname;
 
 	@Override
@@ -30,7 +29,7 @@ public class UserPrincipal implements UserDetails {
 
 	@Override
 	public String getUsername() {
-		return loginId;
+		return nickname != null ? nickname : String.valueOf(userNo);
 	}
 
 	@Override

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="me._hanho.ultary.domain.user.mapper.UserSocialMapper">
+
+	<sql id="socialColumns">
+		user_social_id,
+		user_no,
+		provider,
+		provider_user_id,
+		provider_email,
+		linked_at,
+		created_at,
+		updated_at
+	</sql>
+
+	<select id="findByProviderAndProviderUserId"
+			resultType="me._hanho.ultary.domain.user.model.UserSocial">
+		SELECT <include refid="socialColumns"/>
+		FROM ultary_user_social
+		WHERE provider = #{provider}
+		  AND provider_user_id = #{providerUserId}
+		LIMIT 1
+	</select>
+
+	<select id="findByUserNoAndProvider"
+			resultType="me._hanho.ultary.domain.user.model.UserSocial">
+		SELECT <include refid="socialColumns"/>
+		FROM ultary_user_social
+		WHERE user_no = #{userNo}
+		  AND provider = #{provider}
+		LIMIT 1
+	</select>
+
+	<select id="countByUserNo" resultType="int">
+		SELECT COUNT(1)
+		FROM ultary_user_social
+		WHERE user_no = #{userNo}
+	</select>
+
+	<insert id="insert" useGeneratedKeys="true" keyProperty="userSocialId" keyColumn="user_social_id">
+		INSERT INTO ultary_user_social (
+			user_no,
+			provider,
+			provider_user_id,
+			provider_email
+		) VALUES (
+			#{userNo},
+			#{provider},
+			#{providerUserId},
+			#{providerEmail}
+		)
+	</insert>
+
+	<delete id="deleteByUserNoAndProvider">
+		DELETE FROM ultary_user_social
+		WHERE user_no = #{userNo}
+		  AND provider = #{provider}
+	</delete>
+
+</mapper>

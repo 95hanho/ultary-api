@@ -1,22 +1,49 @@
 @baseUrl = http://localhost:9377
-@accessToken = {{login.response.body.$.data.accessToken}}
-@refreshToken = {{login.response.body.$.data.refreshToken}}
+@accessToken = {{socialLogin.response.body.$.data.accessToken}}
+@refreshToken = {{socialLogin.response.body.$.data.refreshToken}}
+@phoneAuthToken = {{phone.response.body.$.data.phoneAuthToken}}
+@phoneAuthCompleteToken = {{phoneVerify.response.body.$.data.phoneAuthCompleteToken}}
+@passwordChangeToken = {{passwordToken.response.body.$.data.passwordChangeToken}}
 
-### 1. Login
-# @name login
-POST {{baseUrl}}/api/v1/auth/login
+### 1. 소셜 로그인 (신규 가입 포함) — FE/BFF가 OAuth 후 providerUserId 전달
+# @name socialLogin
+POST {{baseUrl}}/api/v1/auth/social/login
 Content-Type: application/json
 
 {
-  "loginId": "testuser1",
-  "password": "Test1234!"
+  "provider": "GOOGLE",
+  "providerUserId": "google-test-user-001",
+  "email": "google.user@example.com",
+  "name": "구글유저"
 }
 
-### 2. Me (인증 필요)
+### 1b. 카카오 소셜 로그인
+POST {{baseUrl}}/api/v1/auth/social/login
+Content-Type: application/json
+
+{
+  "provider": "KAKAO",
+  "providerUserId": "kakao-test-user-001",
+  "email": "kakao.user@example.com"
+}
+
+### 2. Me
 GET {{baseUrl}}/api/v1/auth/me
 Authorization: Bearer {{accessToken}}
 
-### 3. Refresh
+### 3. 닉네임 변경 (is_default_nickname → false)
+PATCH {{baseUrl}}/api/v1/auth/me
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "nickname": "울타리닉네임",
+  "bio": "소개글",
+  "regionSido": "서울특별시",
+  "regionSigungu": "마포구"
+}
+
+### 4. Refresh
 # @name refresh
 POST {{baseUrl}}/api/v1/auth/refresh
 Content-Type: application/json
@@ -25,19 +52,94 @@ Content-Type: application/json
   "refreshToken": "{{refreshToken}}"
 }
 
-### 4. Me with refreshed access token
-GET {{baseUrl}}/api/v1/auth/me
-Authorization: Bearer {{refresh.response.body.$.data.accessToken}}
+### 5. 소셜 계정 연동 (로그인 필요)
+POST {{baseUrl}}/api/v1/auth/social/link
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
 
-### 5. Logout
-POST {{baseUrl}}/api/v1/auth/logout
-Authorization: Bearer {{refresh.response.body.$.data.accessToken}}
+{
+  "provider": "KAKAO",
+  "providerUserId": "kakao-link-user-001",
+  "email": "kakao.link@example.com"
+}
 
-### 6. Login failed (wrong password)
+### 6. 소셜 계정 연동 해제
+DELETE {{baseUrl}}/api/v1/auth/social/unlink?provider=KAKAO
+Authorization: Bearer {{accessToken}}
+
+### 7. 휴대폰 인증 요청
+# @name phone
+POST {{baseUrl}}/api/v1/auth/phone
+Content-Type: application/json
+
+{
+  "phone": "01012345678"
+}
+
+### 8. 휴대폰 인증 확인 (서버 로그의 code 확인)
+# @name phoneVerify
+POST {{baseUrl}}/api/v1/auth/phone/verify
+Content-Type: application/json
+
+{
+  "phoneAuthToken": "{{phoneAuthToken}}",
+  "code": "000000"
+}
+
+### 9. 회원가입 (휴대폰 + 비밀번호)
+POST {{baseUrl}}/api/v1/auth/signup
+Content-Type: application/json
+
+{
+  "phoneAuthCompleteToken": "{{phoneAuthCompleteToken}}",
+  "password": "Test1234!",
+  "nickname": "폰가입유저",
+  "name": "홍길동",
+  "email": "phone.user@ultary.local"
+}
+
+### 10. 로그인 (email 또는 phone + password)
+# @name login
 POST {{baseUrl}}/api/v1/auth/login
 Content-Type: application/json
 
 {
-  "loginId": "testuser1",
-  "password": "wrong-password"
+  "email": "phone.user@ultary.local",
+  "password": "Test1234!"
 }
+
+### 10b. 휴대폰으로 로그인
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "phone": "01012345678",
+  "password": "Test1234!"
+}
+
+### 11. 비밀번호 변경/설정 토큰 (휴대폰 인증 완료 후)
+# @name passwordToken
+POST {{baseUrl}}/api/v1/auth/password/token
+Content-Type: application/json
+
+{
+  "phone": "01012345678",
+  "phoneAuthCompleteToken": "{{phoneAuthCompleteToken}}"
+}
+
+### 12. 비밀번호 변경/설정
+PUT {{baseUrl}}/api/v1/auth/password
+Content-Type: application/json
+
+{
+  "passwordChangeToken": "{{passwordChangeToken}}",
+  "newPassword": "NewPass1234!"
+}
+
+### 13. Logout
+POST {{baseUrl}}/api/v1/auth/logout
+Authorization: Bearer {{accessToken}}
+
+### 14. 회원탈퇴
+DELETE {{baseUrl}}/api/v1/auth/me
+Authorization: Bearer {{accessToken}}
