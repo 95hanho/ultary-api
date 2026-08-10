@@ -50,6 +50,12 @@ public class AuthService {
 	private static final String NICKNAME_RANDOM_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789";
 	private static final int NICKNAME_RANDOM_LENGTH = 8;
 	private static final int NICKNAME_MAX_RETRY = 10;
+	/** ultary_user.name VARCHAR(20) */
+	private static final int USER_NAME_MAX = 20;
+	/** ultary_user.email VARCHAR(50) */
+	private static final int USER_EMAIL_MAX = 50;
+	/** ultary_user_social.provider_email VARCHAR(100) */
+	private static final int PROVIDER_EMAIL_MAX = 100;
 
 	private final UserMapper userMapper;
 	private final UserSocialMapper userSocialMapper;
@@ -68,8 +74,8 @@ public class AuthService {
 	public SocialLoginResponse socialLogin(SocialLoginRequest request, HttpServletRequest httpRequest) {
 		SocialProvider provider = SocialProvider.from(request.getProvider());
 		String providerUserId = request.getProviderUserId().trim();
-		String email = StringUtils.hasText(request.getEmail()) ? request.getEmail().trim() : null;
-		String name = StringUtils.hasText(request.getName()) ? request.getName().trim() : null;
+		String email = truncate(trimToNull(request.getEmail()), USER_EMAIL_MAX);
+		String name = truncate(trimToNull(request.getName()), USER_NAME_MAX);
 
 		UserSocial linked = userSocialMapper.findByProviderAndProviderUserId(provider.name(), providerUserId);
 		boolean newUser = false;
@@ -102,7 +108,7 @@ public class AuthService {
 	public void linkSocial(UserPrincipal principal, SocialLoginRequest request) {
 		SocialProvider provider = SocialProvider.from(request.getProvider());
 		String providerUserId = request.getProviderUserId().trim();
-		String email = StringUtils.hasText(request.getEmail()) ? request.getEmail().trim() : null;
+		String email = truncate(trimToNull(request.getEmail()), PROVIDER_EMAIL_MAX);
 
 		User user = userMapper.findActiveByUserNo(principal.getUserNo());
 		if (user == null) {
@@ -351,10 +357,24 @@ public class AuthService {
 		social.setUserNo(user.getUserNo());
 		social.setProvider(provider.name());
 		social.setProviderUserId(providerUserId);
-		social.setProviderEmail(email);
+		social.setProviderEmail(truncate(email, PROVIDER_EMAIL_MAX));
 		userSocialMapper.insert(social);
 
 		return user;
+	}
+
+	private String trimToNull(String value) {
+		if (!StringUtils.hasText(value)) {
+			return null;
+		}
+		return value.trim();
+	}
+
+	private String truncate(String value, int maxLength) {
+		if (value == null || value.length() <= maxLength) {
+			return value;
+		}
+		return value.substring(0, maxLength);
 	}
 
 	private String generateUniqueNickname(SocialProvider provider) {

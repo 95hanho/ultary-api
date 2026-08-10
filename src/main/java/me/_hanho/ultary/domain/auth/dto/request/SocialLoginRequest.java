@@ -23,6 +23,7 @@ public class SocialLoginRequest {
 	@Size(max = 100, message = "이메일은 100자 이하여야 합니다.")
 	private String email;
 
-	@Size(max = 20, message = "이름은 20자 이하여야 합니다.")
+	/** OAuth 표시명은 DB name(20)보다 길 수 있음 → 서비스에서 truncate */
+	@Size(max = 100, message = "이름은 100자 이하여야 합니다.")
 	private String name;
 }
