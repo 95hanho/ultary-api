@@ -56,6 +56,15 @@
 		</if>
 	</select>
 
+	<select id="countByEmail" resultType="int">
+		SELECT COUNT(1)
+		FROM ultary_user
+		WHERE email = #{email}
+		<if test="excludeUserNo != null">
+			AND user_no != #{excludeUserNo}
+		</if>
+	</select>
+
 	<insert id="insert" useGeneratedKeys="true" keyProperty="userNo" keyColumn="user_no">
 		INSERT INTO ultary_user (
 			password,

@@ -41,15 +41,18 @@ public class SecurityConfig {
 						.accessDeniedHandler(jwtAccessDeniedHandler))
 				.authorizeHttpRequests(auth -> auth
 						.requestMatchers(
+								// 로그인 없이 되는 API 목록
 								"/api/v1/health/**",
 								"/api/v1/auth/login",
 								"/api/v1/auth/refresh",
 								"/api/v1/auth/signup",
+								"/api/v1/auth/nickname/check",
 								"/api/v1/auth/phone",
 								"/api/v1/auth/phone/verify",
 								"/api/v1/auth/password",
 								"/api/v1/auth/password/token",
-								"/api/v1/auth/social/login")
+								"/api/v1/auth/social/login",
+								"/api/v1/test/**")
 						.permitAll()
 						.requestMatchers("/api/v1/**").authenticated()
 						.anyRequest().permitAll())

@@ -5,7 +5,7 @@
 @phoneAuthCompleteToken = {{phoneVerify.response.body.$.data.phoneAuthCompleteToken}}
 @passwordChangeToken = {{passwordToken.response.body.$.data.passwordChangeToken}}
 
-### 1. 소셜 로그인 (신규 가입 포함) — FE/BFF가 OAuth 후 providerUserId 전달
+### 1a. 소셜 로그인 (Google · 신규 가입 포함) — FE/BFF가 OAuth 후 providerUserId 전달
 # @name socialLogin
 POST {{baseUrl}}/api/v1/auth/social/login
 Content-Type: application/json
@@ -17,7 +17,7 @@ Content-Type: application/json
   "name": "구글유저"
 }
 
-### 1b. 카카오 소셜 로그인
+### 1b. 소셜 로그인 (Kakao)
 POST {{baseUrl}}/api/v1/auth/social/login
 Content-Type: application/json
 
@@ -73,7 +73,7 @@ POST {{baseUrl}}/api/v1/auth/phone
 Content-Type: application/json
 
 {
-  "phone": "01012345678"
+  "phone": "01012345679"
 }
 
 ### 8. 휴대폰 인증 확인 (서버 로그의 code 확인)
@@ -83,10 +83,13 @@ Content-Type: application/json
 
 {
   "phoneAuthToken": "{{phoneAuthToken}}",
-  "code": "000000"
+  "code": "140248"
 }
 
-### 9. 회원가입 (휴대폰 + 비밀번호)
+### 9. 닉네임 중복확인
+GET {{baseUrl}}/api/v1/auth/nickname/check?nickname=폰가입유저
+
+### 10. 회원가입 (휴대폰 + 비밀번호)
 POST {{baseUrl}}/api/v1/auth/signup
 Content-Type: application/json
 
@@ -98,17 +101,17 @@ Content-Type: application/json
   "email": "phone.user@ultary.local"
 }
 
-### 10. 로그인 (email 또는 phone + password)
+### 11a. 로그인 (email + password)
 # @name login
 POST {{baseUrl}}/api/v1/auth/login
 Content-Type: application/json
 
 {
-  "email": "phone.user@ultary.local",
-  "password": "Test1234!"
+  "email": "fe.smoke@example.com",
+  "password": "!aest1234!"
 }
 
-### 10b. 휴대폰으로 로그인
+### 11b. 로그인 (phone + password)
 POST {{baseUrl}}/api/v1/auth/login
 Content-Type: application/json
 
@@ -117,7 +120,7 @@ Content-Type: application/json
   "password": "Test1234!"
 }
 
-### 11. 비밀번호 변경/설정 토큰 (휴대폰 인증 완료 후)
+### 12. 비밀번호 변경/설정 토큰 (비로그인 · 휴대폰 인증 완료 후)
 # @name passwordToken
 POST {{baseUrl}}/api/v1/auth/password/token
 Content-Type: application/json
@@ -127,7 +130,7 @@ Content-Type: application/json
   "phoneAuthCompleteToken": "{{phoneAuthCompleteToken}}"
 }
 
-### 12. 비밀번호 변경/설정
+### 13a. 비밀번호 변경/설정 (비로그인 · passwordChangeToken)
 PUT {{baseUrl}}/api/v1/auth/password
 Content-Type: application/json
 
@@ -136,10 +139,21 @@ Content-Type: application/json
   "newPassword": "NewPass1234!"
 }
 
-### 13. Logout
+### 13b. 비밀번호 변경/설정 (로그인 상태)
+# 이미 비밀번호가 있으면 currentPassword 필수 / 소셜만 쓰면 currentPassword 생략 가능
+PUT {{baseUrl}}/api/v1/auth/password/me
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "currentPassword": "Test1234!",
+  "newPassword": "NewPass1234!"
+}
+
+### 14. Logout
 POST {{baseUrl}}/api/v1/auth/logout
 Authorization: Bearer {{accessToken}}
 
-### 14. 회원탈퇴
+### 15. 회원탈퇴
 DELETE {{baseUrl}}/api/v1/auth/me
 Authorization: Bearer {{accessToken}}

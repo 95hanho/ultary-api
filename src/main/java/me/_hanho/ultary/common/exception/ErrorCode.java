@@ -28,9 +28,13 @@ public enum ErrorCode {
 	TOKEN_EXPIRED("TOKEN_EXPIRED", "토큰이 만료되었습니다.", HttpStatus.UNAUTHORIZED),
 	INVALID_TOKEN("INVALID_TOKEN", "유효하지 않은 토큰입니다.", HttpStatus.UNAUTHORIZED),
 	NICKNAME_DUPLICATED("NICKNAME_DUPLICATED", "이미 사용 중인 닉네임입니다.", HttpStatus.CONFLICT),
+	EMAIL_DUPLICATED("EMAIL_DUPLICATED", "이미 사용 중인 이메일입니다.", HttpStatus.CONFLICT),
 	PHONE_AUTH_FAILED("PHONE_AUTH_FAILED", "휴대폰 인증에 실패했습니다.", HttpStatus.BAD_REQUEST),
+	PHONE_CODE_INVALID("PHONE_CODE_INVALID", "인증번호가 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
+	PHONE_CODE_EXPIRED("PHONE_CODE_EXPIRED", "인증번호가 만료되었습니다. 다시 요청해주세요 됩니다.", HttpStatus.BAD_REQUEST),
 	PHONE_ALREADY_USED("PHONE_ALREADY_USED", "이미 가입된 휴대폰 번호입니다.", HttpStatus.CONFLICT),
 	PASSWORD_CHANGE_FAILED("PASSWORD_CHANGE_FAILED", "비밀번호 변경에 실패했습니다.", HttpStatus.BAD_REQUEST),
+	CURRENT_PASSWORD_INVALID("CURRENT_PASSWORD_INVALID", "현재 비밀번호가 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
 	INVALID_SOCIAL_PROVIDER("INVALID_SOCIAL_PROVIDER", "지원하지 않는 소셜 제공자입니다.", HttpStatus.BAD_REQUEST),
 	SOCIAL_ALREADY_LINKED("SOCIAL_ALREADY_LINKED", "이미 연동된 소셜 계정입니다.", HttpStatus.CONFLICT),
 	SOCIAL_ACCOUNT_IN_USE("SOCIAL_ACCOUNT_IN_USE", "다른 계정에 이미 연동된 소셜 계정입니다.", HttpStatus.CONFLICT),
@@ -40,7 +44,11 @@ public enum ErrorCode {
 	// ==============================
 	// 파일 (file)
 	// ==============================
-	// FILE_NOT_FOUND("FILE_NOT_FOUND", "파일을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
+	FILE_NOT_FOUND("FILE_NOT_FOUND", "파일을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
+	INVALID_FILE_TYPE("INVALID_FILE_TYPE", "지원하지 않는 파일 형식입니다.", HttpStatus.BAD_REQUEST),
+	FILE_SIZE_EXCEEDED("FILE_SIZE_EXCEEDED", "파일 크기가 제한을 초과했습니다.", HttpStatus.BAD_REQUEST),
+	FILE_UPLOAD_FAILED("FILE_UPLOAD_FAILED", "파일 업로드에 실패했습니다.", HttpStatus.INTERNAL_SERVER_ERROR),
+	FILE_EMPTY("FILE_EMPTY", "파일이 비어 있습니다.", HttpStatus.BAD_REQUEST),
 
 	// ==============================
 	// 유저 (user)
@@ -50,7 +58,9 @@ public enum ErrorCode {
 	// ==============================
 	// 반려동물 (pet)
 	// ==============================
-	// PET_NOT_FOUND("PET_NOT_FOUND", "반려동물을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
+	PET_NOT_FOUND("PET_NOT_FOUND", "반려동물을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
+	PET_TAG_NOT_FOUND("PET_TAG_NOT_FOUND", "반려동물 태그 요청을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
+	PET_TAG_ALREADY_PROCESSED("PET_TAG_ALREADY_PROCESSED", "이미 처리된 태그 요청입니다.", HttpStatus.CONFLICT),
 
 	// ==============================
 	// 피드 (feed)

@@ -13,22 +13,34 @@ import org.springframework.stereotype.Component;
 @Component
 public class PhoneAuthCodeStore {
 
+	public enum VerifyResult {
+		/** 인증번호 일치 */
+		MATCH,
+		/** 아직 유효한데 번호가 틀림 */
+		INVALID,
+		/** 없거나 시간 만료 → 재전송 필요 */
+		EXPIRED
+	}
+
 	private final Map<String, CodeEntry> store = new ConcurrentHashMap<>();
 
 	public void save(String phone, String code, long ttlSeconds) {
 		store.put(phone, new CodeEntry(code, Instant.now().plusSeconds(ttlSeconds)));
 	}
 
-	public boolean matches(String phone, String code) {
+	public VerifyResult verify(String phone, String code) {
 		CodeEntry entry = store.get(phone);
 		if (entry == null) {
-			return false;
+			return VerifyResult.EXPIRED;
 		}
 		if (Instant.now().isAfter(entry.expiresAt())) {
 			store.remove(phone);
-			return false;
+			return VerifyResult.EXPIRED;
 		}
-		return entry.code().equals(code);
+		if (!entry.code().equals(code)) {
+			return VerifyResult.INVALID;
+		}
+		return VerifyResult.MATCH;
 	}
 
 	public void remove(String phone) {

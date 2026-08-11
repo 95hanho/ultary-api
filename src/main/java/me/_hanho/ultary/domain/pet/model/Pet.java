@@ -20,10 +20,13 @@ public class Pet {
 	private String gender;
 	private Boolean isNeutered;
 	private LocalDateTime birthday;
-	private Integer profileFileId;
+	private Long profileFileId;
 	private String bio;
 	private LocalDateTime createdAt;
 	private LocalDateTime updatedAt;
 	private Boolean isDeleted;
 	private LocalDateTime deletedAt;
+
+	/** update SQL용. DB 컬럼 아님 — profile_file_id NULL 클리어 */
+	private boolean clearProfileFile;
 }

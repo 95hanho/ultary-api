@@ -1,3 +1,4 @@
+-- schema_version: 3
 -- ULTARY MariaDB 10.1.13 Schema
 -- Engine: InnoDB
 -- Charset / Collation: utf8 / utf8_general_ci
@@ -6,6 +7,10 @@
 --   - 일반 사용자 login_id 없음 (소셜 우선, 이후 email/phone + password 로그인)
 --   - password는 최초 NULL, 사용자가 나중에 설정 가능
 --   - 소셜 가입 시 nickname = google_|kakao_ + 랜덤코드, is_default_nickname=1
+-- Change log:
+--   v1: 초기 스키마 (Phase 1-1)
+--   v2: 소셜 로그인 / login_id 제거 / is_default_nickname (Phase 1-6)
+--   v3: ultary_feed_image → ultary_feed_media (IMAGE|VIDEO, thumbnail, duration)
 
 SET NAMES utf8;
 SET FOREIGN_KEY_CHECKS = 0;
@@ -21,7 +26,7 @@ DROP TABLE IF EXISTS `ultary_feed_comment_mention`;
 DROP TABLE IF EXISTS `ultary_feed_reply`;
 DROP TABLE IF EXISTS `ultary_feed_comment`;
 DROP TABLE IF EXISTS `ultary_feed_like`;
-DROP TABLE IF EXISTS `ultary_feed_image`;
+DROP TABLE IF EXISTS `ultary_feed_media`;
 DROP TABLE IF EXISTS `ultary_feed_pet`;
 DROP TABLE IF EXISTS `ultary_feed`;
 DROP TABLE IF EXISTS `ultary_user_block`;
@@ -224,17 +229,22 @@ CREATE TABLE `ultary_feed_pet` (
   KEY `IDX_ultary_feed_pet_status` (`status`) USING BTREE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci COMMENT='피드에 등장하는 반려동물 연결 테이블';
 
-CREATE TABLE `ultary_feed_image` (
-  `feed_image_id` INT(11) NOT NULL AUTO_INCREMENT,
+CREATE TABLE `ultary_feed_media` (
+  `feed_media_id` INT(11) NOT NULL AUTO_INCREMENT,
   `feed_id` INT(11) NOT NULL,
-  `file_id` INT(11) NOT NULL,
-  `sort_order` INT(11) NOT NULL DEFAULT 0,
+  `file_id` INT(11) NOT NULL COMMENT '원본 미디어 파일 (이미지 또는 영상)',
+  `media_type` ENUM('IMAGE','VIDEO') NOT NULL COMMENT '캐러셀 슬롯 타입',
+  `thumbnail_file_id` INT(11) NULL DEFAULT NULL COMMENT 'VIDEO 커버/썸네일 이미지. IMAGE면 NULL',
+  `duration_sec` INT(11) NULL DEFAULT NULL COMMENT 'VIDEO 재생 초. IMAGE면 NULL',
+  `sort_order` INT(11) NOT NULL DEFAULT 0 COMMENT '캐러셀 순서 (0부터)',
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`feed_image_id`) USING BTREE,
-  UNIQUE KEY `UK_ultary_feed_image_sort` (`feed_id`, `sort_order`) USING BTREE,
-  KEY `IDX_ultary_feed_image_file_id` (`file_id`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci COMMENT='피드 이미지 목록';
+  PRIMARY KEY (`feed_media_id`) USING BTREE,
+  UNIQUE KEY `UK_ultary_feed_media_sort` (`feed_id`, `sort_order`) USING BTREE,
+  KEY `IDX_ultary_feed_media_file_id` (`file_id`) USING BTREE,
+  KEY `IDX_ultary_feed_media_thumbnail_file_id` (`thumbnail_file_id`) USING BTREE,
+  KEY `IDX_ultary_feed_media_type` (`media_type`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci COMMENT='피드 미디어 캐러셀 (사진/짧은 영상 여러 개)';
 
 CREATE TABLE `ultary_feed_like` (
   `feed_like_id` INT(11) NOT NULL AUTO_INCREMENT,
@@ -448,9 +458,10 @@ ALTER TABLE `ultary_feed_pet`
   ADD CONSTRAINT `FK_feed_pet_added_user` FOREIGN KEY (`added_by_user_no`) REFERENCES `ultary_user` (`user_no`) ON UPDATE CASCADE ON DELETE RESTRICT,
   ADD CONSTRAINT `FK_feed_pet_approved_user` FOREIGN KEY (`approved_by_user_no`) REFERENCES `ultary_user` (`user_no`) ON UPDATE CASCADE ON DELETE SET NULL;
 
-ALTER TABLE `ultary_feed_image`
-  ADD CONSTRAINT `FK_feed_image_feed` FOREIGN KEY (`feed_id`) REFERENCES `ultary_feed` (`feed_id`) ON UPDATE CASCADE ON DELETE RESTRICT,
-  ADD CONSTRAINT `FK_feed_image_file` FOREIGN KEY (`file_id`) REFERENCES `ultary_file` (`file_id`) ON UPDATE CASCADE ON DELETE RESTRICT;
+ALTER TABLE `ultary_feed_media`
+  ADD CONSTRAINT `FK_feed_media_feed` FOREIGN KEY (`feed_id`) REFERENCES `ultary_feed` (`feed_id`) ON UPDATE CASCADE ON DELETE RESTRICT,
+  ADD CONSTRAINT `FK_feed_media_file` FOREIGN KEY (`file_id`) REFERENCES `ultary_file` (`file_id`) ON UPDATE CASCADE ON DELETE RESTRICT,
+  ADD CONSTRAINT `FK_feed_media_thumbnail_file` FOREIGN KEY (`thumbnail_file_id`) REFERENCES `ultary_file` (`file_id`) ON UPDATE CASCADE ON DELETE SET NULL;
 
 ALTER TABLE `ultary_feed_like`
   ADD CONSTRAINT `FK_feed_like_feed` FOREIGN KEY (`feed_id`) REFERENCES `ultary_feed` (`feed_id`) ON UPDATE CASCADE ON DELETE RESTRICT,

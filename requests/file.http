@@ -1,0 +1,81 @@
+@baseUrl = http://localhost:9377
+@accessToken = {{socialLogin.response.body.$.data.accessToken}}
+@fileId = {{uploadImage.response.body.$.data.fileId}}
+
+### 0. 소셜 로그인 (토큰 확보)
+# @name socialLogin
+POST {{baseUrl}}/api/v1/auth/social/login
+Content-Type: application/json
+
+{
+  "provider": "GOOGLE",
+  "providerUserId": "google-file-test-001",
+  "email": "file.test@example.com",
+  "name": "파일테스트"
+}
+
+### 1. 이미지 업로드 (AUTO)
+# @name uploadImage
+POST {{baseUrl}}/api/v1/files
+Authorization: Bearer {{accessToken}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="sample.jpg"
+Content-Type: image/jpeg
+
+< ./fixtures/sample.jpg
+--WebAppBoundary
+Content-Disposition: form-data; name="mediaType"
+
+AUTO
+--WebAppBoundary--
+
+### 2. 이미지 업로드 (mediaType=IMAGE 명시)
+POST {{baseUrl}}/api/v1/files
+Authorization: Bearer {{accessToken}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="sample.png"
+Content-Type: image/png
+
+< ./fixtures/sample.png
+--WebAppBoundary
+Content-Disposition: form-data; name="mediaType"
+
+IMAGE
+--WebAppBoundary--
+
+### 3. 영상 업로드 (mediaType=VIDEO)
+# @name uploadVideo
+POST {{baseUrl}}/api/v1/files
+Authorization: Bearer {{accessToken}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="sample.mp4"
+Content-Type: video/mp4
+
+< ./fixtures/sample.mp4
+--WebAppBoundary
+Content-Disposition: form-data; name="mediaType"
+
+VIDEO
+--WebAppBoundary--
+
+### 4. 메타 조회
+GET {{baseUrl}}/api/v1/files/{{fileId}}
+Authorization: Bearer {{accessToken}}
+
+### 5. 바이너리 조회
+GET {{baseUrl}}/api/v1/files/{{fileId}}/content
+Authorization: Bearer {{accessToken}}
+
+### 6. 소프트 삭제
+DELETE {{baseUrl}}/api/v1/files/{{fileId}}
+Authorization: Bearer {{accessToken}}
+
+### 7. 삭제 후 메타 조회 (404 예상)
+GET {{baseUrl}}/api/v1/files/{{fileId}}
+Authorization: Bearer {{accessToken}}

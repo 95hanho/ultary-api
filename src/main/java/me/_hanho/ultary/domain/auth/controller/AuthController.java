@@ -17,6 +17,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.response.ApiResponse;
+import me._hanho.ultary.domain.auth.dto.request.ChangeMyPasswordRequest;
 import me._hanho.ultary.domain.auth.dto.request.ChangePasswordRequest;
 import me._hanho.ultary.domain.auth.dto.request.LoginRequest;
 import me._hanho.ultary.domain.auth.dto.request.PasswordTokenRequest;
@@ -26,6 +27,9 @@ import me._hanho.ultary.domain.auth.dto.request.RefreshTokenRequest;
 import me._hanho.ultary.domain.auth.dto.request.SignupRequest;
 import me._hanho.ultary.domain.auth.dto.request.SocialLoginRequest;
 import me._hanho.ultary.domain.auth.dto.request.UpdateMeRequest;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import me._hanho.ultary.domain.auth.dto.response.AvailabilityCheckResponse;
 import me._hanho.ultary.domain.auth.dto.response.MeResponse;
 import me._hanho.ultary.domain.auth.dto.response.PasswordTokenResponse;
 import me._hanho.ultary.domain.auth.dto.response.PhoneAuthResponse;
@@ -137,6 +141,17 @@ public class AuthController {
 		return ApiResponse.ok();
 	}
 
+	// 닉네임 중복확인
+	@GetMapping("/nickname/check")
+	public ApiResponse<AvailabilityCheckResponse> checkNickname(
+			@RequestParam
+			@NotBlank(message = "닉네임은 필수입니다.")
+			@Size(max = 30, message = "닉네임은 30자 이하여야 합니다.")
+			String nickname) {
+		log.info("[checkNickname] nickname={}", nickname);
+		return ApiResponse.ok(authService.checkNickname(nickname));
+	}
+
 	// 휴대폰 인증
 	@PostMapping("/phone")
 	public ApiResponse<PhoneAuthResponse> phone(@Valid @RequestBody PhoneAuthRequest request) {
@@ -151,18 +166,28 @@ public class AuthController {
 		return ApiResponse.ok(authService.verifyPhoneAuth(request));
 	}
 
-	// 비밀번호 변경/설정 토큰 생성
+	// 비밀번호 변경/설정 토큰 생성 (비로그인 · 휴대폰 인증 후)
 	@PostMapping("/password/token")
 	public ApiResponse<PasswordTokenResponse> passwordToken(@Valid @RequestBody PasswordTokenRequest request) {
 		log.info("[passwordToken] phone={}", request.getPhone());
 		return ApiResponse.ok(authService.createPasswordToken(request));
 	}
 
-	// 비밀번호 변경/설정
+	// 비밀번호 변경/설정 (비로그인 · passwordChangeToken)
 	@PutMapping("/password")
 	public ApiResponse<Void> password(@Valid @RequestBody ChangePasswordRequest request) {
 		log.info("[password]");
 		authService.changePassword(request);
+		return ApiResponse.ok();
+	}
+
+	// 비밀번호 변경/설정 (로그인 상태)
+	@PutMapping("/password/me")
+	public ApiResponse<Void> changeMyPassword(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@Valid @RequestBody ChangeMyPasswordRequest request) {
+		log.info("[changeMyPassword]");
+		authService.changeMyPassword(principal, request);
 		return ApiResponse.ok();
 	}
 }

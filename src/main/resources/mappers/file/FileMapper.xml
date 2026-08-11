@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="me._hanho.ultary.domain.file.mapper.FileMapper">
+
+	<sql id="fileColumns">
+		file_id,
+		original_name,
+		store_name,
+		extension,
+		mime_type,
+		file_size,
+		file_path,
+		copyright,
+		copyright_url,
+		uploaded_by_user_no,
+		uploaded_by_admin_no,
+		created_at,
+		is_deleted,
+		deleted_at
+	</sql>
+
+	<select id="findActiveByFileId" resultType="me._hanho.ultary.domain.file.model.FileMeta">
+		SELECT <include refid="fileColumns"/>
+		FROM ultary_file
+		WHERE file_id = #{fileId}
+		  AND is_deleted = 0
+	</select>
+
+	<insert id="insert" useGeneratedKeys="true" keyProperty="fileId" keyColumn="file_id">
+		INSERT INTO ultary_file (
+			original_name,
+			store_name,
+			extension,
+			mime_type,
+			file_size,
+			file_path,
+			copyright,
+			copyright_url,
+			uploaded_by_user_no,
+			uploaded_by_admin_no
+		) VALUES (
+			#{originalName},
+			#{storeName},
+			#{extension},
+			#{mimeType},
+			#{fileSize},
+			#{filePath},
+			#{copyright},
+			#{copyrightUrl},
+			#{uploadedByUserNo},
+			#{uploadedByAdminNo}
+		)
+	</insert>
+
+	<update id="softDelete">
+		UPDATE ultary_file
+		SET is_deleted = 1,
+			deleted_at = NOW()
+		WHERE file_id = #{fileId}
+		  AND is_deleted = 0
+	</update>
+
+</mapper>

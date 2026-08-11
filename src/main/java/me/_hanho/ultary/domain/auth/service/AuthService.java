@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.exception.BusinessException;
 import me._hanho.ultary.common.exception.ErrorCode;
+import me._hanho.ultary.domain.auth.dto.request.ChangeMyPasswordRequest;
 import me._hanho.ultary.domain.auth.dto.request.ChangePasswordRequest;
 import me._hanho.ultary.domain.auth.dto.request.LoginRequest;
 import me._hanho.ultary.domain.auth.dto.request.PasswordTokenRequest;
@@ -23,6 +24,7 @@ import me._hanho.ultary.domain.auth.dto.request.RefreshTokenRequest;
 import me._hanho.ultary.domain.auth.dto.request.SignupRequest;
 import me._hanho.ultary.domain.auth.dto.request.SocialLoginRequest;
 import me._hanho.ultary.domain.auth.dto.request.UpdateMeRequest;
+import me._hanho.ultary.domain.auth.dto.response.AvailabilityCheckResponse;
 import me._hanho.ultary.domain.auth.dto.response.MeResponse;
 import me._hanho.ultary.domain.auth.dto.response.PasswordTokenResponse;
 import me._hanho.ultary.domain.auth.dto.response.PhoneAuthResponse;
@@ -219,6 +221,12 @@ public class AuthService {
 			throw new BusinessException(ErrorCode.NICKNAME_DUPLICATED);
 		}
 
+		if (StringUtils.hasText(request.getEmail())
+				&& !request.getEmail().equals(user.getEmail())
+				&& userMapper.countByEmail(request.getEmail().trim(), user.getUserNo()) > 0) {
+			throw new BusinessException(ErrorCode.EMAIL_DUPLICATED);
+		}
+
 		if (StringUtils.hasText(request.getNickname())) {
 			user.setNickname(request.getNickname());
 			user.setIsDefaultNickname(false);
@@ -227,7 +235,7 @@ public class AuthService {
 			user.setName(request.getName());
 		}
 		if (request.getEmail() != null) {
-			user.setEmail(request.getEmail());
+			user.setEmail(StringUtils.hasText(request.getEmail()) ? request.getEmail().trim() : null);
 		}
 		if (request.getBio() != null) {
 			user.setBio(request.getBio());
@@ -266,14 +274,25 @@ public class AuthService {
 			throw new BusinessException(ErrorCode.NICKNAME_DUPLICATED);
 		}
 
+		String email = StringUtils.hasText(request.getEmail()) ? request.getEmail().trim() : null;
+		if (email != null && userMapper.countByEmail(email, null) > 0) {
+			throw new BusinessException(ErrorCode.EMAIL_DUPLICATED);
+		}
+
 		User user = new User();
 		user.setPassword(passwordEncoder.encode(request.getPassword()));
 		user.setNickname(request.getNickname());
 		user.setIsDefaultNickname(false);
 		user.setName(StringUtils.hasText(request.getName()) ? request.getName() : null);
-		user.setEmail(StringUtils.hasText(request.getEmail()) ? request.getEmail() : null);
+		user.setEmail(email);
 		user.setPhone(phone);
 		userMapper.insert(user);
+	}
+
+	@Transactional(readOnly = true)
+	public AvailabilityCheckResponse checkNickname(String nickname) {
+		boolean available = userMapper.countByNickname(nickname, null) == 0;
+		return AvailabilityCheckResponse.builder().available(available).build();
 	}
 
 	public PhoneAuthResponse requestPhoneAuth(PhoneAuthRequest request) {
@@ -293,9 +312,14 @@ public class AuthService {
 		Claims claims = jwtTokenProvider.parsePhoneAuthToken(request.getPhoneAuthToken());
 		String phone = jwtTokenProvider.getPhone(claims);
 
-		if (!phoneAuthCodeStore.matches(phone, request.getCode())) {
-			throw new BusinessException(ErrorCode.PHONE_AUTH_FAILED);
+		PhoneAuthCodeStore.VerifyResult result = phoneAuthCodeStore.verify(phone, request.getCode());
+		if (result == PhoneAuthCodeStore.VerifyResult.EXPIRED) {
+			throw new BusinessException(ErrorCode.PHONE_CODE_EXPIRED);
 		}
+		if (result == PhoneAuthCodeStore.VerifyResult.INVALID) {
+			throw new BusinessException(ErrorCode.PHONE_CODE_INVALID);
+		}
+
 		phoneAuthCodeStore.remove(phone);
 
 		String completeToken = jwtTokenProvider.createPhoneAuthCompleteToken(phone);
@@ -331,6 +355,26 @@ public class AuthService {
 
 		userMapper.updatePassword(userNo, passwordEncoder.encode(request.getNewPassword()));
 		tokenMapper.revokeAllByUserNo(userNo);
+	}
+
+	/** 로그인 상태 비밀번호 변경/최초 설정 */
+	@Transactional
+	public void changeMyPassword(UserPrincipal principal, ChangeMyPasswordRequest request) {
+		User user = userMapper.findActiveByUserNo(principal.getUserNo());
+		if (user == null) {
+			throw new BusinessException(ErrorCode.UNAUTHORIZED);
+		}
+
+		boolean hasPassword = StringUtils.hasText(user.getPassword());
+		if (hasPassword) {
+			if (!StringUtils.hasText(request.getCurrentPassword())
+					|| !passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+				throw new BusinessException(ErrorCode.CURRENT_PASSWORD_INVALID);
+			}
+		}
+
+		userMapper.updatePassword(user.getUserNo(), passwordEncoder.encode(request.getNewPassword()));
+		tokenMapper.revokeAllByUserNo(user.getUserNo());
 	}
 
 	private User createSocialUser(

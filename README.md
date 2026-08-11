@@ -10,10 +10,18 @@ Spring Boot DevTools를 정상적으로 사용하려면 두 개의 터미널을 
 
 ### 터미널 2
 
-
 ```bash
 .\gradlew.bat bootRun
 ```
+
+코드/리소스 저장 → 터미널1이 `classes` 재컴파일 → DevTools가 감지해 서버 재시작.
+
+### 재시작이 깨졌을 때
+
+`Could not load [mappers/]` / `web application instance has been stopped already` 가 뜨면
+DevTools 재시작 중 MyBatis 로딩이 꼬인 상태입니다. **터미널2 `bootRun`을 끊고 다시 실행**하면 됩니다.
+
+(mapper 경로는 `classpath*:mappers/**/*.xml` + `META-INF/spring-devtools.properties` 로 완화해 둠)
 
 ## Clean
 

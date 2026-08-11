@@ -1,0 +1,80 @@
+@baseUrl = http://localhost:9377
+@accessToken = {{socialLogin.response.body.$.data.accessToken}}
+@petId = {{createPet.response.body.$.data.petId}}
+
+### 0. 소셜 로그인 (토큰 확보)
+# @name socialLogin
+POST {{baseUrl}}/api/v1/auth/social/login
+Content-Type: application/json
+
+{
+  "provider": "GOOGLE",
+  "providerUserId": "google-pet-test-001",
+  "email": "pet.test@example.com",
+  "name": "펫테스트"
+}
+
+### 1. 반려동물 등록
+# @name createPet
+POST {{baseUrl}}/api/v1/pets
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "초코",
+  "species": "DOG",
+  "breed": "푸들",
+  "gender": "MALE",
+  "isNeutered": true,
+  "birthday": "2020-05-01T00:00:00",
+  "bio": "산책 좋아함"
+}
+
+### 2. 내 반려동물 목록
+GET {{baseUrl}}/api/v1/pets
+Authorization: Bearer {{accessToken}}
+
+### 3. 반려동물 수정
+PATCH {{baseUrl}}/api/v1/pets/{{petId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "초코수정",
+  "bio": "간식도 좋아함",
+  "isNeutered": false
+}
+
+### 4. 프로필 이미지 연결 (fileId는 file.http 업로드 후 교체)
+PATCH {{baseUrl}}/api/v1/pets/{{petId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "profileFileId": 1
+}
+
+### 5. 프로필 이미지 제거
+PATCH {{baseUrl}}/api/v1/pets/{{petId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "removeProfileFile": true
+}
+
+### 6. 태그 승인 (feedPetId는 피드 태그 생성 후)
+POST {{baseUrl}}/api/v1/pets/tags/1/approve
+Authorization: Bearer {{accessToken}}
+
+### 7. 태그 거절
+POST {{baseUrl}}/api/v1/pets/tags/1/reject
+Authorization: Bearer {{accessToken}}
+
+### 8. 반려동물 삭제
+DELETE {{baseUrl}}/api/v1/pets/{{petId}}
+Authorization: Bearer {{accessToken}}
+
+### 9. 삭제 후 목록 (없어야 함)
+GET {{baseUrl}}/api/v1/pets
+Authorization: Bearer {{accessToken}}

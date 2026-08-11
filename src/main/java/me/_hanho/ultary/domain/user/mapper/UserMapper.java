@@ -18,6 +18,10 @@ public interface UserMapper {
 			@Param("nickname") String nickname,
 			@Param("excludeUserNo") Long excludeUserNo);
 
+	int countByEmail(
+			@Param("email") String email,
+			@Param("excludeUserNo") Long excludeUserNo);
+
 	int insert(User user);
 
 	int updateProfile(User user);

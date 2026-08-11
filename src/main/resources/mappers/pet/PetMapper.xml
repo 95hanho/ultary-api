@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="me._hanho.ultary.domain.pet.mapper.PetMapper">
+
+	<sql id="petColumns">
+		pet_id,
+		user_no,
+		name,
+		species,
+		breed,
+		gender,
+		is_neutered,
+		birthday,
+		profile_file_id,
+		bio,
+		created_at,
+		updated_at,
+		is_deleted,
+		deleted_at
+	</sql>
+
+	<select id="findActiveByUserNo" resultType="me._hanho.ultary.domain.pet.model.Pet">
+		SELECT <include refid="petColumns"/>
+		FROM ultary_pet
+		WHERE user_no = #{userNo}
+		  AND is_deleted = 0
+		ORDER BY pet_id ASC
+	</select>
+
+	<select id="findActiveByPetId" resultType="me._hanho.ultary.domain.pet.model.Pet">
+		SELECT <include refid="petColumns"/>
+		FROM ultary_pet
+		WHERE pet_id = #{petId}
+		  AND is_deleted = 0
+	</select>
+
+	<select id="findActiveByPetIdAndUserNo" resultType="me._hanho.ultary.domain.pet.model.Pet">
+		SELECT <include refid="petColumns"/>
+		FROM ultary_pet
+		WHERE pet_id = #{petId}
+		  AND user_no = #{userNo}
+		  AND is_deleted = 0
+	</select>
+
+	<insert id="insert" useGeneratedKeys="true" keyProperty="petId" keyColumn="pet_id">
+		INSERT INTO ultary_pet (
+			user_no,
+			name,
+			species,
+			breed,
+			gender,
+			is_neutered,
+			birthday,
+			profile_file_id,
+			bio
+		) VALUES (
+			#{userNo},
+			#{name},
+			#{species},
+			#{breed},
+			#{gender},
+			#{isNeutered},
+			#{birthday},
+			#{profileFileId},
+			#{bio}
+		)
+	</insert>
+
+	<update id="update">
+		UPDATE ultary_pet
+		SET
+			<if test="name != null">
+				name = #{name},
+			</if>
+			<if test="species != null">
+				species = #{species},
+			</if>
+			<if test="breed != null">
+				breed = NULLIF(#{breed}, ''),
+			</if>
+			<if test="gender != null">
+				gender = #{gender},
+			</if>
+			<if test="isNeutered != null">
+				is_neutered = #{isNeutered},
+			</if>
+			<if test="birthday != null">
+				birthday = #{birthday},
+			</if>
+			<if test="clearProfileFile">
+				profile_file_id = NULL,
+			</if>
+			<if test="!clearProfileFile and profileFileId != null">
+				profile_file_id = #{profileFileId},
+			</if>
+			<if test="bio != null">
+				bio = NULLIF(#{bio}, ''),
+			</if>
+			updated_at = NOW()
+		WHERE pet_id = #{petId}
+		  AND user_no = #{userNo}
+		  AND is_deleted = 0
+	</update>
+
+	<update id="softDelete">
+		UPDATE ultary_pet
+		SET is_deleted = 1,
+			deleted_at = NOW()
+		WHERE pet_id = #{petId}
+		  AND user_no = #{userNo}
+		  AND is_deleted = 0
+	</update>
+
+	<select id="findFeedPetOwnedByUser" resultType="me._hanho.ultary.domain.feed.model.FeedPet">
+		SELECT
+			fp.feed_pet_id,
+			fp.feed_id,
+			fp.pet_id,
+			fp.added_by_user_no,
+			fp.status,
+			fp.approved_by_user_no,
+			fp.approved_at,
+			fp.rejected_at,
+			fp.is_main,
+			fp.created_at,
+			fp.updated_at
+		FROM ultary_feed_pet fp
+		INNER JOIN ultary_pet p
+			ON p.pet_id = fp.pet_id
+		   AND p.is_deleted = 0
+		WHERE fp.feed_pet_id = #{feedPetId}
+		  AND p.user_no = #{userNo}
+	</select>
+
+	<update id="approveFeedPetTag">
+		UPDATE ultary_feed_pet
+		SET status = 'APPROVED',
+			approved_by_user_no = #{approvedByUserNo},
+			approved_at = NOW(),
+			rejected_at = NULL
+		WHERE feed_pet_id = #{feedPetId}
+		  AND status = 'PENDING'
+	</update>
+
+	<update id="rejectFeedPetTag">
+		UPDATE ultary_feed_pet
+		SET status = 'REJECTED',
+			rejected_at = NOW(),
+			approved_by_user_no = NULL,
+			approved_at = NULL
+		WHERE feed_pet_id = #{feedPetId}
+		  AND status = 'PENDING'
+	</update>
+
+</mapper>

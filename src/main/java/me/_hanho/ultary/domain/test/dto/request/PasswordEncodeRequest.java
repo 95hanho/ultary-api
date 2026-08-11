@@ -1,4 +1,4 @@
-package me._hanho.ultary.domain.auth.dto.request;
+package me._hanho.ultary.domain.test.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -9,13 +9,10 @@ import me._hanho.ultary.common.validation.PasswordRules;
 
 @Getter
 @Setter
-public class ChangePasswordRequest {
+public class PasswordEncodeRequest {
 
-	@NotBlank(message = "비밀번호 변경 토큰은 필수입니다.")
-	private String passwordChangeToken;
-
-	@NotBlank(message = "새 비밀번호는 필수입니다.")
+	@NotBlank(message = "비밀번호는 필수입니다.")
 	@Size(max = 100, message = "비밀번호는 100자 이하여야 합니다.")
 	@Pattern(regexp = PasswordRules.REGEX, message = PasswordRules.MESSAGE)
-	private String newPassword;
+	private String password;
 }
