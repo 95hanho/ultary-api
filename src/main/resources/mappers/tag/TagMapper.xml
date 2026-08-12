@@ -28,6 +28,84 @@
 		  AND is_deleted = 0
 	</select>
 
+	<insert id="insert" useGeneratedKeys="true" keyProperty="tagId" keyColumn="tag_id">
+		INSERT INTO ultary_tag (
+			hashtag,
+			title,
+			handle,
+			handle_changed_at,
+			content,
+			link,
+			created_by_user_no
+		) VALUES (
+			#{hashtag},
+			#{title},
+			#{handle},
+			<choose>
+				<when test="handle != null">NOW()</when>
+				<otherwise>NULL</otherwise>
+			</choose>,
+			#{content},
+			#{link},
+			#{createdByUserNo}
+		)
+	</insert>
+
+	<update id="update">
+		UPDATE ultary_tag
+		SET
+			<if test="clearTitle">
+				title = NULL,
+			</if>
+			<if test="!clearTitle and title != null">
+				title = NULLIF(#{title}, ''),
+			</if>
+			<if test="clearContent">
+				content = NULL,
+			</if>
+			<if test="!clearContent and content != null">
+				content = NULLIF(#{content}, ''),
+			</if>
+			<if test="clearLink">
+				link = NULL,
+			</if>
+			<if test="!clearLink and link != null">
+				link = NULLIF(#{link}, ''),
+			</if>
+			updated_at = NOW()
+		WHERE tag_id = #{tagId}
+		  AND created_by_user_no = #{createdByUserNo}
+		  AND is_deleted = 0
+	</update>
+
+	<select id="search" resultType="me._hanho.ultary.domain.tag.model.Tag">
+		SELECT <include refid="tagColumns"/>
+		FROM ultary_tag
+		WHERE is_deleted = 0
+		  AND (
+			hashtag LIKE CONCAT('%', #{q}, '%')
+			OR IFNULL(title, '') LIKE CONCAT('%', #{q}, '%')
+			OR IFNULL(handle, '') LIKE CONCAT('%', #{q}, '%')
+		  )
+		ORDER BY use_count DESC, tag_id DESC
+		LIMIT #{limit}
+	</select>
+
+	<select id="recommend" resultType="me._hanho.ultary.domain.tag.model.Tag">
+		SELECT <include refid="tagColumns"/>
+		FROM ultary_tag
+		WHERE is_deleted = 0
+		<if test="q != null and q != ''">
+			AND (
+				hashtag LIKE CONCAT(#{q}, '%')
+				OR IFNULL(handle, '') LIKE CONCAT(#{q}, '%')
+				OR IFNULL(title, '') LIKE CONCAT('%', #{q}, '%')
+			)
+		</if>
+		ORDER BY use_count DESC, tag_id DESC
+		LIMIT #{limit}
+	</select>
+
 	<select id="countByHandle" resultType="int">
 		SELECT COUNT(1)
 		FROM ultary_tag
@@ -47,5 +125,24 @@
 		  AND created_by_user_no = #{createdByUserNo}
 		  AND is_deleted = 0
 	</update>
+
+	<insert id="insertImage" useGeneratedKeys="true" keyProperty="tagImageId" keyColumn="tag_image_id">
+		INSERT INTO ultary_tag_image (
+			tag_id,
+			file_id,
+			sort_order
+		) VALUES (
+			#{tagId},
+			#{fileId},
+			#{sortOrder}
+		)
+	</insert>
+
+	<select id="findImageFileIdsByTagId" resultType="long">
+		SELECT file_id
+		FROM ultary_tag_image
+		WHERE tag_id = #{tagId}
+		ORDER BY sort_order ASC, tag_image_id ASC
+	</select>
 
 </mapper>

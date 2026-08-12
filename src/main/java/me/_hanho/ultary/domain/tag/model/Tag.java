@@ -26,4 +26,11 @@ public class Tag {
 	private LocalDateTime updatedAt;
 	private Boolean isDeleted;
 	private LocalDateTime deletedAt;
+
+	/** update용: title NULL 클리어 */
+	private Boolean clearTitle;
+	/** update용: content NULL 클리어 */
+	private Boolean clearContent;
+	/** update용: link NULL 클리어 */
+	private Boolean clearLink;
 }

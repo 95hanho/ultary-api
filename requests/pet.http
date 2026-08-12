@@ -36,7 +36,7 @@ Content-Type: application/json
 GET {{baseUrl}}/api/v1/pets
 Authorization: Bearer {{accessToken}}
 
-### 3. 반려동물 수정 — bio 등 (name·mentionId 제외)
+### 3a. 반려동물 수정 — bio 등 (name·mentionId 제외)
 # (= 4·5번과 동일 API) PATCH /api/v1/pets/{petId} · PetController.update
 PATCH {{baseUrl}}/api/v1/pets/{{petId}}
 Authorization: Bearer {{accessToken}}
@@ -61,7 +61,7 @@ Content-Type: application/json
 }
 
 ### 4. 프로필 이미지 연결 (fileId는 file.http 업로드 후 교체)
-# (= 3·5번과 동일 API) PATCH /api/v1/pets/{petId} · body.profileFileId
+# (= 3a·5번과 동일 API) PATCH /api/v1/pets/{petId} · body.profileFileId
 PATCH {{baseUrl}}/api/v1/pets/{{petId}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
@@ -71,7 +71,7 @@ Content-Type: application/json
 }
 
 ### 5. 프로필 이미지 제거
-# (= 3·4번과 동일 API) PATCH /api/v1/pets/{petId} · body.removeProfileFile=true
+# (= 3a·4번과 동일 API) PATCH /api/v1/pets/{petId} · body.removeProfileFile=true
 PATCH {{baseUrl}}/api/v1/pets/{{petId}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json

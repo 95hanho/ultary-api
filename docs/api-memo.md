@@ -133,12 +133,13 @@ BFF: `/api/...` · Spring: `/api/v1/...`
 |------|--------|-----|
 | 태그 등록 | POST | `/api/tags` |
 | 태그 정보 조회 (호버·클릭) | GET | `/api/tags/:tagId` |
+| 태그 수정 (hashtag·handle 제외) | PATCH | `/api/tags/:tagId` |
 | handle 변경 가능 여부 | GET | `/api/tags/:tagId/handle/change-availability` |
 | handle 변경/최초 설정 (설정·변경 후 30일 쿨다운) | PATCH | `/api/tags/:tagId/handle` |
 | 태그 검색 | GET | `/api/tags/search` |
 | 내용 입력 시 태그 추천 | GET | `/api/tags/recommend` |
 
-> `hashtag`는 생성 후 불변. `handle`은 선택·UNIQUE. handle 미설정(`handle_changed_at` NULL)이면 최초 설정은 언제든 가능.
+> `hashtag`는 생성 후 불변. `handle`은 선택·UNIQUE. handle 미설정(`handle_changed_at` NULL)이면 최초 설정은 언제든 가능. 생성 시 handle을 넣으면 그 시점부터 30일 쿨다운.
 
 > 해시태그 / 반려동물 태그명 / 관리자 검수 대상 태그는 구현 시 구분한다.
 

@@ -1,5 +1,7 @@
 package me._hanho.ultary.domain.tag;
 
+import java.util.List;
+
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,8 +19,9 @@ import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.response.ApiResponse;
 import me._hanho.ultary.common.response.ChangeAvailabilityResponse;
 import me._hanho.ultary.domain.tag.dto.request.ChangeTagHandleRequest;
+import me._hanho.ultary.domain.tag.dto.request.CreateTagRequest;
+import me._hanho.ultary.domain.tag.dto.request.UpdateTagRequest;
 import me._hanho.ultary.domain.tag.dto.response.TagResponse;
-import me._hanho.ultary.domain.tag.TagService;
 import me._hanho.ultary.security.principal.UserPrincipal;
 
 /** 경로 원본: springEndpoints.tags / api-memo.md §6 */
@@ -31,28 +34,31 @@ public class TagController {
 
 	private final TagService tagService;
 
-	// 태그 등록
+	/** 태그 등록 (hashtag 필수·이후 불변, handle 선택) */
 	@PostMapping
-	public ApiResponse<Void> create() {
-		log.info("[create]");
-		tagService.create();
-		return ApiResponse.ok();
+	public ApiResponse<TagResponse> create(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@Valid @RequestBody CreateTagRequest request) {
+		log.info("[create] hashtag={} handle={}", request.getHashtag(), request.getHandle());
+		return ApiResponse.ok(tagService.create(principal, request));
 	}
 
-	// 태그 검색
+	/** 태그 검색 (hashtag·title·handle 부분일치). q 없으면 빈 목록 */
 	@GetMapping("/search")
-	public ApiResponse<Void> search(@RequestParam(required = false) String q) {
-		log.info("[search] q={}", q);
-		tagService.search(q);
-		return ApiResponse.ok();
+	public ApiResponse<List<TagResponse>> search(
+			@RequestParam(required = false) String q,
+			@RequestParam(required = false) Integer limit) {
+		log.info("[search] q={} limit={}", q, limit);
+		return ApiResponse.ok(tagService.search(q, limit));
 	}
 
-	// 내용 입력 시 태그 추천
+	/** 내용 입력 시 태그 추천 (접두/부분일치, use_count 우선). q 없으면 인기순 */
 	@GetMapping("/recommend")
-	public ApiResponse<Void> recommend(@RequestParam(required = false) String q) {
-		log.info("[recommend] q={}", q);
-		tagService.recommend(q);
-		return ApiResponse.ok();
+	public ApiResponse<List<TagResponse>> recommend(
+			@RequestParam(required = false) String q,
+			@RequestParam(required = false) Integer limit) {
+		log.info("[recommend] q={} limit={}", q, limit);
+		return ApiResponse.ok(tagService.recommend(q, limit));
 	}
 
 	/** handle 변경 가능 여부 */
@@ -74,11 +80,20 @@ public class TagController {
 		return ApiResponse.ok(tagService.changeHandle(principal, tagId, request));
 	}
 
-	// 태그 정보 조회 (호버·클릭)
+	/** 태그 수정 (hashtag·handle 제외) */
+	@PatchMapping("/{tagId}")
+	public ApiResponse<TagResponse> update(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@PathVariable Long tagId,
+			@Valid @RequestBody UpdateTagRequest request) {
+		log.info("[update] tagId={}", tagId);
+		return ApiResponse.ok(tagService.update(principal, tagId, request));
+	}
+
+	/** 태그 정보 조회 (호버·클릭) */
 	@GetMapping("/{tagId}")
-	public ApiResponse<Void> detail(@PathVariable Long tagId) {
+	public ApiResponse<TagResponse> detail(@PathVariable Long tagId) {
 		log.info("[detail] tagId={}", tagId);
-		tagService.getDetail(tagId);
-		return ApiResponse.ok();
+		return ApiResponse.ok(tagService.getDetail(tagId));
 	}
 }
