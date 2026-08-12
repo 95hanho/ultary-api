@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="me._hanho.ultary.domain.tag.TagMapper">
+
+	<sql id="tagColumns">
+		tag_id,
+		hashtag,
+		title,
+		handle,
+		handle_changed_at,
+		content,
+		link,
+		use_count,
+		created_by_user_no,
+		created_at,
+		updated_at,
+		is_deleted,
+		deleted_at
+	</sql>
+
+	<select id="findActiveByTagId" resultType="me._hanho.ultary.domain.tag.model.Tag">
+		SELECT <include refid="tagColumns"/>
+		FROM ultary_tag
+		WHERE tag_id = #{tagId}
+		  AND is_deleted = 0
+	</select>
+
+	<select id="countByHandle" resultType="int">
+		SELECT COUNT(1)
+		FROM ultary_tag
+		WHERE handle = #{handle}
+		  AND is_deleted = 0
+		<if test="excludeTagId != null">
+			AND tag_id != #{excludeTagId}
+		</if>
+	</select>
+
+	<update id="updateHandle">
+		UPDATE ultary_tag
+		SET handle = #{handle},
+			handle_changed_at = NOW(),
+			updated_at = NOW()
+		WHERE tag_id = #{tagId}
+		  AND created_by_user_no = #{createdByUserNo}
+		  AND is_deleted = 0
+	</update>
+
+</mapper>

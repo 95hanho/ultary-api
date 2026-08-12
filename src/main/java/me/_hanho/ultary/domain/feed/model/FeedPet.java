@@ -5,7 +5,7 @@ import java.time.LocalDateTime;
 import lombok.Getter;
 import lombok.Setter;
 
-/** ultary_feed_pet */
+/** ultary_feed_pet — 승인 없음. COLLABORATOR면 멘션된 피드·삭제 권한 */
 @Getter
 @Setter
 public class FeedPet {
@@ -14,11 +14,8 @@ public class FeedPet {
 	private Long feedId;
 	private Long petId;
 	private Long addedByUserNo;
-	/** APPROVED | PENDING | REJECTED */
-	private String status;
-	private Long approvedByUserNo;
-	private LocalDateTime approvedAt;
-	private LocalDateTime rejectedAt;
+	/** TAGGED | COLLABORATOR */
+	private String role;
 	private Boolean isMain;
 	private LocalDateTime createdAt;
 	private LocalDateTime updatedAt;

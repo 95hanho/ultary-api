@@ -14,6 +14,7 @@ public class User {
 	private String password;
 	private String name;
 	private String nickname;
+	private LocalDateTime nicknameChangedAt;
 	/** 1=소셜 자동 닉네임(변경 유도), 0=사용자 변경 완료 */
 	private Boolean isDefaultNickname;
 	private String email;

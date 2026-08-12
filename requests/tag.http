@@ -1,0 +1,27 @@
+@baseUrl = http://localhost:9377
+@accessToken = {{socialLogin.response.body.$.data.accessToken}}
+
+### 0. 소셜 로그인
+# @name socialLogin
+POST {{baseUrl}}/api/v1/auth/social/login
+Content-Type: application/json
+
+{
+  "provider": "GOOGLE",
+  "providerUserId": "google-tag-test-001",
+  "email": "tag.test@example.com",
+  "name": "태그테스트"
+}
+
+### 1. handle 변경 가능 여부 (tagId는 태그 생성 후)
+GET {{baseUrl}}/api/v1/tags/1/handle/change-availability
+Authorization: Bearer {{accessToken}}
+
+### 2. handle 변경/최초 설정 (설정·변경 후 30일 쿨다운)
+PATCH {{baseUrl}}/api/v1/tags/1/handle
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "handle": "royal_canin_01"
+}

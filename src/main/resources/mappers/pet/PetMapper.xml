@@ -3,11 +3,13 @@
 		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		"https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
-<mapper namespace="me._hanho.ultary.domain.pet.mapper.PetMapper">
+<mapper namespace="me._hanho.ultary.domain.pet.PetMapper">
 
 	<sql id="petColumns">
 		pet_id,
 		user_no,
+		mention_id,
+		mention_id_changed_at,
 		name,
 		species,
 		breed,
@@ -48,6 +50,7 @@
 	<insert id="insert" useGeneratedKeys="true" keyProperty="petId" keyColumn="pet_id">
 		INSERT INTO ultary_pet (
 			user_no,
+			mention_id,
 			name,
 			species,
 			breed,
@@ -58,6 +61,7 @@
 			bio
 		) VALUES (
 			#{userNo},
+			#{mentionId},
 			#{name},
 			#{species},
 			#{breed},
@@ -72,9 +76,6 @@
 	<update id="update">
 		UPDATE ultary_pet
 		SET
-			<if test="name != null">
-				name = #{name},
-			</if>
 			<if test="species != null">
 				species = #{species},
 			</if>
@@ -105,6 +106,16 @@
 		  AND is_deleted = 0
 	</update>
 
+	<update id="updateMentionId">
+		UPDATE ultary_pet
+		SET mention_id = #{mentionId},
+			mention_id_changed_at = NOW(),
+			updated_at = NOW()
+		WHERE pet_id = #{petId}
+		  AND user_no = #{userNo}
+		  AND is_deleted = 0
+	</update>
+
 	<update id="softDelete">
 		UPDATE ultary_pet
 		SET is_deleted = 1,
@@ -114,45 +125,14 @@
 		  AND is_deleted = 0
 	</update>
 
-	<select id="findFeedPetOwnedByUser" resultType="me._hanho.ultary.domain.feed.model.FeedPet">
-		SELECT
-			fp.feed_pet_id,
-			fp.feed_id,
-			fp.pet_id,
-			fp.added_by_user_no,
-			fp.status,
-			fp.approved_by_user_no,
-			fp.approved_at,
-			fp.rejected_at,
-			fp.is_main,
-			fp.created_at,
-			fp.updated_at
-		FROM ultary_feed_pet fp
-		INNER JOIN ultary_pet p
-			ON p.pet_id = fp.pet_id
-		   AND p.is_deleted = 0
-		WHERE fp.feed_pet_id = #{feedPetId}
-		  AND p.user_no = #{userNo}
+	<select id="countByMentionId" resultType="int">
+		SELECT COUNT(1)
+		FROM ultary_pet
+		WHERE mention_id = #{mentionId}
+		  AND is_deleted = 0
+		<if test="excludePetId != null">
+			AND pet_id != #{excludePetId}
+		</if>
 	</select>
-
-	<update id="approveFeedPetTag">
-		UPDATE ultary_feed_pet
-		SET status = 'APPROVED',
-			approved_by_user_no = #{approvedByUserNo},
-			approved_at = NOW(),
-			rejected_at = NULL
-		WHERE feed_pet_id = #{feedPetId}
-		  AND status = 'PENDING'
-	</update>
-
-	<update id="rejectFeedPetTag">
-		UPDATE ultary_feed_pet
-		SET status = 'REJECTED',
-			rejected_at = NOW(),
-			approved_by_user_no = NULL,
-			approved_at = NULL
-		WHERE feed_pet_id = #{feedPetId}
-		  AND status = 'PENDING'
-	</update>
 
 </mapper>

@@ -19,7 +19,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import me._hanho.ultary.common.exception.BusinessException;
 import me._hanho.ultary.common.exception.ErrorCode;
-import me._hanho.ultary.domain.user.mapper.UserMapper;
+import me._hanho.ultary.domain.user.UserMapper;
 import me._hanho.ultary.domain.user.model.User;
 import me._hanho.ultary.security.principal.UserPrincipal;
 

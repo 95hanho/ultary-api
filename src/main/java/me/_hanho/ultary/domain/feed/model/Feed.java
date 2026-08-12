@@ -22,4 +22,6 @@ public class Feed {
 	private LocalDateTime updatedAt;
 	private Boolean isDeleted;
 	private LocalDateTime deletedAt;
+	/** 작성자 또는 COLLABORATOR 펫 보호자 */
+	private Long deletedByUserNo;
 }

@@ -15,7 +15,7 @@ public class Notification {
 	private Long actorUserNo;
 	/**
 	 * FEED_LIKE | FEED_COMMENT | FEED_REPLY | MENTION |
-	 * NEIGHBOR_REQUEST | NEIGHBOR_ACCEPTED | PET_TAG_REQUEST | PET_TAG_APPROVED | SYSTEM
+	 * NEIGHBOR_REQUEST | NEIGHBOR_ACCEPTED | FEED_COLLABORATOR | SYSTEM
 	 */
 	private String type;
 	private Long feedId;

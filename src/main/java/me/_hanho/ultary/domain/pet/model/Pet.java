@@ -12,6 +12,9 @@ public class Pet {
 
 	private Long petId;
 	private Long userNo;
+	/** @멘션 핸들 (영문·숫자·_) */
+	private String mentionId;
+	private LocalDateTime mentionIdChangedAt;
 	private String name;
 	/** DOG | CAT | ETC */
 	private String species;

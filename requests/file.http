@@ -15,6 +15,7 @@ Content-Type: application/json
 }
 
 ### 1. 이미지 업로드 (AUTO)
+# (= 2·3번과 동일 API) POST /api/v1/files · FileController.upload · mediaType=AUTO
 # @name uploadImage
 POST {{baseUrl}}/api/v1/files
 Authorization: Bearer {{accessToken}}
@@ -32,6 +33,7 @@ AUTO
 --WebAppBoundary--
 
 ### 2. 이미지 업로드 (mediaType=IMAGE 명시)
+# (= 1·3번과 동일 API) POST /api/v1/files · mediaType=IMAGE
 POST {{baseUrl}}/api/v1/files
 Authorization: Bearer {{accessToken}}
 Content-Type: multipart/form-data; boundary=WebAppBoundary
@@ -48,6 +50,7 @@ IMAGE
 --WebAppBoundary--
 
 ### 3. 영상 업로드 (mediaType=VIDEO)
+# (= 1·2번과 동일 API) POST /api/v1/files · mediaType=VIDEO
 # @name uploadVideo
 POST {{baseUrl}}/api/v1/files
 Authorization: Bearer {{accessToken}}
@@ -65,6 +68,7 @@ VIDEO
 --WebAppBoundary--
 
 ### 4. 메타 조회
+# (= 7번과 동일 API) GET /api/v1/files/{fileId}
 GET {{baseUrl}}/api/v1/files/{{fileId}}
 Authorization: Bearer {{accessToken}}
 
@@ -77,5 +81,6 @@ DELETE {{baseUrl}}/api/v1/files/{{fileId}}
 Authorization: Bearer {{accessToken}}
 
 ### 7. 삭제 후 메타 조회 (404 예상)
+# (= 4번과 동일 API) GET /api/v1/files/{fileId}
 GET {{baseUrl}}/api/v1/files/{{fileId}}
 Authorization: Bearer {{accessToken}}

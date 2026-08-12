@@ -7,13 +7,10 @@ import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 
-/** null 필드는 변경하지 않음. 프로필 이미지 제거는 removeProfileFile=true */
+/** null 필드는 변경하지 않음. name/mentionId는 전용 정책 — 이 API에서 변경 불가 */
 @Getter
 @Setter
 public class UpdatePetRequest {
-
-	@Size(max = 30, message = "이름은 30자 이하여야 합니다.")
-	private String name;
 
 	@Pattern(regexp = "DOG|CAT|ETC", message = "species는 DOG, CAT, ETC만 가능합니다.")
 	private String species;

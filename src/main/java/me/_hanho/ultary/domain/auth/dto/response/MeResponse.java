@@ -24,4 +24,5 @@ public class MeResponse {
 	private String regionSigungu;
 	private String withdrawalStatus;
 	private LocalDateTime createdAt;
+	private LocalDateTime nicknameChangedAt;
 }

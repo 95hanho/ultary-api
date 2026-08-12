@@ -6,6 +6,7 @@
 @passwordChangeToken = {{passwordToken.response.body.$.data.passwordChangeToken}}
 
 ### 1a. 소셜 로그인 (Google · 신규 가입 포함) — FE/BFF가 OAuth 후 providerUserId 전달
+# (= 1b와 동일 API) POST /api/v1/auth/social/login
 # @name socialLogin
 POST {{baseUrl}}/api/v1/auth/social/login
 Content-Type: application/json
@@ -18,6 +19,7 @@ Content-Type: application/json
 }
 
 ### 1b. 소셜 로그인 (Kakao)
+# (= 1a와 동일 API) POST /api/v1/auth/social/login
 POST {{baseUrl}}/api/v1/auth/social/login
 Content-Type: application/json
 
@@ -31,13 +33,25 @@ Content-Type: application/json
 GET {{baseUrl}}/api/v1/auth/me
 Authorization: Bearer {{accessToken}}
 
-### 3. 닉네임 변경 (is_default_nickname → false)
+### 3a. 닉네임 변경 가능 여부
+GET {{baseUrl}}/api/v1/auth/me/nickname/change-availability
+Authorization: Bearer {{accessToken}}
+
+### 3b. 닉네임 변경 (생성·변경 후 7일 쿨다운)
+PATCH {{baseUrl}}/api/v1/auth/me/nickname
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "nickname": "울타리닉네임"
+}
+
+### 3c. 회원정보 변경 (닉네임 제외)
 PATCH {{baseUrl}}/api/v1/auth/me
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "nickname": "울타리닉네임",
   "bio": "소개글",
   "regionSido": "서울특별시",
   "regionSigungu": "마포구"
@@ -102,6 +116,7 @@ Content-Type: application/json
 }
 
 ### 11a. 로그인 (email + password)
+# (= 11b와 동일 API) POST /api/v1/auth/login
 # @name login
 POST {{baseUrl}}/api/v1/auth/login
 Content-Type: application/json
@@ -112,6 +127,7 @@ Content-Type: application/json
 }
 
 ### 11b. 로그인 (phone + password)
+# (= 11a와 동일 API) POST /api/v1/auth/login
 POST {{baseUrl}}/api/v1/auth/login
 Content-Type: application/json
 

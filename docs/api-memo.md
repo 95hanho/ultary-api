@@ -21,7 +21,9 @@ BFF: `/api/...` · Spring: `/api/v1/...`
 | 로그인 토큰 재발급 | POST | `/api/auth/refresh` | `/api/v1/auth/refresh` |
 | 로그아웃 | POST | `/api/auth/logout` | `/api/v1/auth/logout` |
 | 내 회원정보 조회 | GET | `/api/auth/me` | `/api/v1/auth/me` |
-| 회원정보 변경 (닉네임 등) | PATCH | `/api/auth/me` | `/api/v1/auth/me` |
+| 회원정보 변경 (닉네임 제외) | PATCH | `/api/auth/me` | `/api/v1/auth/me` |
+| 닉네임 변경 가능 여부 | GET | `/api/auth/me/nickname/change-availability` | `/api/v1/auth/me/nickname/change-availability` |
+| 닉네임 변경 (생성·변경 후 7일 쿨다운) | PATCH | `/api/auth/me/nickname` | `/api/v1/auth/me/nickname` |
 | 회원탈퇴 | DELETE | `/api/auth/me` | `/api/v1/auth/me` |
 | 회원가입 | POST | `/api/auth/signup` | `/api/v1/auth/signup` |
 | 휴대폰 인증 | POST | `/api/auth/phone` | `/api/v1/auth/phone` |
@@ -89,10 +91,12 @@ BFF: `/api/...` · Spring: `/api/v1/...`
 |------|--------|-----|
 | 반려동물 목록 | GET | `/api/pets` |
 | 반려동물 등록 | POST | `/api/pets` |
-| 반려동물 수정 | PATCH | `/api/pets/:petId` |
+| 반려동물 수정 (name·mentionId 제외) | PATCH | `/api/pets/:petId` |
+| mention_id 변경 가능 여부 | GET | `/api/pets/:petId/mention-id/change-availability` |
+| mention_id 변경 (생성·변경 후 30일 쿨다운) | PATCH | `/api/pets/:petId/mention-id` |
 | 반려동물 삭제 | DELETE | `/api/pets/:petId` |
-| 피드 반려동물 태그 승인 | POST | `/api/pets/tags/:feedPetId/approve` |
-| 피드 반려동물 태그 거절 | POST | `/api/pets/tags/:feedPetId/reject` |
+
+> `name`은 생성 후 불변. 사진 `@` 멘션·공동작성은 승인/거절 없음. 멘션된 피드는 `GET /api/my-ultary/tagged-feeds`, 삭제는 작성자 또는 COLLABORATOR 펫 보호자.
 
 ---
 
@@ -104,6 +108,8 @@ BFF: `/api/...` · Spring: `/api/v1/...`
 | 게시글 상세 | GET | `/api/feeds/:feedId` |
 | 게시글 수정 | PATCH | `/api/feeds/:feedId` |
 | 게시글 삭제 | DELETE | `/api/feeds/:feedId` |
+
+> 삭제 권한: 작성자 또는 `feed_pet.role=COLLABORATOR` 펫의 보호자. `deleted_by_user_no`에 실제 삭제자 기록.
 | 좋아요 | POST | `/api/feeds/:feedId/like` |
 | 좋아요 취소 | DELETE | `/api/feeds/:feedId/like` |
 | 좋아요한 사람 목록 | GET | `/api/feeds/:feedId/likers` |
@@ -127,8 +133,12 @@ BFF: `/api/...` · Spring: `/api/v1/...`
 |------|--------|-----|
 | 태그 등록 | POST | `/api/tags` |
 | 태그 정보 조회 (호버·클릭) | GET | `/api/tags/:tagId` |
+| handle 변경 가능 여부 | GET | `/api/tags/:tagId/handle/change-availability` |
+| handle 변경/최초 설정 (설정·변경 후 30일 쿨다운) | PATCH | `/api/tags/:tagId/handle` |
 | 태그 검색 | GET | `/api/tags/search` |
 | 내용 입력 시 태그 추천 | GET | `/api/tags/recommend` |
+
+> `hashtag`는 생성 후 불변. `handle`은 선택·UNIQUE. handle 미설정(`handle_changed_at` NULL)이면 최초 설정은 언제든 가능.
 
 > 해시태그 / 반려동물 태그명 / 관리자 검수 대상 태그는 구현 시 구분한다.
 
@@ -189,7 +199,7 @@ BFF: `/api/...` · Spring: `/api/v1/...`
 - 게시글 태그됨
 - 스토리 좋아요
 - 울타리 주민 요청
-- (스키마) 댓글·답글·멘션·주민 수락·펫 태그 요청/승인·시스템 등
+- (스키마) 댓글·답글·멘션·주민 수락·공동작성(FEED_COLLABORATOR)·시스템 등
 
 ---
 

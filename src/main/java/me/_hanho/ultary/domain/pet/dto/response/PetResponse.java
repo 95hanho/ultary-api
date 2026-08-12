@@ -11,6 +11,8 @@ public class PetResponse {
 
 	private Long petId;
 	private Long userNo;
+	private String mentionId;
+	private LocalDateTime mentionIdChangedAt;
 	private String name;
 	private String species;
 	private String breed;

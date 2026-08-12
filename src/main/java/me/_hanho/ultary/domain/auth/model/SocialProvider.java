@@ -8,7 +8,7 @@ public enum SocialProvider {
 	KAKAO;
 
 	public String nicknamePrefix() {
-		return name().toLowerCase() + "_";
+		return name().toLowerCase();
 	}
 
 	public static SocialProvider from(String value) {

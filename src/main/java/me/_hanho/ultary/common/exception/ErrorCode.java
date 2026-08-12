@@ -28,6 +28,7 @@ public enum ErrorCode {
 	TOKEN_EXPIRED("TOKEN_EXPIRED", "토큰이 만료되었습니다.", HttpStatus.UNAUTHORIZED),
 	INVALID_TOKEN("INVALID_TOKEN", "유효하지 않은 토큰입니다.", HttpStatus.UNAUTHORIZED),
 	NICKNAME_DUPLICATED("NICKNAME_DUPLICATED", "이미 사용 중인 닉네임입니다.", HttpStatus.CONFLICT),
+	NICKNAME_CHANGE_COOLDOWN("NICKNAME_CHANGE_COOLDOWN", "닉네임은 변경 후 7일간 다시 변경할 수 없습니다.", HttpStatus.BAD_REQUEST),
 	EMAIL_DUPLICATED("EMAIL_DUPLICATED", "이미 사용 중인 이메일입니다.", HttpStatus.CONFLICT),
 	PHONE_AUTH_FAILED("PHONE_AUTH_FAILED", "휴대폰 인증에 실패했습니다.", HttpStatus.BAD_REQUEST),
 	PHONE_CODE_INVALID("PHONE_CODE_INVALID", "인증번호가 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
@@ -59,8 +60,8 @@ public enum ErrorCode {
 	// 반려동물 (pet)
 	// ==============================
 	PET_NOT_FOUND("PET_NOT_FOUND", "반려동물을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
-	PET_TAG_NOT_FOUND("PET_TAG_NOT_FOUND", "반려동물 태그 요청을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
-	PET_TAG_ALREADY_PROCESSED("PET_TAG_ALREADY_PROCESSED", "이미 처리된 태그 요청입니다.", HttpStatus.CONFLICT),
+	PET_MENTION_DUPLICATED("PET_MENTION_DUPLICATED", "이미 사용 중인 멘션 ID입니다.", HttpStatus.CONFLICT),
+	PET_MENTION_CHANGE_COOLDOWN("PET_MENTION_CHANGE_COOLDOWN", "멘션 ID는 변경 후 30일간 다시 변경할 수 없습니다.", HttpStatus.BAD_REQUEST),
 
 	// ==============================
 	// 피드 (feed)
@@ -75,7 +76,10 @@ public enum ErrorCode {
 	// ==============================
 	// 태그 (tag)
 	// ==============================
-	// TAG_NOT_FOUND("TAG_NOT_FOUND", "태그를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
+	TAG_NOT_FOUND("TAG_NOT_FOUND", "태그를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
+	TAG_HANDLE_DUPLICATED("TAG_HANDLE_DUPLICATED", "이미 사용 중인 태그 핸들입니다.", HttpStatus.CONFLICT),
+	TAG_HANDLE_CHANGE_COOLDOWN("TAG_HANDLE_CHANGE_COOLDOWN", "태그 핸들은 변경 후 30일간 다시 변경할 수 없습니다.", HttpStatus.BAD_REQUEST),
+	TAG_HANDLE_REQUIRED("TAG_HANDLE_REQUIRED", "핸들은 비울 수 없습니다.", HttpStatus.BAD_REQUEST),
 
 	// ==============================
 	// 알림 (notification)
