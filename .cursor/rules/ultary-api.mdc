@@ -1,0 +1,35 @@
+---
+description: ultary-api 프로젝트 컨텍스트 및 세션 시작(XXXX)
+alwaysApply: true
+---
+
+# ultary-api
+
+Spring Boot 3.4 / MyBatis / MariaDB 10.1 / 패키지 `me._hanho.ultary` / API prefix `/api/v1`.
+
+## 세션 시작 — `XXXX`
+
+사용자가 **`XXXX`** 라고 하면(또는 “XXXX로 시작”) 아래를 **먼저** 한 뒤 이어서 작업한다.
+
+1. `git log -5 --oneline` 으로 **최근 커밋 메시지** 확인 → 어디까지 했는지 파악
+2. 필요 시 `docs/api-memo.md`, `database/schema/mariadb_10_1/001_init_schema.sql`, `requests/*.http` 훑기
+3. 한두 문장으로 “이어서 할 일” 요약한 뒤, 사용자 지시(또는 커밋에 적힌 WIP)부터 진행
+
+집/다른 PC에서도 동일: 채팅은 안 따라오므로 **커밋 메시지 + 이 규칙**이 이어가기 신호다.
+
+## 도메인 패턴
+
+- flatten: `domain/{name}/` 에 Controller·Service·Mapper (하위 controller/ 폴더 지양)
+- 완성 참고: auth, file, pet, tag
+- 식별자 변경은 전용 API + `change-availability` (일반 PATCH에 nickname/mentionId/handle/hashtag 넣지 않음)
+- `hashtag`·`pet.name` 생성 후 불변
+- 쿨다운: nickname 7일 / mention_id·handle 30일 (`handle_changed_at` NULL이면 handle 최초 설정 자유)
+
+## HTTP 요청 파일
+
+- `requests/*.http` — `Nb`가 있으면 앞은 반드시 `Na`
+
+## Git
+
+- 커밋·푸시는 사용자가 명시할 때만
+- WIP 커밋 메시지는 Phase 스타일 + 상태 힌트 (예: `Phase 1-8: Tag 도메인 API 구현 (테스트 중)`)
