@@ -159,17 +159,24 @@ BFF: `/api/...` · Spring: `/api/v1/...`
 
 ## 7. 다른 유저 울타리 · 관계
 
-| 기능 | Method | BFF |
-|------|--------|-----|
-| 해당 유저 울타리 정보 (프로필·스토리·주민/이웃수·상태글·이웃여부) | GET | `/api/users/:userNo/ultary` |
-| 주민·이웃 목록 | GET | `/api/users/:userNo/neighbors` |
-| 주민(이웃) 요청 | POST | `/api/users/:userNo/neighbors/request` |
-| 주민 요청 수락 | POST | `/api/neighbors/:neighborId/accept` |
-| 주민 요청 거절 | POST | `/api/neighbors/:neighborId/reject` |
-| 주민 요청 취소 · 이웃 해제 | DELETE | `/api/neighbors/:neighborId` |
-| 유저 차단 | POST | `/api/users/:userNo/block` |
-| 유저 차단 해제 | DELETE | `/api/users/:userNo/block` |
-| 신고 | POST | `/api/reports` |
+| 기능 | Method | BFF | Spring | 상태 |
+|------|--------|-----|--------|------|
+| 해당 유저 울타리 정보 | GET | `/api/users/:userNo/ultary` | `/api/v1/users/:userNo/ultary` | 구현 |
+| 주민·이웃 목록 | GET | `/api/users/:userNo/neighbors` | `/api/v1/users/:userNo/neighbors?type=` | 구현 |
+| 주민(이웃) 요청 | POST | `/api/users/:userNo/neighbors/request` | `/api/v1/users/:userNo/neighbors/request` | 구현 |
+| 주민 요청 수락 | POST | `/api/neighbors/:neighborId/accept` | `/api/v1/neighbors/:neighborId/accept` | 구현 |
+| 주민 요청 거절 | POST | `/api/neighbors/:neighborId/reject` | `/api/v1/neighbors/:neighborId/reject` | 구현 |
+| 주민 요청 취소 · 이웃 해제 | DELETE | `/api/neighbors/:neighborId` | `/api/v1/neighbors/:neighborId` | 구현 |
+| 유저 차단 | POST | `/api/users/:userNo/block` | `/api/v1/users/:userNo/block` | 구현 |
+| 유저 차단 해제 | DELETE | `/api/users/:userNo/block` | `/api/v1/users/:userNo/block` | 구현 |
+| 신고 | POST | `/api/reports` | — | 미구현 |
+
+> `type=RESIDENTS`(주민/팔로잉, 기본) · `type=NEIGHBORS`(이웃/팔로워).  
+> `pair_key` = `minUserNo:maxUserNo` (한 쌍에 관계 행 1개).  
+> `relationStatus`: `NONE` \| `PENDING_SENT` \| `PENDING_RECEIVED` \| `ACCEPTED` \| `REJECTED` \| `BLOCKED`.  
+> 차단 시 기존 neighbor 행 삭제. 상대가 나를 차단하면 울타리/목록 조회 `USER_BLOCKED`.  
+> 피드 `visibility=NEIGHBORS`는 ACCEPTED 쌍만 조회 가능.  
+> HTTP: `requests/neighbor.http` (시드 user 101~105)
 
 ---
 
@@ -243,7 +250,7 @@ BFF: `/api/...` · Spring: `/api/v1/...`
 - 로컬 시드(선택): `database/seed/mariadb_10_1/001_dev_sample_data.sql`  
   - 스키마 직후 실행. **재실행 가능**(CLEANUP 후 INSERT). 운영/최종 배포에서는 실행하지 않음.  
   - `ultary_file`은 업로드 디렉터리에 있는 실제 파일만 (`images/…`, `videos/…`).  
-  - 시드 user 101 = `my-ultary.http` / `story.http` 소셜 로그인과 동일.
+  - 시드 user **101~105** (펫 유저당 1~2). HTTP: `my-ultary` / `story` / `neighbor` → 101 (`google-myultary-test-001`)
 
 ### Spring 구현 진행 (BE)
 
@@ -253,6 +260,7 @@ BFF: `/api/...` · Spring: `/api/v1/...`
 | 1-8 | Tag | 완료 |
 | 1-9 | Feed (+ 성공 메시지) | 완료 |
 | 1-10 | MyUltary + Story (스키마 v7) | HTTP 스모크 테스트함. **최종 E2E는 별도 재검증 예정** |
-| 다음 | Neighbor·Main feeds/search·DM·알림 등 | 미착수 |
+| 1-11 | Neighbor (+ block, NEIGHBORS 피드 가시성) | 스모크 테스트함. 시드 user 5·pet 1~2. HTTP `neighbor.http` |
+| 다음 | Main feeds/search·DM·알림 등 | 미착수 |
 
 파일 업로드 상대경로: `images/{uuid}.ext`, `videos/{uuid}.ext` (`UPLOAD_DIR` / `D:/files/ultary-api`).

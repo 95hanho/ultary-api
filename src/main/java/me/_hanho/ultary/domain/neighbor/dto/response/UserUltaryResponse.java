@@ -1,11 +1,11 @@
-package me._hanho.ultary.domain.myultary.dto.response;
+package me._hanho.ultary.domain.neighbor.dto.response;
 
 import lombok.Builder;
 import lombok.Getter;
 
 @Getter
 @Builder
-public class MyUltaryProfileResponse {
+public class UserUltaryResponse {
 
 	private Long userNo;
 	private String nickname;
@@ -14,12 +14,17 @@ public class MyUltaryProfileResponse {
 	private String bio;
 	private String regionSido;
 	private String regionSigungu;
-	/** 활성 스토리 유무 */
 	private boolean hasStory;
-	/** 내가 팔로우(요청·수락)한 수 = 주민 */
 	private int residentCount;
-	/** 나를 팔로우(요청·수락)한 수 = 이웃 */
 	private int neighborCount;
 	private int petCount;
 	private int feedCount;
+	/**
+	 * 나와의 관계:
+	 * NONE | PENDING_SENT | PENDING_RECEIVED | ACCEPTED | REJECTED | BLOCKED
+	 */
+	private String relationStatus;
+	private Long neighborId;
+	private boolean blockedByMe;
+	private boolean blockedMe;
 }

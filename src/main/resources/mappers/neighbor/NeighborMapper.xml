@@ -5,6 +5,20 @@
 
 <mapper namespace="me._hanho.ultary.domain.neighbor.NeighborMapper">
 
+	<sql id="neighborColumns">
+		neighbor_id,
+		requester_user_no,
+		receiver_user_no,
+		pair_key,
+		status,
+		requested_at,
+		accepted_at,
+		rejected_at,
+		blocked_at,
+		created_at,
+		updated_at
+	</sql>
+
 	<select id="countAcceptedAsRequester" resultType="int">
 		SELECT COUNT(1)
 		FROM ultary_neighbor
@@ -17,6 +31,114 @@
 		FROM ultary_neighbor
 		WHERE receiver_user_no = #{userNo}
 		  AND status = 'ACCEPTED'
+	</select>
+
+	<select id="countAcceptedPair" resultType="int">
+		SELECT COUNT(1)
+		FROM ultary_neighbor
+		WHERE status = 'ACCEPTED'
+		  AND (
+			(requester_user_no = #{userNoA} AND receiver_user_no = #{userNoB})
+			OR (requester_user_no = #{userNoB} AND receiver_user_no = #{userNoA})
+		  )
+	</select>
+
+	<select id="findByNeighborId" resultType="me._hanho.ultary.domain.neighbor.model.Neighbor">
+		SELECT <include refid="neighborColumns"/>
+		FROM ultary_neighbor
+		WHERE neighbor_id = #{neighborId}
+	</select>
+
+	<select id="findByPairKey" resultType="me._hanho.ultary.domain.neighbor.model.Neighbor">
+		SELECT <include refid="neighborColumns"/>
+		FROM ultary_neighbor
+		WHERE pair_key = #{pairKey}
+	</select>
+
+	<insert id="insert" useGeneratedKeys="true" keyProperty="neighborId" keyColumn="neighbor_id">
+		INSERT INTO ultary_neighbor (
+			requester_user_no,
+			receiver_user_no,
+			pair_key,
+			status,
+			requested_at
+		) VALUES (
+			#{requesterUserNo},
+			#{receiverUserNo},
+			#{pairKey},
+			#{status},
+			NOW()
+		)
+	</insert>
+
+	<update id="updateAccept">
+		UPDATE ultary_neighbor
+		SET status = 'ACCEPTED',
+			accepted_at = NOW(),
+			rejected_at = NULL,
+			blocked_at = NULL
+		WHERE neighbor_id = #{neighborId}
+		  AND status = 'PENDING'
+	</update>
+
+	<update id="updateReject">
+		UPDATE ultary_neighbor
+		SET status = 'REJECTED',
+			rejected_at = NOW(),
+			accepted_at = NULL
+		WHERE neighbor_id = #{neighborId}
+		  AND status = 'PENDING'
+	</update>
+
+	<update id="updateReRequest">
+		UPDATE ultary_neighbor
+		SET requester_user_no = #{requesterUserNo},
+			receiver_user_no = #{receiverUserNo},
+			status = 'PENDING',
+			requested_at = NOW(),
+			accepted_at = NULL,
+			rejected_at = NULL,
+			blocked_at = NULL
+		WHERE neighbor_id = #{neighborId}
+	</update>
+
+	<delete id="deleteByNeighborId">
+		DELETE FROM ultary_neighbor
+		WHERE neighbor_id = #{neighborId}
+	</delete>
+
+	<select id="findAcceptedResidents" resultType="me._hanho.ultary.domain.neighbor.model.NeighborListRow">
+		SELECT
+			n.neighbor_id AS neighborId,
+			u.user_no AS userNo,
+			u.nickname AS nickname,
+			u.profile_file_id AS profileFileId,
+			n.status AS status,
+			'RESIDENTS' AS listType
+		FROM ultary_neighbor n
+		INNER JOIN ultary_user u ON u.user_no = n.receiver_user_no
+			AND u.withdrawal_status = 'ACTIVE'
+		WHERE n.requester_user_no = #{userNo}
+		  AND n.status = 'ACCEPTED'
+		ORDER BY n.accepted_at DESC, n.neighbor_id DESC
+		LIMIT #{limit}
+	</select>
+
+	<select id="findAcceptedNeighbors" resultType="me._hanho.ultary.domain.neighbor.model.NeighborListRow">
+		SELECT
+			n.neighbor_id AS neighborId,
+			u.user_no AS userNo,
+			u.nickname AS nickname,
+			u.profile_file_id AS profileFileId,
+			n.status AS status,
+			'NEIGHBORS' AS listType
+		FROM ultary_neighbor n
+		INNER JOIN ultary_user u ON u.user_no = n.requester_user_no
+			AND u.withdrawal_status = 'ACTIVE'
+		WHERE n.receiver_user_no = #{userNo}
+		  AND n.status = 'ACCEPTED'
+		ORDER BY n.accepted_at DESC, n.neighbor_id DESC
+		LIMIT #{limit}
 	</select>
 
 </mapper>

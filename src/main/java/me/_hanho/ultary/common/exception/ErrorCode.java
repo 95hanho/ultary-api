@@ -82,7 +82,15 @@ public enum ErrorCode {
 	// ==============================
 	// 이웃 (neighbor)
 	// ==============================
-	// NEIGHBOR_NOT_FOUND("NEIGHBOR_NOT_FOUND", "이웃 관계를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
+	NEIGHBOR_NOT_FOUND("NEIGHBOR_NOT_FOUND", "이웃 관계를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
+	NEIGHBOR_ALREADY_EXISTS("NEIGHBOR_ALREADY_EXISTS", "이미 주민/이웃 관계가 있습니다.", HttpStatus.CONFLICT),
+	NEIGHBOR_ALREADY_REQUESTED("NEIGHBOR_ALREADY_REQUESTED", "이미 주민 요청을 보냈습니다.", HttpStatus.CONFLICT),
+	NEIGHBOR_PENDING_RECEIVED("NEIGHBOR_PENDING_RECEIVED", "상대가 이미 주민 요청을 보냈습니다. 수락해 주세요.", HttpStatus.CONFLICT),
+	NEIGHBOR_SELF("NEIGHBOR_SELF", "자기 자신에게는 요청할 수 없습니다.", HttpStatus.BAD_REQUEST),
+	NEIGHBOR_BLOCKED("NEIGHBOR_BLOCKED", "차단된 사용자와는 주민 요청을 할 수 없습니다.", HttpStatus.FORBIDDEN),
+	USER_BLOCKED("USER_BLOCKED", "차단된 사용자입니다.", HttpStatus.FORBIDDEN),
+	USER_ALREADY_BLOCKED("USER_ALREADY_BLOCKED", "이미 차단한 사용자입니다.", HttpStatus.CONFLICT),
+	USER_NOT_BLOCKED("USER_NOT_BLOCKED", "차단하지 않은 사용자입니다.", HttpStatus.NOT_FOUND),
 
 	// ==============================
 	// 태그 (tag)

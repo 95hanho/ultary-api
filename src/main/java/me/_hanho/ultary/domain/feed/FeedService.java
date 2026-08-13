@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.exception.BusinessException;
 import me._hanho.ultary.common.exception.ErrorCode;
+import me._hanho.ultary.domain.neighbor.NeighborService;
 import me._hanho.ultary.domain.feed.dto.request.CommentMentionRequest;
 import me._hanho.ultary.domain.feed.dto.request.CreateCommentRequest;
 import me._hanho.ultary.domain.feed.dto.request.CreateFeedRequest;
@@ -62,6 +63,7 @@ public class FeedService {
 	private final PetMapper petMapper;
 	private final TagMapper tagMapper;
 	private final UserMapper userMapper;
+	private final NeighborService neighborService;
 
 	@Transactional
 	public FeedResponse create(UserPrincipal principal, CreateFeedRequest request) {
@@ -445,7 +447,11 @@ public class FeedService {
 		if ("PRIVATE".equals(feed.getVisibility()) && !feed.getUserNo().equals(viewerUserNo)) {
 			throw new BusinessException(ErrorCode.FEED_NOT_FOUND);
 		}
-		// NEIGHBORS: 이웃 도메인 전까지 인증 사용자에게 공개
+		if ("NEIGHBORS".equals(feed.getVisibility())
+				&& !feed.getUserNo().equals(viewerUserNo)
+				&& !neighborService.isAcceptedPair(viewerUserNo, feed.getUserNo())) {
+			throw new BusinessException(ErrorCode.FEED_NOT_FOUND);
+		}
 		return feed;
 	}
 

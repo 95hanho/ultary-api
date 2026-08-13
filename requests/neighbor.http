@@ -1,0 +1,78 @@
+@baseUrl = http://localhost:9377
+@accessToken = {{socialLogin.response.body.$.data.accessToken}}
+@accessToken104 = {{socialLogin104.response.body.$.data.accessToken}}
+@neighborIdPending = 104
+@neighborIdAccepted = 101
+
+### 0. 소셜 로그인 (시드 user 101)
+# @name socialLogin
+POST {{baseUrl}}/api/v1/auth/social/login
+Content-Type: application/json
+
+{
+  "provider": "GOOGLE",
+  "providerUserId": "google-myultary-test-001",
+  "email": "myultary.test@example.com",
+  "name": "마이울타리테스트"
+}
+
+### 1. 다른 유저 울타리 (102) — relationStatus=ACCEPTED
+GET {{baseUrl}}/api/v1/users/102/ultary
+Authorization: Bearer {{accessToken}}
+
+### 2. 다른 유저 울타리 (104) — PENDING_RECEIVED
+GET {{baseUrl}}/api/v1/users/104/ultary
+Authorization: Bearer {{accessToken}}
+
+### 3a. 내(101) 주민 목록 (RESIDENTS = 102, 103)
+GET {{baseUrl}}/api/v1/users/101/neighbors?type=RESIDENTS&limit=30
+Authorization: Bearer {{accessToken}}
+
+### 3b. 내(101) 이웃 목록 (NEIGHBORS = 105)
+GET {{baseUrl}}/api/v1/users/101/neighbors?type=NEIGHBORS&limit=30
+Authorization: Bearer {{accessToken}}
+
+### 4. 주민 요청 (101 → 미연결 유저가 있으면) — 이미 연결된 102는 CONFLICT
+POST {{baseUrl}}/api/v1/users/102/neighbors/request
+Authorization: Bearer {{accessToken}}
+
+### 5a. 대기 요청 수락 (104→101, neighborId=104) — 101이 수신자
+# @name acceptPending
+POST {{baseUrl}}/api/v1/neighbors/{{neighborIdPending}}/accept
+Authorization: Bearer {{accessToken}}
+
+### 5b. (선택) 거절 테스트용 — 시드 재실행 후 reject
+# POST {{baseUrl}}/api/v1/neighbors/{{neighborIdPending}}/reject
+# Authorization: Bearer {{accessToken}}
+
+### 6. 주민 해제 (ACCEPTED 101:102) — 필요 시 시드 재실행
+# DELETE {{baseUrl}}/api/v1/neighbors/{{neighborIdAccepted}}
+# Authorization: Bearer {{accessToken}}
+
+### 7a. 차단
+POST {{baseUrl}}/api/v1/users/102/block
+Authorization: Bearer {{accessToken}}
+
+### 7b. 차단 해제
+DELETE {{baseUrl}}/api/v1/users/102/block
+Authorization: Bearer {{accessToken}}
+
+### 8. 요청자 측 로그인 (104) — 대기 요청 취소 테스트용
+# @name socialLogin104
+POST {{baseUrl}}/api/v1/auth/social/login
+Content-Type: application/json
+
+{
+  "provider": "GOOGLE",
+  "providerUserId": "google-seed-user-104",
+  "email": "seed.u104@example.com",
+  "name": "시드대기중"
+}
+
+### 8b. 요청 취소 (PENDING, 요청자만) — accept 전에 실행할 것
+# DELETE {{baseUrl}}/api/v1/neighbors/{{neighborIdPending}}
+# Authorization: Bearer {{accessToken104}}
+
+### 9. 스토리 owners (101 주민 중 활성 스토리 → 103)
+GET {{baseUrl}}/api/v1/main/stories/owners
+Authorization: Bearer {{accessToken}}

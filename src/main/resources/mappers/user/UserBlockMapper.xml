@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="me._hanho.ultary.domain.user.UserBlockMapper">
+
+	<sql id="blockColumns">
+		user_block_id,
+		blocker_user_no,
+		blocked_user_no,
+		reason,
+		created_at,
+		is_deleted,
+		deleted_at
+	</sql>
+
+	<select id="findActiveByPair" resultType="me._hanho.ultary.domain.user.model.UserBlock">
+		SELECT <include refid="blockColumns"/>
+		FROM ultary_user_block
+		WHERE blocker_user_no = #{blockerUserNo}
+		  AND blocked_user_no = #{blockedUserNo}
+		  AND is_deleted = 0
+		LIMIT 1
+	</select>
+
+	<select id="findActiveEitherWay" resultType="me._hanho.ultary.domain.user.model.UserBlock">
+		SELECT <include refid="blockColumns"/>
+		FROM ultary_user_block
+		WHERE is_deleted = 0
+		  AND (
+			(blocker_user_no = #{userNoA} AND blocked_user_no = #{userNoB})
+			OR (blocker_user_no = #{userNoB} AND blocked_user_no = #{userNoA})
+		  )
+		ORDER BY CASE WHEN blocker_user_no = #{userNoA} THEN 0 ELSE 1 END
+		LIMIT 1
+	</select>
+
+	<select id="findAnyByPair" resultType="me._hanho.ultary.domain.user.model.UserBlock">
+		SELECT <include refid="blockColumns"/>
+		FROM ultary_user_block
+		WHERE blocker_user_no = #{blockerUserNo}
+		  AND blocked_user_no = #{blockedUserNo}
+		LIMIT 1
+	</select>
+
+	<insert id="insert" useGeneratedKeys="true" keyProperty="userBlockId" keyColumn="user_block_id">
+		INSERT INTO ultary_user_block (
+			blocker_user_no,
+			blocked_user_no,
+			reason
+		) VALUES (
+			#{blockerUserNo},
+			#{blockedUserNo},
+			#{reason}
+		)
+	</insert>
+
+	<update id="restore">
+		UPDATE ultary_user_block
+		SET is_deleted = 0,
+			deleted_at = NULL,
+			created_at = NOW()
+		WHERE user_block_id = #{userBlockId}
+	</update>
+
+	<update id="softDelete">
+		UPDATE ultary_user_block
+		SET is_deleted = 1,
+			deleted_at = NOW()
+		WHERE blocker_user_no = #{blockerUserNo}
+		  AND blocked_user_no = #{blockedUserNo}
+		  AND is_deleted = 0
+	</update>
+
+</mapper>
