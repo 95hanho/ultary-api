@@ -34,66 +34,59 @@ public class TagController {
 
 	private final TagService tagService;
 
-	/** 태그 등록 (hashtag 필수·이후 불변, handle 선택) */
 	@PostMapping
 	public ApiResponse<TagResponse> create(
 			@AuthenticationPrincipal UserPrincipal principal,
 			@Valid @RequestBody CreateTagRequest request) {
 		log.info("[create] hashtag={} handle={}", request.getHashtag(), request.getHandle());
-		return ApiResponse.ok(tagService.create(principal, request));
+		return ApiResponse.ok(tagService.create(principal, request), "태그 등록 성공");
 	}
 
-	/** 태그 검색 (hashtag·title·handle 부분일치). q 없으면 빈 목록 */
 	@GetMapping("/search")
 	public ApiResponse<List<TagResponse>> search(
 			@RequestParam(required = false) String q,
 			@RequestParam(required = false) Integer limit) {
 		log.info("[search] q={} limit={}", q, limit);
-		return ApiResponse.ok(tagService.search(q, limit));
+		return ApiResponse.ok(tagService.search(q, limit), "태그 검색 성공");
 	}
 
-	/** 내용 입력 시 태그 추천 (접두/부분일치, use_count 우선). q 없으면 인기순 */
 	@GetMapping("/recommend")
 	public ApiResponse<List<TagResponse>> recommend(
 			@RequestParam(required = false) String q,
 			@RequestParam(required = false) Integer limit) {
 		log.info("[recommend] q={} limit={}", q, limit);
-		return ApiResponse.ok(tagService.recommend(q, limit));
+		return ApiResponse.ok(tagService.recommend(q, limit), "태그 추천 조회 성공");
 	}
 
-	/** handle 변경 가능 여부 */
 	@GetMapping("/{tagId}/handle/change-availability")
 	public ApiResponse<ChangeAvailabilityResponse> handleChangeAvailability(
 			@AuthenticationPrincipal UserPrincipal principal,
 			@PathVariable Long tagId) {
 		log.info("[handleChangeAvailability] tagId={}", tagId);
-		return ApiResponse.ok(tagService.handleChangeAvailability(principal, tagId));
+		return ApiResponse.ok(tagService.handleChangeAvailability(principal, tagId), "핸들 변경 가능 여부 조회 성공");
 	}
 
-	/** handle 변경/최초 설정 (설정·변경 후 30일 쿨다운). hashtag는 변경 불가 */
 	@PatchMapping("/{tagId}/handle")
 	public ApiResponse<TagResponse> changeHandle(
 			@AuthenticationPrincipal UserPrincipal principal,
 			@PathVariable Long tagId,
 			@Valid @RequestBody ChangeTagHandleRequest request) {
 		log.info("[changeHandle] tagId={} handle={}", tagId, request.getHandle());
-		return ApiResponse.ok(tagService.changeHandle(principal, tagId, request));
+		return ApiResponse.ok(tagService.changeHandle(principal, tagId, request), "핸들 변경 성공");
 	}
 
-	/** 태그 수정 (hashtag·handle 제외) */
 	@PatchMapping("/{tagId}")
 	public ApiResponse<TagResponse> update(
 			@AuthenticationPrincipal UserPrincipal principal,
 			@PathVariable Long tagId,
 			@Valid @RequestBody UpdateTagRequest request) {
 		log.info("[update] tagId={}", tagId);
-		return ApiResponse.ok(tagService.update(principal, tagId, request));
+		return ApiResponse.ok(tagService.update(principal, tagId, request), "태그 수정 성공");
 	}
 
-	/** 태그 정보 조회 (호버·클릭) */
 	@GetMapping("/{tagId}")
 	public ApiResponse<TagResponse> detail(@PathVariable Long tagId) {
 		log.info("[detail] tagId={}", tagId);
-		return ApiResponse.ok(tagService.getDetail(tagId));
+		return ApiResponse.ok(tagService.getDetail(tagId), "태그 조회 성공");
 	}
 }

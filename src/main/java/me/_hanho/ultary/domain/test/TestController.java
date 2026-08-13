@@ -36,6 +36,6 @@ public class TestController {
 		String encoded = passwordEncoder.encode(request.getPassword());
 		return ApiResponse.ok(PasswordEncodeResponse.builder()
 				.encodedPassword(encoded)
-				.build());
+				.build(), "비밀번호 인코딩 성공");
 	}
 }

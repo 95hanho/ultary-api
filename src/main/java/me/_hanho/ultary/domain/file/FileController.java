@@ -19,7 +19,6 @@ import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.response.ApiResponse;
 import me._hanho.ultary.domain.file.dto.response.FileResponse;
 import me._hanho.ultary.domain.file.model.FileMeta;
-import me._hanho.ultary.domain.file.FileService;
 import me._hanho.ultary.security.principal.UserPrincipal;
 
 /**
@@ -33,7 +32,6 @@ public class FileController {
 
 	private final FileService fileService;
 
-	/** 파일 업로드 (IMAGE / VIDEO / AUTO) */
 	@PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
 	public ApiResponse<FileResponse> upload(
 			@AuthenticationPrincipal UserPrincipal principal,
@@ -41,19 +39,17 @@ public class FileController {
 			@RequestParam(value = "mediaType", required = false, defaultValue = "AUTO") String mediaType) {
 		log.info("[upload] mediaType={} originalName={} size={}",
 				mediaType, file.getOriginalFilename(), file.getSize());
-		return ApiResponse.ok(fileService.upload(file, mediaType, principal.getUserNo()));
+		return ApiResponse.ok(fileService.upload(file, mediaType, principal.getUserNo()), "파일 업로드 성공");
 	}
 
-	/** 파일 메타 조회 */
 	@GetMapping("/{fileId}")
 	public ApiResponse<FileResponse> meta(
 			@AuthenticationPrincipal UserPrincipal principal,
 			@PathVariable Long fileId) {
 		log.info("[meta] fileId={} userNo={}", fileId, principal.getUserNo());
-		return ApiResponse.ok(fileService.getMeta(fileId));
+		return ApiResponse.ok(fileService.getMeta(fileId), "파일 메타 조회 성공");
 	}
 
-	/** 파일 바이너리 다운로드/미리보기 */
 	@GetMapping("/{fileId}/content")
 	public ResponseEntity<Resource> content(
 			@AuthenticationPrincipal UserPrincipal principal,
@@ -75,13 +71,12 @@ public class FileController {
 				.body(resource);
 	}
 
-	/** 소프트 삭제 (업로더 본인만) */
 	@DeleteMapping("/{fileId}")
 	public ApiResponse<Void> delete(
 			@AuthenticationPrincipal UserPrincipal principal,
 			@PathVariable Long fileId) {
 		log.info("[delete] fileId={} userNo={}", fileId, principal.getUserNo());
 		fileService.softDelete(fileId, principal.getUserNo());
-		return ApiResponse.ok();
+		return ApiResponse.okEmpty("파일 삭제 성공");
 	}
 }

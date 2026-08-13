@@ -145,4 +145,12 @@
 		ORDER BY sort_order ASC, tag_image_id ASC
 	</select>
 
+	<update id="incrementUseCount">
+		UPDATE ultary_tag
+		SET use_count = use_count + 1,
+			updated_at = NOW()
+		WHERE tag_id = #{tagId}
+		  AND is_deleted = 0
+	</update>
+
 </mapper>

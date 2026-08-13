@@ -110,6 +110,8 @@ BFF: `/api/...` · Spring: `/api/v1/...`
 | 게시글 삭제 | DELETE | `/api/feeds/:feedId` |
 
 > 삭제 권한: 작성자 또는 `feed_pet.role=COLLABORATOR` 펫의 보호자. `deleted_by_user_no`에 실제 삭제자 기록.
+> 등록 시 `media` 1개 이상 필수. PATCH는 content·visibility만 (미디어/펫/태그 교체 미지원).
+> `PRIVATE`는 작성자만 조회. `NEIGHBORS`는 이웃 도메인 전까지 인증 사용자에게 공개.
 | 좋아요 | POST | `/api/feeds/:feedId/like` |
 | 좋아요 취소 | DELETE | `/api/feeds/:feedId/like` |
 | 좋아요한 사람 목록 | GET | `/api/feeds/:feedId/likers` |

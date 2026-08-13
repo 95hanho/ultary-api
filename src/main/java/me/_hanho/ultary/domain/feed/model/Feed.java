@@ -24,4 +24,7 @@ public class Feed {
 	private LocalDateTime deletedAt;
 	/** 작성자 또는 COLLABORATOR 펫 보호자 */
 	private Long deletedByUserNo;
+
+	/** update용: content NULL 클리어 */
+	private Boolean clearContent;
 }

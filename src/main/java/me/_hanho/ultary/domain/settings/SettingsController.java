@@ -8,7 +8,6 @@ import org.springframework.web.bind.annotation.RestController;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.response.ApiResponse;
-import me._hanho.ultary.domain.settings.SettingsService;
 
 /** 경로 원본: springEndpoints.settings / api-memo.md §11 */
 @Slf4j
@@ -19,19 +18,17 @@ public class SettingsController {
 
 	private final SettingsService settingsService;
 
-	// 설정 조회 (프로필 공개 범위 등)
 	@GetMapping
 	public ApiResponse<Void> get() {
 		log.info("[get]");
 		settingsService.get();
-		return ApiResponse.ok();
+		return ApiResponse.okEmpty("설정 조회 성공");
 	}
 
-	// 설정 변경
 	@PatchMapping
 	public ApiResponse<Void> update() {
 		log.info("[update]");
 		settingsService.update();
-		return ApiResponse.ok();
+		return ApiResponse.okEmpty("설정 변경 성공");
 	}
 }

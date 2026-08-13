@@ -37,4 +37,6 @@ public interface TagMapper {
 	int insertImage(TagImage image);
 
 	List<Long> findImageFileIdsByTagId(@Param("tagId") Long tagId);
+
+	int incrementUseCount(@Param("tagId") Long tagId);
 }

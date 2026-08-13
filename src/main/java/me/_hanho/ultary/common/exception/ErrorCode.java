@@ -66,7 +66,11 @@ public enum ErrorCode {
 	// ==============================
 	// 피드 (feed)
 	// ==============================
-	// FEED_NOT_FOUND("FEED_NOT_FOUND", "게시글을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
+	FEED_NOT_FOUND("FEED_NOT_FOUND", "게시글을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
+	FEED_MEDIA_REQUIRED("FEED_MEDIA_REQUIRED", "게시글에는 미디어가 1개 이상 필요합니다.", HttpStatus.BAD_REQUEST),
+	FEED_COMMENT_NOT_FOUND("FEED_COMMENT_NOT_FOUND", "댓글을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
+	FEED_REPLY_NOT_FOUND("FEED_REPLY_NOT_FOUND", "답글을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
+	FEED_INVALID_VISIBILITY("FEED_INVALID_VISIBILITY", "공개 범위가 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
 
 	// ==============================
 	// 이웃 (neighbor)

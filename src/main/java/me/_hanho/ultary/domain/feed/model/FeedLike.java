@@ -16,4 +16,7 @@ public class FeedLike {
 	private LocalDateTime createdAt;
 	private Boolean isDeleted;
 	private LocalDateTime deletedAt;
+
+	/** 조인 조회용 (likers) */
+	private String nickname;
 }

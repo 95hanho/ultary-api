@@ -18,4 +18,7 @@ public class FeedReply {
 	private LocalDateTime updatedAt;
 	private Boolean isDeleted;
 	private LocalDateTime deletedAt;
+
+	/** 조인 조회용 */
+	private String authorNickname;
 }

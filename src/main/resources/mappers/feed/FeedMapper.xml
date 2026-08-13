@@ -1,0 +1,549 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="me._hanho.ultary.domain.feed.FeedMapper">
+
+	<sql id="feedColumns">
+		feed_id,
+		user_no,
+		content,
+		visibility,
+		like_count,
+		comment_count,
+		store_count,
+		created_at,
+		updated_at,
+		is_deleted,
+		deleted_at,
+		deleted_by_user_no
+	</sql>
+
+	<insert id="insertFeed" useGeneratedKeys="true" keyProperty="feedId" keyColumn="feed_id">
+		INSERT INTO ultary_feed (
+			user_no,
+			content,
+			visibility
+		) VALUES (
+			#{userNo},
+			#{content},
+			#{visibility}
+		)
+	</insert>
+
+	<select id="findActiveByFeedId" resultType="me._hanho.ultary.domain.feed.model.Feed">
+		SELECT <include refid="feedColumns"/>
+		FROM ultary_feed
+		WHERE feed_id = #{feedId}
+		  AND is_deleted = 0
+	</select>
+
+	<update id="updateFeed">
+		UPDATE ultary_feed
+		SET
+			<if test="clearContent">
+				content = NULL,
+			</if>
+			<if test="!clearContent and content != null">
+				content = NULLIF(#{content}, ''),
+			</if>
+			<if test="visibility != null">
+				visibility = #{visibility},
+			</if>
+			updated_at = NOW()
+		WHERE feed_id = #{feedId}
+		  AND user_no = #{userNo}
+		  AND is_deleted = 0
+	</update>
+
+	<update id="softDeleteFeed">
+		UPDATE ultary_feed
+		SET is_deleted = 1,
+			deleted_at = NOW(),
+			deleted_by_user_no = #{deletedByUserNo},
+			updated_at = NOW()
+		WHERE feed_id = #{feedId}
+		  AND is_deleted = 0
+	</update>
+
+	<select id="countCollaboratorOwnedByUser" resultType="int">
+		SELECT COUNT(1)
+		FROM ultary_feed_pet fp
+		INNER JOIN ultary_pet p ON p.pet_id = fp.pet_id AND p.is_deleted = 0
+		WHERE fp.feed_id = #{feedId}
+		  AND fp.role = 'COLLABORATOR'
+		  AND p.user_no = #{userNo}
+	</select>
+
+	<insert id="insertMedia" useGeneratedKeys="true" keyProperty="feedMediaId" keyColumn="feed_media_id">
+		INSERT INTO ultary_feed_media (
+			feed_id,
+			file_id,
+			media_type,
+			thumbnail_file_id,
+			duration_sec,
+			sort_order
+		) VALUES (
+			#{feedId},
+			#{fileId},
+			#{mediaType},
+			#{thumbnailFileId},
+			#{durationSec},
+			#{sortOrder}
+		)
+	</insert>
+
+	<select id="findMediaByFeedId" resultType="me._hanho.ultary.domain.feed.model.FeedMedia">
+		SELECT
+			feed_media_id,
+			feed_id,
+			file_id,
+			media_type,
+			thumbnail_file_id,
+			duration_sec,
+			sort_order,
+			created_at,
+			updated_at
+		FROM ultary_feed_media
+		WHERE feed_id = #{feedId}
+		ORDER BY sort_order ASC, feed_media_id ASC
+	</select>
+
+	<insert id="insertMediaMention" useGeneratedKeys="true" keyProperty="feedMediaMentionId" keyColumn="feed_media_mention_id">
+		INSERT INTO ultary_feed_media_mention (
+			feed_media_id,
+			pet_id,
+			pos_x,
+			pos_y,
+			added_by_user_no
+		) VALUES (
+			#{feedMediaId},
+			#{petId},
+			#{posX},
+			#{posY},
+			#{addedByUserNo}
+		)
+	</insert>
+
+	<select id="findMentionsByFeedMediaId" resultType="me._hanho.ultary.domain.feed.model.FeedMediaMention">
+		SELECT
+			feed_media_mention_id,
+			feed_media_id,
+			pet_id,
+			pos_x,
+			pos_y,
+			added_by_user_no,
+			created_at
+		FROM ultary_feed_media_mention
+		WHERE feed_media_id = #{feedMediaId}
+		ORDER BY feed_media_mention_id ASC
+	</select>
+
+	<insert id="insertFeedPet" useGeneratedKeys="true" keyProperty="feedPetId" keyColumn="feed_pet_id">
+		INSERT INTO ultary_feed_pet (
+			feed_id,
+			pet_id,
+			added_by_user_no,
+			role,
+			is_main
+		) VALUES (
+			#{feedId},
+			#{petId},
+			#{addedByUserNo},
+			#{role},
+			#{isMain}
+		)
+	</insert>
+
+	<select id="findPetsByFeedId" resultType="me._hanho.ultary.domain.feed.model.FeedPet">
+		SELECT
+			feed_pet_id,
+			feed_id,
+			pet_id,
+			added_by_user_no,
+			role,
+			is_main,
+			created_at,
+			updated_at
+		FROM ultary_feed_pet
+		WHERE feed_id = #{feedId}
+		ORDER BY is_main DESC, feed_pet_id ASC
+	</select>
+
+	<insert id="insertFeedTag">
+		INSERT INTO ultary_feed_tag (
+			feed_id,
+			tag_id
+		) VALUES (
+			#{feedId},
+			#{tagId}
+		)
+	</insert>
+
+	<select id="findTagIdsByFeedId" resultType="long">
+		SELECT tag_id
+		FROM ultary_feed_tag
+		WHERE feed_id = #{feedId}
+		  AND is_deleted = 0
+		ORDER BY feed_tag_id ASC
+	</select>
+
+	<select id="findLike" resultType="me._hanho.ultary.domain.feed.model.FeedLike">
+		SELECT
+			feed_like_id,
+			feed_id,
+			user_no,
+			created_at,
+			is_deleted,
+			deleted_at
+		FROM ultary_feed_like
+		WHERE feed_id = #{feedId}
+		  AND user_no = #{userNo}
+	</select>
+
+	<insert id="insertLike">
+		INSERT INTO ultary_feed_like (feed_id, user_no, is_deleted, deleted_at)
+		VALUES (#{feedId}, #{userNo}, 0, NULL)
+	</insert>
+
+	<update id="restoreLike">
+		UPDATE ultary_feed_like
+		SET is_deleted = 0,
+			deleted_at = NULL,
+			created_at = NOW()
+		WHERE feed_id = #{feedId}
+		  AND user_no = #{userNo}
+		  AND is_deleted = 1
+	</update>
+
+	<update id="softDeleteLike">
+		UPDATE ultary_feed_like
+		SET is_deleted = 1,
+			deleted_at = NOW()
+		WHERE feed_id = #{feedId}
+		  AND user_no = #{userNo}
+		  AND is_deleted = 0
+	</update>
+
+	<update id="adjustLikeCount">
+		UPDATE ultary_feed
+		SET like_count = CASE
+				WHEN #{delta} &lt; 0 AND like_count &lt;= 0 THEN 0
+				ELSE like_count + #{delta}
+			END,
+			updated_at = NOW()
+		WHERE feed_id = #{feedId}
+		  AND is_deleted = 0
+	</update>
+
+	<select id="findActiveLikers" resultType="me._hanho.ultary.domain.feed.model.FeedLike">
+		SELECT
+			l.feed_like_id,
+			l.feed_id,
+			l.user_no,
+			l.created_at,
+			l.is_deleted,
+			l.deleted_at,
+			u.nickname AS nickname
+		FROM ultary_feed_like l
+		INNER JOIN ultary_user u ON u.user_no = l.user_no
+		WHERE l.feed_id = #{feedId}
+		  AND l.is_deleted = 0
+		ORDER BY l.created_at DESC
+		LIMIT #{limit}
+	</select>
+
+	<select id="findStore" resultType="me._hanho.ultary.domain.feed.model.FeedStore">
+		SELECT
+			feed_store_id,
+			feed_id,
+			user_no,
+			created_at,
+			is_deleted,
+			deleted_at
+		FROM ultary_feed_store
+		WHERE feed_id = #{feedId}
+		  AND user_no = #{userNo}
+	</select>
+
+	<insert id="insertStore">
+		INSERT INTO ultary_feed_store (feed_id, user_no, is_deleted, deleted_at)
+		VALUES (#{feedId}, #{userNo}, 0, NULL)
+	</insert>
+
+	<update id="restoreStore">
+		UPDATE ultary_feed_store
+		SET is_deleted = 0,
+			deleted_at = NULL,
+			created_at = NOW()
+		WHERE feed_id = #{feedId}
+		  AND user_no = #{userNo}
+		  AND is_deleted = 1
+	</update>
+
+	<update id="softDeleteStore">
+		UPDATE ultary_feed_store
+		SET is_deleted = 1,
+			deleted_at = NOW()
+		WHERE feed_id = #{feedId}
+		  AND user_no = #{userNo}
+		  AND is_deleted = 0
+	</update>
+
+	<update id="adjustStoreCount">
+		UPDATE ultary_feed
+		SET store_count = CASE
+				WHEN #{delta} &lt; 0 AND store_count &lt;= 0 THEN 0
+				ELSE store_count + #{delta}
+			END,
+			updated_at = NOW()
+		WHERE feed_id = #{feedId}
+		  AND is_deleted = 0
+	</update>
+
+	<insert id="insertComment" useGeneratedKeys="true" keyProperty="feedCommentId" keyColumn="feed_comment_id">
+		INSERT INTO ultary_feed_comment (
+			feed_id,
+			user_no,
+			content
+		) VALUES (
+			#{feedId},
+			#{userNo},
+			#{content}
+		)
+	</insert>
+
+	<select id="findActiveComment" resultType="me._hanho.ultary.domain.feed.model.FeedComment">
+		SELECT
+			feed_comment_id,
+			feed_id,
+			user_no,
+			content,
+			created_at,
+			updated_at,
+			is_deleted,
+			deleted_at
+		FROM ultary_feed_comment
+		WHERE feed_comment_id = #{commentId}
+		  AND feed_id = #{feedId}
+		  AND is_deleted = 0
+	</select>
+
+	<select id="findActiveComments" resultType="me._hanho.ultary.domain.feed.model.FeedComment">
+		SELECT
+			c.feed_comment_id,
+			c.feed_id,
+			c.user_no,
+			c.content,
+			c.created_at,
+			c.updated_at,
+			c.is_deleted,
+			c.deleted_at,
+			u.nickname AS authorNickname
+		FROM ultary_feed_comment c
+		INNER JOIN ultary_user u ON u.user_no = c.user_no
+		WHERE c.feed_id = #{feedId}
+		  AND c.is_deleted = 0
+		ORDER BY c.created_at ASC
+		LIMIT #{limit}
+	</select>
+
+	<select id="countActiveCommentsAndReplies" resultType="int">
+		SELECT
+			(
+				SELECT COUNT(1)
+				FROM ultary_feed_comment
+				WHERE feed_id = #{feedId}
+				  AND is_deleted = 0
+			)
+			+
+			(
+				SELECT COUNT(1)
+				FROM ultary_feed_reply r
+				INNER JOIN ultary_feed_comment c ON c.feed_comment_id = r.feed_comment_id
+				WHERE c.feed_id = #{feedId}
+				  AND c.is_deleted = 0
+				  AND r.is_deleted = 0
+			)
+	</select>
+
+	<select id="countActiveRepliesByCommentId" resultType="int">
+		SELECT COUNT(1)
+		FROM ultary_feed_reply
+		WHERE feed_comment_id = #{commentId}
+		  AND is_deleted = 0
+	</select>
+
+	<update id="updateCommentContent">
+		UPDATE ultary_feed_comment
+		SET content = #{content},
+			updated_at = NOW()
+		WHERE feed_comment_id = #{commentId}
+		  AND user_no = #{userNo}
+		  AND is_deleted = 0
+	</update>
+
+	<update id="softDeleteComment">
+		UPDATE ultary_feed_comment
+		SET is_deleted = 1,
+			deleted_at = NOW(),
+			updated_at = NOW()
+		WHERE feed_comment_id = #{commentId}
+		  AND user_no = #{userNo}
+		  AND is_deleted = 0
+	</update>
+
+	<update id="softDeleteCommentByFeedAuthor">
+		UPDATE ultary_feed_comment
+		SET is_deleted = 1,
+			deleted_at = NOW(),
+			updated_at = NOW()
+		WHERE feed_comment_id = #{commentId}
+		  AND feed_id = #{feedId}
+		  AND is_deleted = 0
+		  AND EXISTS (
+			SELECT 1
+			FROM ultary_feed f
+			WHERE f.feed_id = #{feedId}
+			  AND f.user_no = #{feedAuthorUserNo}
+			  AND f.is_deleted = 0
+		  )
+	</update>
+
+	<update id="adjustCommentCount">
+		UPDATE ultary_feed
+		SET comment_count = CASE
+				WHEN #{delta} &lt; 0 AND comment_count &lt;= 0 THEN 0
+				ELSE comment_count + #{delta}
+			END,
+			updated_at = NOW()
+		WHERE feed_id = #{feedId}
+		  AND is_deleted = 0
+	</update>
+
+	<insert id="insertReply" useGeneratedKeys="true" keyProperty="feedReplyId" keyColumn="feed_reply_id">
+		INSERT INTO ultary_feed_reply (
+			feed_comment_id,
+			user_no,
+			content
+		) VALUES (
+			#{feedCommentId},
+			#{userNo},
+			#{content}
+		)
+	</insert>
+
+	<select id="findActiveReply" resultType="me._hanho.ultary.domain.feed.model.FeedReply">
+		SELECT
+			feed_reply_id,
+			feed_comment_id,
+			user_no,
+			content,
+			created_at,
+			updated_at,
+			is_deleted,
+			deleted_at
+		FROM ultary_feed_reply
+		WHERE feed_reply_id = #{replyId}
+		  AND feed_comment_id = #{commentId}
+		  AND is_deleted = 0
+	</select>
+
+	<select id="findActiveReplies" resultType="me._hanho.ultary.domain.feed.model.FeedReply">
+		SELECT
+			r.feed_reply_id,
+			r.feed_comment_id,
+			r.user_no,
+			r.content,
+			r.created_at,
+			r.updated_at,
+			r.is_deleted,
+			r.deleted_at,
+			u.nickname AS authorNickname
+		FROM ultary_feed_reply r
+		INNER JOIN ultary_user u ON u.user_no = r.user_no
+		WHERE r.feed_comment_id = #{commentId}
+		  AND r.is_deleted = 0
+		ORDER BY r.created_at ASC
+		LIMIT #{limit}
+	</select>
+
+	<update id="updateReplyContent">
+		UPDATE ultary_feed_reply
+		SET content = #{content},
+			updated_at = NOW()
+		WHERE feed_reply_id = #{replyId}
+		  AND user_no = #{userNo}
+		  AND is_deleted = 0
+	</update>
+
+	<update id="softDeleteReply">
+		UPDATE ultary_feed_reply
+		SET is_deleted = 1,
+			deleted_at = NOW(),
+			updated_at = NOW()
+		WHERE feed_reply_id = #{replyId}
+		  AND user_no = #{userNo}
+		  AND is_deleted = 0
+	</update>
+
+	<update id="softDeleteReplyByFeedAuthor">
+		UPDATE ultary_feed_reply
+		SET is_deleted = 1,
+			deleted_at = NOW(),
+			updated_at = NOW()
+		WHERE feed_reply_id = #{replyId}
+		  AND feed_comment_id = #{commentId}
+		  AND is_deleted = 0
+		  AND EXISTS (
+			SELECT 1
+			FROM ultary_feed_comment c
+			INNER JOIN ultary_feed f ON f.feed_id = c.feed_id
+			WHERE c.feed_comment_id = #{commentId}
+			  AND f.user_no = #{feedAuthorUserNo}
+			  AND f.is_deleted = 0
+		  )
+	</update>
+
+	<insert id="insertCommentMention" useGeneratedKeys="true" keyProperty="feedCommentMentionId" keyColumn="feed_comment_mention_id">
+		INSERT INTO ultary_feed_comment_mention (
+			feed_comment_id,
+			feed_reply_id,
+			mentioned_user_no,
+			mentioned_pet_id
+		) VALUES (
+			#{feedCommentId},
+			#{feedReplyId},
+			#{mentionedUserNo},
+			#{mentionedPetId}
+		)
+	</insert>
+
+	<select id="findMentionsByCommentId" resultType="me._hanho.ultary.domain.feed.model.FeedCommentMention">
+		SELECT
+			feed_comment_mention_id,
+			feed_comment_id,
+			feed_reply_id,
+			mentioned_user_no,
+			mentioned_pet_id,
+			created_at
+		FROM ultary_feed_comment_mention
+		WHERE feed_comment_id = #{commentId}
+		ORDER BY feed_comment_mention_id ASC
+	</select>
+
+	<select id="findMentionsByReplyId" resultType="me._hanho.ultary.domain.feed.model.FeedCommentMention">
+		SELECT
+			feed_comment_mention_id,
+			feed_comment_id,
+			feed_reply_id,
+			mentioned_user_no,
+			mentioned_pet_id,
+			created_at
+		FROM ultary_feed_comment_mention
+		WHERE feed_reply_id = #{replyId}
+		ORDER BY feed_comment_mention_id ASC
+	</select>
+
+</mapper>

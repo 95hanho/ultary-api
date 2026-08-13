@@ -21,13 +21,13 @@ public class HealthController {
 	@GetMapping("/health")
 	public ApiResponse<String> health() {
 		log.info("[health]");
-		return ApiResponse.ok("OK");
+		return ApiResponse.ok("OK", "서버 생존 확인 성공");
 	}
 
 	// DB 연결 확인
 	@GetMapping("/health/db")
 	public ApiResponse<String> healthDb() {
 		log.info("[healthDb]");
-		return ApiResponse.ok(healthService.checkDbConnection());
+		return ApiResponse.ok(healthService.checkDbConnection(), "DB 연결 확인 성공");
 	}
 }

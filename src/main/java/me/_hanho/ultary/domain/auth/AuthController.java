@@ -14,10 +14,14 @@ import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.response.ApiResponse;
 import me._hanho.ultary.common.response.ChangeAvailabilityResponse;
+import me._hanho.ultary.common.validation.NicknameRules;
 import me._hanho.ultary.domain.auth.dto.request.ChangeMyPasswordRequest;
 import me._hanho.ultary.domain.auth.dto.request.ChangeNicknameRequest;
 import me._hanho.ultary.domain.auth.dto.request.ChangePasswordRequest;
@@ -29,10 +33,6 @@ import me._hanho.ultary.domain.auth.dto.request.RefreshTokenRequest;
 import me._hanho.ultary.domain.auth.dto.request.SignupRequest;
 import me._hanho.ultary.domain.auth.dto.request.SocialLoginRequest;
 import me._hanho.ultary.domain.auth.dto.request.UpdateMeRequest;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.Size;
-import me._hanho.ultary.common.validation.NicknameRules;
 import me._hanho.ultary.domain.auth.dto.response.AvailabilityCheckResponse;
 import me._hanho.ultary.domain.auth.dto.response.MeResponse;
 import me._hanho.ultary.domain.auth.dto.response.PasswordTokenResponse;
@@ -40,7 +40,6 @@ import me._hanho.ultary.domain.auth.dto.response.PhoneAuthResponse;
 import me._hanho.ultary.domain.auth.dto.response.PhoneVerifyResponse;
 import me._hanho.ultary.domain.auth.dto.response.SocialLoginResponse;
 import me._hanho.ultary.domain.auth.dto.response.TokenResponse;
-import me._hanho.ultary.domain.auth.AuthService;
 import me._hanho.ultary.security.principal.UserPrincipal;
 
 /**
@@ -56,36 +55,32 @@ public class AuthController {
 
 	private final AuthService authService;
 
-	// 소셜 로그인 (가입 포함) — FE/BFF가 providerUserId 전달
 	@PostMapping("/social/login")
 	public ApiResponse<SocialLoginResponse> socialLogin(
 			@Valid @RequestBody SocialLoginRequest request,
 			HttpServletRequest httpRequest) {
 		log.info("[socialLogin] provider={}", request.getProvider());
-		return ApiResponse.ok(authService.socialLogin(request, httpRequest));
+		return ApiResponse.ok(authService.socialLogin(request, httpRequest), "소셜 로그인 성공");
 	}
 
-	// 소셜 계정 연동
 	@PostMapping("/social/link")
 	public ApiResponse<Void> socialLink(
 			@AuthenticationPrincipal UserPrincipal principal,
 			@Valid @RequestBody SocialLoginRequest request) {
 		log.info("[socialLink] provider={}", request.getProvider());
 		authService.linkSocial(principal, request);
-		return ApiResponse.ok();
+		return ApiResponse.okEmpty("소셜 계정 연동 성공");
 	}
 
-	// 소셜 계정 연동 해제
 	@DeleteMapping("/social/unlink")
 	public ApiResponse<Void> socialUnlink(
 			@AuthenticationPrincipal UserPrincipal principal,
 			@RequestParam String provider) {
 		log.info("[socialUnlink] provider={}", provider);
 		authService.unlinkSocial(principal, provider);
-		return ApiResponse.ok();
+		return ApiResponse.okEmpty("소셜 계정 연동 해제 성공");
 	}
 
-	// 로그인 (email 또는 phone + password)
 	@PostMapping("/login")
 	public ApiResponse<TokenResponse> login(
 			@Valid @RequestBody LoginRequest request,
@@ -93,76 +88,67 @@ public class AuthController {
 		log.info("[login] emailPresent={} phonePresent={}",
 				request.getEmail() != null && !request.getEmail().isBlank(),
 				request.getPhone() != null && !request.getPhone().isBlank());
-		return ApiResponse.ok(authService.login(request, httpRequest));
+		return ApiResponse.ok(authService.login(request, httpRequest), "로그인 성공");
 	}
 
-	// 로그인 토큰 재발급
 	@PostMapping("/refresh")
 	public ApiResponse<TokenResponse> refresh(
 			@Valid @RequestBody RefreshTokenRequest request,
 			HttpServletRequest httpRequest) {
 		log.info("[refresh]");
-		return ApiResponse.ok(authService.refresh(request, httpRequest));
+		return ApiResponse.ok(authService.refresh(request, httpRequest), "토큰 재발급 성공");
 	}
 
-	// 로그아웃
 	@PostMapping("/logout")
 	public ApiResponse<Void> logout(@AuthenticationPrincipal UserPrincipal principal) {
 		log.info("[logout]");
 		authService.logout(principal);
-		return ApiResponse.ok();
+		return ApiResponse.okEmpty("로그아웃 성공");
 	}
 
-	// 내 회원정보 조회
 	@GetMapping("/me")
 	public ApiResponse<MeResponse> me(@AuthenticationPrincipal UserPrincipal principal) {
 		log.info("[me]");
-		return ApiResponse.ok(authService.me(principal));
+		return ApiResponse.ok(authService.me(principal), "회원정보 조회 성공");
 	}
 
-	// 회원정보 변경 (닉네임 제외 — PATCH /me/nickname)
 	@PatchMapping("/me")
 	public ApiResponse<MeResponse> updateMe(
 			@AuthenticationPrincipal UserPrincipal principal,
 			@Valid @RequestBody UpdateMeRequest request) {
 		log.info("[updateMe]");
-		return ApiResponse.ok(authService.updateMe(principal, request));
+		return ApiResponse.ok(authService.updateMe(principal, request), "회원정보 수정 성공");
 	}
 
-	// 닉네임 변경 가능 여부 (다음 변경 가능 시각)
 	@GetMapping("/me/nickname/change-availability")
 	public ApiResponse<ChangeAvailabilityResponse> nicknameChangeAvailability(
 			@AuthenticationPrincipal UserPrincipal principal) {
 		log.info("[nicknameChangeAvailability]");
-		return ApiResponse.ok(authService.nicknameChangeAvailability(principal));
+		return ApiResponse.ok(authService.nicknameChangeAvailability(principal), "닉네임 변경 가능 여부 조회 성공");
 	}
 
-	// 닉네임 변경 (생성·변경 후 7일 쿨다운)
 	@PatchMapping("/me/nickname")
 	public ApiResponse<MeResponse> changeNickname(
 			@AuthenticationPrincipal UserPrincipal principal,
 			@Valid @RequestBody ChangeNicknameRequest request) {
 		log.info("[changeNickname] nickname={}", request.getNickname());
-		return ApiResponse.ok(authService.changeNickname(principal, request));
+		return ApiResponse.ok(authService.changeNickname(principal, request), "닉네임 변경 성공");
 	}
 
-	// 회원탈퇴
 	@DeleteMapping("/me")
 	public ApiResponse<Void> withdraw(@AuthenticationPrincipal UserPrincipal principal) {
 		log.info("[withdraw]");
 		authService.withdraw(principal);
-		return ApiResponse.ok();
+		return ApiResponse.okEmpty("회원탈퇴 성공");
 	}
 
-	// 회원가입 (휴대폰 인증 + 비밀번호)
 	@PostMapping("/signup")
 	public ApiResponse<Void> signup(@Valid @RequestBody SignupRequest request) {
 		log.info("[signup]");
 		authService.signup(request);
-		return ApiResponse.ok();
+		return ApiResponse.okEmpty("회원가입 성공");
 	}
 
-	// 닉네임 중복확인
 	@GetMapping("/nickname/check")
 	public ApiResponse<AvailabilityCheckResponse> checkNickname(
 			@RequestParam
@@ -171,45 +157,40 @@ public class AuthController {
 			@Pattern(regexp = NicknameRules.REGEX, message = NicknameRules.MESSAGE)
 			String nickname) {
 		log.info("[checkNickname] nickname={}", nickname);
-		return ApiResponse.ok(authService.checkNickname(nickname));
+		return ApiResponse.ok(authService.checkNickname(nickname), "닉네임 중복확인 성공");
 	}
 
-	// 휴대폰 인증
 	@PostMapping("/phone")
 	public ApiResponse<PhoneAuthResponse> phone(@Valid @RequestBody PhoneAuthRequest request) {
 		log.info("[phone] phone={}", request.getPhone());
-		return ApiResponse.ok(authService.requestPhoneAuth(request));
+		return ApiResponse.ok(authService.requestPhoneAuth(request), "휴대폰 인증 요청 성공");
 	}
 
-	// 휴대폰 인증 확인
 	@PostMapping("/phone/verify")
 	public ApiResponse<PhoneVerifyResponse> phoneVerify(@Valid @RequestBody PhoneVerifyRequest request) {
 		log.info("[phoneVerify]");
-		return ApiResponse.ok(authService.verifyPhoneAuth(request));
+		return ApiResponse.ok(authService.verifyPhoneAuth(request), "휴대폰 인증 확인 성공");
 	}
 
-	// 비밀번호 변경/설정 토큰 생성 (비로그인 · 휴대폰 인증 후)
 	@PostMapping("/password/token")
 	public ApiResponse<PasswordTokenResponse> passwordToken(@Valid @RequestBody PasswordTokenRequest request) {
 		log.info("[passwordToken] phone={}", request.getPhone());
-		return ApiResponse.ok(authService.createPasswordToken(request));
+		return ApiResponse.ok(authService.createPasswordToken(request), "비밀번호 변경 토큰 발급 성공");
 	}
 
-	// 비밀번호 변경/설정 (비로그인 · passwordChangeToken)
 	@PutMapping("/password")
 	public ApiResponse<Void> password(@Valid @RequestBody ChangePasswordRequest request) {
 		log.info("[password]");
 		authService.changePassword(request);
-		return ApiResponse.ok();
+		return ApiResponse.okEmpty("비밀번호 변경 성공");
 	}
 
-	// 비밀번호 변경/설정 (로그인 상태)
 	@PutMapping("/password/me")
 	public ApiResponse<Void> changeMyPassword(
 			@AuthenticationPrincipal UserPrincipal principal,
 			@Valid @RequestBody ChangeMyPasswordRequest request) {
 		log.info("[changeMyPassword]");
 		authService.changeMyPassword(principal, request);
-		return ApiResponse.ok();
+		return ApiResponse.okEmpty("비밀번호 변경 성공");
 	}
 }

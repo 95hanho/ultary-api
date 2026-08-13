@@ -1,0 +1,152 @@
+@baseUrl = http://localhost:9377
+@accessToken = {{socialLogin.response.body.$.data.accessToken}}
+@feedId = {{createFeed.response.body.$.data.feedId}}
+@commentId = {{createComment.response.body.$.data.feedCommentId}}
+@replyId = {{createReply.response.body.$.data.feedReplyId}}
+
+### 0. 소셜 로그인 (토큰 확보)
+# @name socialLogin
+POST {{baseUrl}}/api/v1/auth/social/login
+Content-Type: application/json
+
+{
+  "provider": "GOOGLE",
+  "providerUserId": "google-feed-test-001",
+  "email": "feed.test@example.com",
+  "name": "피드테스트"
+}
+
+### 1. 게시글 등록 (fileId·petId·tagId는 사전 생성 후 교체)
+# @name createFeed
+POST {{baseUrl}}/api/v1/feeds
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "content": "초코랑 산책 #산책",
+  "visibility": "PUBLIC",
+  "media": [
+    {
+      "fileId": 1,
+      "mediaType": "IMAGE",
+      "mentions": [
+        {
+          "petId": 1,
+          "posX": 42.5,
+          "posY": 60.0
+        }
+      ]
+    }
+  ],
+  "pets": [
+    {
+      "petId": 1,
+      "role": "COLLABORATOR",
+      "isMain": true
+    }
+  ],
+  "tagIds": [1]
+}
+
+### 2. 게시글 상세
+GET {{baseUrl}}/api/v1/feeds/{{feedId}}
+Authorization: Bearer {{accessToken}}
+
+### 3. 게시글 수정 (content·visibility)
+PATCH {{baseUrl}}/api/v1/feeds/{{feedId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "content": "초코랑 산책 (수정)",
+  "visibility": "PUBLIC"
+}
+
+### 4a. 좋아요
+POST {{baseUrl}}/api/v1/feeds/{{feedId}}/like
+Authorization: Bearer {{accessToken}}
+
+### 4b. 좋아요한 사람 목록
+GET {{baseUrl}}/api/v1/feeds/{{feedId}}/likers?limit=20
+Authorization: Bearer {{accessToken}}
+
+### 4c. 좋아요 취소
+DELETE {{baseUrl}}/api/v1/feeds/{{feedId}}/like
+Authorization: Bearer {{accessToken}}
+
+### 5a. 게시글 저장
+POST {{baseUrl}}/api/v1/feeds/{{feedId}}/store
+Authorization: Bearer {{accessToken}}
+
+### 5b. 게시글 저장 해제
+DELETE {{baseUrl}}/api/v1/feeds/{{feedId}}/store
+Authorization: Bearer {{accessToken}}
+
+### 6. 공유 경로 힌트
+POST {{baseUrl}}/api/v1/feeds/{{feedId}}/share
+Authorization: Bearer {{accessToken}}
+
+### 7a. 댓글 작성 (@유저 / @펫 멘션)
+# @name createComment
+POST {{baseUrl}}/api/v1/feeds/{{feedId}}/comments
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "content": "귀엽다! @울타리닉네임 @choco_01",
+  "mentions": [
+    { "userNo": 1 },
+    { "petId": 1 }
+  ]
+}
+
+### 7b. 댓글 목록 (댓글+답글 합 ≤10이면 replies 포함, 초과면 replies=null)
+GET {{baseUrl}}/api/v1/feeds/{{feedId}}/comments?limit=50
+Authorization: Bearer {{accessToken}}
+
+### 7c. 댓글 수정
+PATCH {{baseUrl}}/api/v1/feeds/{{feedId}}/comments/{{commentId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "content": "정말 귀엽다!"
+}
+
+### 8a. 답글 작성 (@멘션)
+# @name createReply
+POST {{baseUrl}}/api/v1/feeds/{{feedId}}/comments/{{commentId}}/replies
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "content": "고마워! @울타리닉네임",
+  "mentions": [
+    { "userNo": 1 }
+  ]
+}
+
+### 8b. 답글 목록
+GET {{baseUrl}}/api/v1/feeds/{{feedId}}/comments/{{commentId}}/replies?limit=50
+Authorization: Bearer {{accessToken}}
+
+### 8c. 답글 수정
+PATCH {{baseUrl}}/api/v1/feeds/{{feedId}}/comments/{{commentId}}/replies/{{replyId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "content": "정말 고마워!"
+}
+
+### 8d. 답글 삭제
+DELETE {{baseUrl}}/api/v1/feeds/{{feedId}}/comments/{{commentId}}/replies/{{replyId}}
+Authorization: Bearer {{accessToken}}
+
+### 7d. 댓글 삭제
+DELETE {{baseUrl}}/api/v1/feeds/{{feedId}}/comments/{{commentId}}
+Authorization: Bearer {{accessToken}}
+
+### 9. 게시글 삭제 (작성자 또는 COLLABORATOR 펫 보호자)
+DELETE {{baseUrl}}/api/v1/feeds/{{feedId}}
+Authorization: Bearer {{accessToken}}
