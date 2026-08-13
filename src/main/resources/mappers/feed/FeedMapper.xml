@@ -39,6 +39,84 @@
 		  AND is_deleted = 0
 	</select>
 
+	<select id="findActiveByUserNo" resultType="me._hanho.ultary.domain.feed.model.Feed">
+		SELECT <include refid="feedColumns"/>
+		FROM ultary_feed
+		WHERE user_no = #{userNo}
+		  AND is_deleted = 0
+		ORDER BY created_at DESC, feed_id DESC
+		LIMIT #{limit}
+	</select>
+
+	<select id="countActiveByUserNo" resultType="int">
+		SELECT COUNT(1)
+		FROM ultary_feed
+		WHERE user_no = #{userNo}
+		  AND is_deleted = 0
+	</select>
+
+	<select id="findSavedByUserNo" resultType="me._hanho.ultary.domain.feed.model.Feed">
+		SELECT
+			f.feed_id,
+			f.user_no,
+			f.content,
+			f.visibility,
+			f.like_count,
+			f.comment_count,
+			f.store_count,
+			f.created_at,
+			f.updated_at,
+			f.is_deleted,
+			f.deleted_at,
+			f.deleted_by_user_no
+		FROM ultary_feed_store s
+		INNER JOIN ultary_feed f ON f.feed_id = s.feed_id AND f.is_deleted = 0
+		WHERE s.user_no = #{userNo}
+		  AND s.is_deleted = 0
+		ORDER BY s.created_at DESC, s.feed_store_id DESC
+		LIMIT #{limit}
+	</select>
+
+	<select id="findTaggedByUserNo" resultType="me._hanho.ultary.domain.feed.model.Feed">
+		SELECT DISTINCT
+			f.feed_id,
+			f.user_no,
+			f.content,
+			f.visibility,
+			f.like_count,
+			f.comment_count,
+			f.store_count,
+			f.created_at,
+			f.updated_at,
+			f.is_deleted,
+			f.deleted_at,
+			f.deleted_by_user_no
+		FROM ultary_feed f
+		WHERE f.is_deleted = 0
+		  AND (
+			EXISTS (
+				SELECT 1
+				FROM ultary_feed_pet fp
+				INNER JOIN ultary_pet p ON p.pet_id = fp.pet_id
+					AND p.user_no = #{userNo}
+					AND p.is_deleted = 0
+				WHERE fp.feed_id = f.feed_id
+				  AND fp.role = 'COLLABORATOR'
+			)
+			OR EXISTS (
+				SELECT 1
+				FROM ultary_feed_media m
+				INNER JOIN ultary_feed_media_mention mm ON mm.feed_media_id = m.feed_media_id
+				INNER JOIN ultary_pet p ON p.pet_id = mm.pet_id
+					AND p.user_no = #{userNo}
+					AND p.is_deleted = 0
+				WHERE m.feed_id = f.feed_id
+			)
+		  )
+		ORDER BY f.created_at DESC, f.feed_id DESC
+		LIMIT #{limit}
+	</select>
+
 	<update id="updateFeed">
 		UPDATE ultary_feed
 		SET

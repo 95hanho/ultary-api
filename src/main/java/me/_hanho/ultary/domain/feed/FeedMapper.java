@@ -22,6 +22,20 @@ public interface FeedMapper {
 
 	Feed findActiveByFeedId(@Param("feedId") Long feedId);
 
+	List<Feed> findActiveByUserNo(
+			@Param("userNo") Long userNo,
+			@Param("limit") int limit);
+
+	int countActiveByUserNo(@Param("userNo") Long userNo);
+
+	List<Feed> findSavedByUserNo(
+			@Param("userNo") Long userNo,
+			@Param("limit") int limit);
+
+	List<Feed> findTaggedByUserNo(
+			@Param("userNo") Long userNo,
+			@Param("limit") int limit);
+
 	int updateFeed(Feed feed);
 
 	int softDeleteFeed(

@@ -34,4 +34,6 @@ public interface PetMapper {
 	int countByMentionId(
 			@Param("mentionId") String mentionId,
 			@Param("excludePetId") Long excludePetId);
+
+	int countActiveByUserNo(@Param("userNo") Long userNo);
 }

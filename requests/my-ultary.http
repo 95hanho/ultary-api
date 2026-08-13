@@ -1,0 +1,103 @@
+@baseUrl = http://localhost:9377
+@accessToken = {{socialLogin.response.body.$.data.accessToken}}
+
+### 0. 소셜 로그인 (시드 user 101 — 001_dev_sample_data.sql)
+# @name socialLogin
+POST {{baseUrl}}/api/v1/auth/social/login
+Content-Type: application/json
+
+{
+  "provider": "GOOGLE",
+  "providerUserId": "google-myultary-test-001",
+  "email": "myultary.test@example.com",
+  "name": "마이울타리테스트"
+}
+
+### 1. 마이울타리 정보 조회 (hasStory, petCount, feedCount 등)
+GET {{baseUrl}}/api/v1/my-ultary
+Authorization: Bearer {{accessToken}}
+
+### 2. MY 게시글 그리드 (feed 101)
+GET {{baseUrl}}/api/v1/my-ultary/feeds?limit=30
+Authorization: Bearer {{accessToken}}
+
+### 3. MY 게시글 상세 (시드 feedId=101)
+GET {{baseUrl}}/api/v1/my-ultary/feeds/101
+Authorization: Bearer {{accessToken}}
+
+### 4. 저장한 게시글 그리드 (시드: feed 102 저장)
+GET {{baseUrl}}/api/v1/my-ultary/saved-feeds?limit=30
+Authorization: Bearer {{accessToken}}
+
+### 5. 태그된 게시글 그리드 (시드: feed 102에 choco COLLABORATOR/멘션)
+GET {{baseUrl}}/api/v1/my-ultary/tagged-feeds?limit=30
+Authorization: Bearer {{accessToken}}
+
+### 6a. 프로필 사진 변경 (시드 fileId=100~103 이미지)
+PATCH {{baseUrl}}/api/v1/my-ultary/profile-image
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "profileFileId": 103
+}
+
+### 6b. 프로필 사진 제거
+PATCH {{baseUrl}}/api/v1/my-ultary/profile-image
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "removeProfileFile": true
+}
+
+### 7a. 소개글 변경
+PATCH {{baseUrl}}/api/v1/my-ultary/bio
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "bio": "강아지랑 산책하는 집사"
+}
+
+### 7b. 소개글 삭제
+PATCH {{baseUrl}}/api/v1/my-ultary/bio
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "clearBio": true
+}
+
+### 8a. 내 스토리 목록 (시드 story 101)
+GET {{baseUrl}}/api/v1/my-ultary/stories
+Authorization: Bearer {{accessToken}}
+
+### 8b. 스토리 등록 (이미지 — 시드 fileId=100)
+# @name createStory
+POST {{baseUrl}}/api/v1/my-ultary/stories
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "fileId": 100,
+  "mediaType": "IMAGE",
+  "caption": "오늘 산책"
+}
+
+### 8c. 스토리 등록 (영상 — 시드 fileId=104, 썸네일 103)
+POST {{baseUrl}}/api/v1/my-ultary/stories
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "fileId": 104,
+  "mediaType": "VIDEO",
+  "thumbnailFileId": 103,
+  "durationSec": 12,
+  "caption": "짧은 영상"
+}
+
+### 8d. 스토리 삭제
+DELETE {{baseUrl}}/api/v1/my-ultary/stories/{{createStory.response.body.$.data.storyId}}
+Authorization: Bearer {{accessToken}}

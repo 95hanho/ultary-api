@@ -1,0 +1,47 @@
+@baseUrl = http://localhost:9377
+@accessToken = {{socialLogin.response.body.$.data.accessToken}}
+@storyId = {{createStory.response.body.$.data.storyId}}
+
+### 0. 소셜 로그인
+# @name socialLogin
+POST {{baseUrl}}/api/v1/auth/social/login
+Content-Type: application/json
+
+{
+  "provider": "GOOGLE",
+  "providerUserId": "google-myultary-test-001",
+  "email": "myultary.test@example.com",
+  "name": "마이울타리테스트"
+}
+
+### 1. 스토리 등록 (시드 fileId=100)
+# @name createStory
+POST {{baseUrl}}/api/v1/my-ultary/stories
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "fileId": 100,
+  "mediaType": "IMAGE",
+  "caption": "24시간 스토리"
+}
+
+### 2. 내 스토리 목록 (createdAt / expiresAt)
+GET {{baseUrl}}/api/v1/my-ultary/stories
+Authorization: Bearer {{accessToken}}
+
+### 3. 주민 중 스토리 있는 목록 (hasUnviewed)
+GET {{baseUrl}}/api/v1/main/stories/owners
+Authorization: Bearer {{accessToken}}
+
+### 4. 특정 유저 스토리 조회 (본인 또는 ACCEPTED 이웃)
+GET {{baseUrl}}/api/v1/main/stories?userNo=101
+Authorization: Bearer {{accessToken}}
+
+### 5. 스토리 읽음 처리
+POST {{baseUrl}}/api/v1/stories/{{storyId}}/view
+Authorization: Bearer {{accessToken}}
+
+### 6. 스토리 삭제
+DELETE {{baseUrl}}/api/v1/my-ultary/stories/{{storyId}}
+Authorization: Bearer {{accessToken}}

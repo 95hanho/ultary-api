@@ -1,4 +1,4 @@
--- schema_version: 6
+-- schema_version: 7
 -- ULTARY MariaDB 10.1.13 Schema
 -- Engine: InnoDB
 -- Charset / Collation: utf8 / utf8_general_ci
@@ -26,13 +26,17 @@
 --   - hashtag  : # 입력용 표시 키 (필수, 중복 허용)  ← 구 name
 --   - title    : 상품/소개 표시명 (선택, 길게)
 --   - handle   : 선택 고유 코드 (중복 hashtag 구분용, pet.mention_id와 동일 정규식)  ← mention_id 대신 handle
+-- Story note (v7):
+--   - ultary_story: IMAGE|VIDEO 1건 = 스토리 1건. expires_at = created_at + 24h
+--   - ultary_story_view: 시청자별 읽음 (story_id + viewer_user_no UNIQUE)
+--   - 활성 스토리 = is_deleted=0 AND expires_at > NOW()
 -- Change log:
 --   v1: 초기 스키마 (Phase 1-1)
 --   v2: 소셜 로그인 / login_id 제거 / is_default_nickname (Phase 1-6)
 --   v3: ultary_feed_image → ultary_feed_media (IMAGE|VIDEO, thumbnail, duration)
---   v4: pet.mention_id, tag hashtag/handle, feed_media_mention, feed_pet.role, user_search_history, nickname 규칙
---   v5: 펫 멘션 승인 제거, feed.deleted_by_user_no, 알림 PET_TAG_* 제거 / FEED_COLLABORATOR 추가
+--   v4: pet.mention_id, tag hashtag/handle, feed_m 알림 PET_TAG_* 제거 / FEED_COLLABORATOR 추가
 --   v6: nickname_changed_at / mention_id_changed_at / handle_changed_at (식별자 변경 쿨다운)
+--   v7: ultary_story / ultary_story_view (24h 스토리·읽음)
 
 SET NAMES utf8;
 SET FOREIGN_KEY_CHECKS = 0;
@@ -40,6 +44,9 @@ SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS `ultary_ai_request_log`;
 DROP TABLE IF EXISTS `ultary_report`;
 DROP TABLE IF EXISTS `ultary_notification`;
+DROP TABLE IF EXISTS `ultary_story_view`;
+DROP Tedia_mention, feed_pet.role, user_search_history, nickname 규칙
+--   v5: 펫 멘션 승인 제거, feed.deleted_by_user_no,ABLE IF EXISTS `ultary_story`;
 DROP TABLE IF EXISTS `ultary_user_search_history`;
 DROP TABLE IF EXISTS `ultary_tag_image`;
 DROP TABLE IF EXISTS `ultary_feed_tag`;
@@ -485,6 +492,35 @@ CREATE TABLE `ultary_ai_request_log` (
   KEY `IDX_ultary_ai_feature_status` (`feature_type`, `status`) USING BTREE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci COMMENT='AI 문구 추천, 해시태그 추천, 프로필 소개, alt text 등 요청 이력';
 
+CREATE TABLE `ultary_story` (
+  `story_id` INT(11) NOT NULL AUTO_INCREMENT,
+  `user_no` INT(11) NOT NULL COMMENT '스토리 작성자',
+  `file_id` INT(11) NOT NULL COMMENT '원본 미디어 (이미지 또는 짧은 영상)',
+  `media_type` ENUM('IMAGE','VIDEO') NOT NULL,
+  `thumbnail_file_id` INT(11) NULL DEFAULT NULL COMMENT 'VIDEO 커버. IMAGE면 NULL',
+  `duration_sec` INT(11) NULL DEFAULT NULL COMMENT 'VIDEO 재생 초(최대 60). IMAGE면 NULL',
+  `caption` VARCHAR(200) NULL DEFAULT NULL COMMENT '짧은 문구',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '업로드 시각 (UI 표시)',
+  `expires_at` DATETIME NOT NULL COMMENT 'created_at + 24시간. 이후 비활성',
+  `is_deleted` TINYINT(1) NOT NULL DEFAULT 0,
+  `deleted_at` DATETIME NULL DEFAULT NULL,
+  PRIMARY KEY (`story_id`) USING BTREE,
+  KEY `IDX_ultary_story_user_expires` (`user_no`, `expires_at`) USING BTREE,
+  KEY `IDX_ultary_story_expires_deleted` (`expires_at`, `is_deleted`) USING BTREE,
+  KEY `IDX_ultary_story_file_id` (`file_id`) USING BTREE,
+  KEY `IDX_ultary_story_thumbnail_file_id` (`thumbnail_file_id`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci COMMENT='24시간 스토리 (사진/짧은 영상)';
+
+CREATE TABLE `ultary_story_view` (
+  `story_view_id` INT(11) NOT NULL AUTO_INCREMENT,
+  `story_id` INT(11) NOT NULL,
+  `viewer_user_no` INT(11) NOT NULL COMMENT '스토리를 본 사용자',
+  `viewed_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`story_view_id`) USING BTREE,
+  UNIQUE KEY `UK_ultary_story_view_story_viewer` (`story_id`, `viewer_user_no`) USING BTREE,
+  KEY `IDX_ultary_story_view_viewer` (`viewer_user_no`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci COMMENT='스토리 읽음(시청) 기록';
+
 ALTER TABLE `ultary_user`
   ADD CONSTRAINT `FK_user_profile_file` FOREIGN KEY (`profile_file_id`) REFERENCES `ultary_file` (`file_id`) ON UPDATE CASCADE ON DELETE SET NULL;
 
@@ -591,3 +627,12 @@ ALTER TABLE `ultary_ai_request_log`
   ADD CONSTRAINT `FK_ai_user` FOREIGN KEY (`user_no`) REFERENCES `ultary_user` (`user_no`) ON UPDATE CASCADE ON DELETE RESTRICT,
   ADD CONSTRAINT `FK_ai_target_feed` FOREIGN KEY (`target_feed_id`) REFERENCES `ultary_feed` (`feed_id`) ON UPDATE CASCADE ON DELETE SET NULL,
   ADD CONSTRAINT `FK_ai_target_pet` FOREIGN KEY (`target_pet_id`) REFERENCES `ultary_pet` (`pet_id`) ON UPDATE CASCADE ON DELETE SET NULL;
+
+ALTER TABLE `ultary_story`
+  ADD CONSTRAINT `FK_story_user` FOREIGN KEY (`user_no`) REFERENCES `ultary_user` (`user_no`) ON UPDATE CASCADE ON DELETE RESTRICT,
+  ADD CONSTRAINT `FK_story_file` FOREIGN KEY (`file_id`) REFERENCES `ultary_file` (`file_id`) ON UPDATE CASCADE ON DELETE RESTRICT,
+  ADD CONSTRAINT `FK_story_thumbnail_file` FOREIGN KEY (`thumbnail_file_id`) REFERENCES `ultary_file` (`file_id`) ON UPDATE CASCADE ON DELETE SET NULL;
+
+ALTER TABLE `ultary_story_view`
+  ADD CONSTRAINT `FK_story_view_story` FOREIGN KEY (`story_id`) REFERENCES `ultary_story` (`story_id`) ON UPDATE CASCADE ON DELETE CASCADE,
+  ADD CONSTRAINT `FK_story_view_viewer` FOREIGN KEY (`viewer_user_no`) REFERENCES `ultary_user` (`user_no`) ON UPDATE CASCADE ON DELETE CASCADE;

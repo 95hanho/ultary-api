@@ -73,6 +73,13 @@ public enum ErrorCode {
 	FEED_INVALID_VISIBILITY("FEED_INVALID_VISIBILITY", "공개 범위가 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
 
 	// ==============================
+	// 스토리 (story)
+	// ==============================
+	STORY_NOT_FOUND("STORY_NOT_FOUND", "스토리를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
+	STORY_EXPIRED("STORY_EXPIRED", "만료된 스토리입니다.", HttpStatus.GONE),
+	STORY_FORBIDDEN("STORY_FORBIDDEN", "스토리를 볼 권한이 없습니다.", HttpStatus.FORBIDDEN),
+
+	// ==============================
 	// 이웃 (neighbor)
 	// ==============================
 	// NEIGHBOR_NOT_FOUND("NEIGHBOR_NOT_FOUND", "이웃 관계를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),

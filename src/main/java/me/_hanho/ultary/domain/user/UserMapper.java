@@ -37,4 +37,14 @@ public interface UserMapper {
 	int updateWithdrawalStatus(
 			@Param("userNo") Long userNo,
 			@Param("withdrawalStatus") String withdrawalStatus);
+
+	int updateBio(
+			@Param("userNo") Long userNo,
+			@Param("bio") String bio,
+			@Param("clearBio") boolean clearBio);
+
+	int updateProfileFileId(
+			@Param("userNo") Long userNo,
+			@Param("profileFileId") Long profileFileId,
+			@Param("clearProfileFile") boolean clearProfileFile);
 }

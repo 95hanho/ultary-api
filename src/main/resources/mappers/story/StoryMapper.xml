@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="me._hanho.ultary.domain.story.StoryMapper">
+
+	<sql id="storyColumns">
+		story_id,
+		user_no,
+		file_id,
+		media_type,
+		thumbnail_file_id,
+		duration_sec,
+		caption,
+		created_at,
+		expires_at,
+		is_deleted,
+		deleted_at
+	</sql>
+
+	<sql id="activeStoryCondition">
+		is_deleted = 0
+		AND expires_at &gt; NOW()
+	</sql>
+
+	<insert id="insert" useGeneratedKeys="true" keyProperty="storyId" keyColumn="story_id">
+		INSERT INTO ultary_story (
+			user_no,
+			file_id,
+			media_type,
+			thumbnail_file_id,
+			duration_sec,
+			caption,
+			expires_at
+		) VALUES (
+			#{userNo},
+			#{fileId},
+			#{mediaType},
+			#{thumbnailFileId},
+			#{durationSec},
+			#{caption},
+			DATE_ADD(NOW(), INTERVAL 24 HOUR)
+		)
+	</insert>
+
+	<select id="findActiveByStoryId" resultType="me._hanho.ultary.domain.story.model.Story">
+		SELECT <include refid="storyColumns"/>
+		FROM ultary_story
+		WHERE story_id = #{storyId}
+		  AND <include refid="activeStoryCondition"/>
+	</select>
+
+	<select id="findActiveByUserNo" resultType="me._hanho.ultary.domain.story.model.Story">
+		SELECT <include refid="storyColumns"/>
+		FROM ultary_story
+		WHERE user_no = #{userNo}
+		  AND <include refid="activeStoryCondition"/>
+		ORDER BY created_at ASC, story_id ASC
+	</select>
+
+	<select id="countActiveByUserNo" resultType="int">
+		SELECT COUNT(1)
+		FROM ultary_story
+		WHERE user_no = #{userNo}
+		  AND <include refid="activeStoryCondition"/>
+	</select>
+
+	<update id="softDelete">
+		UPDATE ultary_story
+		SET is_deleted = 1,
+			deleted_at = NOW()
+		WHERE story_id = #{storyId}
+		  AND user_no = #{userNo}
+		  AND is_deleted = 0
+	</update>
+
+	<insert id="insertViewIgnoreDuplicate">
+		INSERT IGNORE INTO ultary_story_view (
+			story_id,
+			viewer_user_no
+		) VALUES (
+			#{storyId},
+			#{viewerUserNo}
+		)
+	</insert>
+
+	<select id="countView" resultType="int">
+		SELECT COUNT(1)
+		FROM ultary_story_view
+		WHERE story_id = #{storyId}
+		  AND viewer_user_no = #{viewerUserNo}
+	</select>
+
+	<select id="findResidentOwnersWithActiveStories" resultType="me._hanho.ultary.domain.story.model.StoryOwnerRow">
+		SELECT
+			u.user_no AS userNo,
+			u.nickname AS nickname,
+			u.profile_file_id AS profileFileId,
+			COUNT(s.story_id) AS storyCount
+		FROM ultary_neighbor n
+		INNER JOIN ultary_user u ON u.user_no = n.receiver_user_no
+			AND u.withdrawal_status = 'ACTIVE'
+		INNER JOIN ultary_story s ON s.user_no = u.user_no
+			AND s.is_deleted = 0
+			AND s.expires_at &gt; NOW()
+		WHERE n.requester_user_no = #{viewerUserNo}
+		  AND n.status = 'ACCEPTED'
+		GROUP BY u.user_no, u.nickname, u.profile_file_id
+		ORDER BY MAX(s.created_at) DESC
+	</select>
+
+	<select id="countUnviewedActiveByOwner" resultType="int">
+		SELECT COUNT(1)
+		FROM ultary_story s
+		WHERE s.user_no = #{ownerUserNo}
+		  AND s.is_deleted = 0
+		  AND s.expires_at &gt; NOW()
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM ultary_story_view v
+			WHERE v.story_id = s.story_id
+			  AND v.viewer_user_no = #{viewerUserNo}
+		  )
+	</select>
+
+	<select id="countAcceptedNeighborPair" resultType="int">
+		SELECT COUNT(1)
+		FROM ultary_neighbor
+		WHERE status = 'ACCEPTED'
+		  AND (
+			(requester_user_no = #{userNoA} AND receiver_user_no = #{userNoB})
+			OR (requester_user_no = #{userNoB} AND receiver_user_no = #{userNoA})
+		  )
+	</select>
+
+</mapper>

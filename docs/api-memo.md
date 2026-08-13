@@ -60,28 +60,38 @@ BFF: `/api/...` · Spring: `/api/v1/...`
 
 ## 2. 메인
 
-| 기능 | Method | BFF |
-|------|--------|-----|
-| 주민 스토리 있는 목록 조회 | GET | `/api/main/stories/owners` |
-| 주민 스토리 조회 | GET | `/api/main/stories` |
-| 주민 게시글 조회 (무한 스크롤) | GET | `/api/main/feeds` |
-| 검색 (유저 / 반려동물 / 태그 / 게시글) | GET | `/api/main/search` |
+| 기능 | Method | BFF | Spring | 상태 |
+|------|--------|-----|--------|------|
+| 주민 스토리 있는 목록 조회 | GET | `/api/main/stories/owners` | `/api/v1/main/stories/owners` | 구현 |
+| 주민 스토리 조회 | GET | `/api/main/stories?userNo=` | `/api/v1/main/stories?userNo=` | 구현 |
+| 주민 게시글 조회 (무한 스크롤) | GET | `/api/main/feeds` | — | 미구현 |
+| 검색 (유저 / 반려동물 / 태그 / 게시글) | GET | `/api/main/search` | — | 미구현 |
+
+> 스토리 소유자 목록 = 내가 팔로우(`requester` ACCEPTED)한 유저 중 활성 스토리 보유자. `hasUnviewed`로 안 읽은 링 표시.  
+> HTTP: `requests/story.http`
 
 ---
 
 ## 3. 마이울타리
 
-| 기능 | Method | BFF |
-|------|--------|-----|
-| 마이울타리 정보 조회 (프로필·스토리유무·주민수·이웃수·상태글) | GET | `/api/my-ultary` |
-| MY 게시글 조회 (그리드) | GET | `/api/my-ultary/feeds` |
-| MY 게시글 상세 (피드형) | GET | `/api/my-ultary/feeds/:feedId` |
-| 저장한 게시글 조회 | GET | `/api/my-ultary/saved-feeds` |
-| 자신이 태그된 게시글 조회 | GET | `/api/my-ultary/tagged-feeds` |
-| 프로필 사진 변경 | PATCH | `/api/my-ultary/profile-image` |
-| 소개글 변경 | PATCH | `/api/my-ultary/bio` |
-| 스토리 등록 | POST | `/api/my-ultary/stories` |
-| 스토리 삭제 | DELETE | `/api/my-ultary/stories/:storyId` |
+| 기능 | Method | BFF | Spring | 상태 |
+|------|--------|-----|--------|------|
+| 마이울타리 정보 조회 (프로필·스토리유무·주민수·이웃수·상태글) | GET | `/api/my-ultary` | `/api/v1/my-ultary` | 구현 |
+| MY 게시글 조회 (그리드) | GET | `/api/my-ultary/feeds` | `/api/v1/my-ultary/feeds` | 구현 |
+| MY 게시글 상세 (피드형) | GET | `/api/my-ultary/feeds/:feedId` | `/api/v1/my-ultary/feeds/:feedId` | 구현 |
+| 저장한 게시글 조회 | GET | `/api/my-ultary/saved-feeds` | `/api/v1/my-ultary/saved-feeds` | 구현 |
+| 자신이 태그된 게시글 조회 | GET | `/api/my-ultary/tagged-feeds` | `/api/v1/my-ultary/tagged-feeds` | 구현 |
+| 프로필 사진 변경 | PATCH | `/api/my-ultary/profile-image` | `/api/v1/my-ultary/profile-image` | 구현 |
+| 소개글 변경 | PATCH | `/api/my-ultary/bio` | `/api/v1/my-ultary/bio` | 구현 |
+| 내 스토리 목록 | GET | `/api/my-ultary/stories` | `/api/v1/my-ultary/stories` | 구현 |
+| 스토리 등록 | POST | `/api/my-ultary/stories` | `/api/v1/my-ultary/stories` | 구현 |
+| 스토리 삭제 | DELETE | `/api/my-ultary/stories/:storyId` | `/api/v1/my-ultary/stories/:storyId` | 구현 |
+| 스토리 읽음 | POST | `/api/stories/:storyId/view` | `/api/v1/stories/:storyId/view` | 구현 |
+
+> 주민 = 팔로잉(`requester` ACCEPTED), 이웃 = 팔로워(`receiver` ACCEPTED).  
+> 스토리: IMAGE\|VIDEO, `expires_at = created_at + 24h`, 읽음은 `ultary_story_view`. 조회는 본인 또는 ACCEPTED 이웃.  
+> tagged-feeds: 내 펫 `COLLABORATOR` 또는 사진 `@` 멘션된 게시글.  
+> HTTP: `requests/my-ultary.http` (시드 user 101 / `google-myultary-test-001`)
 
 ---
 
@@ -228,5 +238,21 @@ BFF: `/api/...` · Spring: `/api/v1/...`
 
 - 코드 상수: `src/lib/api/endpoints.ts` (`bffEndpoints` / `springEndpoints`)
 - BFF 스켈레톤: `src/app/api/**/route.ts`
-- REST Client 틀: `http/bff.http`
-- DB 스키마: `database/schema/mariadb_10_1/001_init_schema.sql`
+- REST Client 틀: `http/bff.http` (프론트) · Spring: `requests/*.http`
+- DB 스키마: `database/schema/mariadb_10_1/001_init_schema.sql` (**schema_version 7**, 스토리 포함)
+- 로컬 시드(선택): `database/seed/mariadb_10_1/001_dev_sample_data.sql`  
+  - 스키마 직후 실행. **재실행 가능**(CLEANUP 후 INSERT). 운영/최종 배포에서는 실행하지 않음.  
+  - `ultary_file`은 업로드 디렉터리에 있는 실제 파일만 (`images/…`, `videos/…`).  
+  - 시드 user 101 = `my-ultary.http` / `story.http` 소셜 로그인과 동일.
+
+### Spring 구현 진행 (BE)
+
+| Phase | 내용 | 비고 |
+|-------|------|------|
+| 1-7 | Auth / File / Pet | 완료 |
+| 1-8 | Tag | 완료 |
+| 1-9 | Feed (+ 성공 메시지) | 완료 |
+| 1-10 | MyUltary + Story (스키마 v7) | HTTP 스모크 테스트함. **최종 E2E는 별도 재검증 예정** |
+| 다음 | Neighbor·Main feeds/search·DM·알림 등 | 미착수 |
+
+파일 업로드 상대경로: `images/{uuid}.ext`, `videos/{uuid}.ext` (`UPLOAD_DIR` / `D:/files/ultary-api`).

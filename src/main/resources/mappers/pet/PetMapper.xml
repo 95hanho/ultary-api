@@ -135,4 +135,11 @@
 		</if>
 	</select>
 
+	<select id="countActiveByUserNo" resultType="int">
+		SELECT COUNT(1)
+		FROM ultary_pet
+		WHERE user_no = #{userNo}
+		  AND is_deleted = 0
+	</select>
+
 </mapper>

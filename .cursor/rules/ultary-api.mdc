@@ -17,13 +17,24 @@ Spring Boot 3.4 / MyBatis / MariaDB 10.1 / 패키지 `me._hanho.ultary` / API pr
 
 집/다른 PC에서도 동일: 채팅은 안 따라오므로 **커밋 메시지 + 이 규칙**이 이어가기 신호다.
 
+## 진행 상태 (커밋 메시지와 함께 갱신)
+
+- 스키마: **v7** (`ultary_story` / `ultary_story_view`)
+- 완료(스모크): auth, file, pet, tag, feed, **myultary**, **story**
+- 로컬 시드(선택): `database/seed/mariadb_10_1/001_dev_sample_data.sql` — 재실행 가능, 운영에서는 제외. HTTP는 user 101 / `google-myultary-test-001`
+- HTTP: `requests/my-ultary.http`, `requests/story.http` 등
+- **최종 E2E 재검증**은 도메인 더 붙인 뒤(또는 배포 전) 별도로 한다
+- 다음 후보: neighbor API, main feeds/search, DM, 알림 …
+
 ## 도메인 패턴
 
 - flatten: `domain/{name}/` 에 Controller·Service·Mapper (하위 controller/ 폴더 지양)
-- 완성 참고: auth, file, pet, tag
+- 완성 참고: auth, file, pet, tag, feed, myultary, story
 - 식별자 변경은 전용 API + `change-availability` (일반 PATCH에 nickname/mentionId/handle/hashtag 넣지 않음)
 - `hashtag`·`pet.name` 생성 후 불변
 - 쿨다운: nickname 7일 / mention_id·handle 30일 (`handle_changed_at` NULL이면 handle 최초 설정 자유)
+- 스토리: IMAGE|VIDEO, `expires_at = created_at + 24h`, 조회는 본인 또는 ACCEPTED 이웃. owners = requester ACCEPTED 주민 중 활성 스토리
+- 파일 경로: `images/…`, `videos/…` (uploadDir 기준 상대경로)
 
 ## HTTP 요청 파일
 
