@@ -64,11 +64,13 @@ BFF: `/api/...` · Spring: `/api/v1/...`
 |------|--------|-----|--------|------|
 | 주민 스토리 있는 목록 조회 | GET | `/api/main/stories/owners` | `/api/v1/main/stories/owners` | 구현 |
 | 주민 스토리 조회 | GET | `/api/main/stories?userNo=` | `/api/v1/main/stories?userNo=` | 구현 |
-| 주민 게시글 조회 (무한 스크롤) | GET | `/api/main/feeds` | — | 미구현 |
-| 검색 (유저 / 반려동물 / 태그 / 게시글) | GET | `/api/main/search` | — | 미구현 |
+| 주민 게시글 조회 (무한 스크롤) | GET | `/api/main/feeds` | `/api/v1/main/feeds` | 구현 |
+| 검색 (유저 / 반려동물 / 태그 / 게시글) | GET | `/api/main/search` | `/api/v1/main/search` | 구현 |
 
 > 스토리 소유자 목록 = 내가 팔로우(`requester` ACCEPTED)한 유저 중 활성 스토리 보유자. `hasUnviewed`로 안 읽은 링 표시.  
-> HTTP: `requests/story.http`
+> 메인 피드: 본인 + 주민 게시글. `PUBLIC` / 본인 / `NEIGHBORS`(ACCEPTED). 차단 쌍 제외. 커서 `cursorFeedId` + `nextCursorFeedId`.  
+> 검색 `type`: `ALL`(기본) \| `USER` \| `PET` \| `TAG` \| `FEED`. `@`/`#` 접두는 서버에서 제거. URL 쿼리에서는 `#`를 `%23`, `@`를 `%40`로 인코딩해야 함(`#`는 fragment라 미인코딩 시 `q`/`type`이 잘림). 차단 유저·펫 제외.  
+> HTTP: `requests/story.http`, `requests/main.http`
 
 ---
 
@@ -121,7 +123,7 @@ BFF: `/api/...` · Spring: `/api/v1/...`
 
 > 삭제 권한: 작성자 또는 `feed_pet.role=COLLABORATOR` 펫의 보호자. `deleted_by_user_no`에 실제 삭제자 기록.
 > 등록 시 `media` 1개 이상 필수. PATCH는 content·visibility만 (미디어/펫/태그 교체 미지원).
-> `PRIVATE`는 작성자만 조회. `NEIGHBORS`는 이웃 도메인 전까지 인증 사용자에게 공개.
+> `PRIVATE`는 작성자만 조회. `NEIGHBORS`는 ACCEPTED 이웃만 조회.
 | 좋아요 | POST | `/api/feeds/:feedId/like` |
 | 좋아요 취소 | DELETE | `/api/feeds/:feedId/like` |
 | 좋아요한 사람 목록 | GET | `/api/feeds/:feedId/likers` |
@@ -261,6 +263,7 @@ BFF: `/api/...` · Spring: `/api/v1/...`
 | 1-9 | Feed (+ 성공 메시지) | 완료 |
 | 1-10 | MyUltary + Story (스키마 v7) | HTTP 스모크 테스트함. **최종 E2E는 별도 재검증 예정** |
 | 1-11 | Neighbor (+ block, NEIGHBORS 피드 가시성) | 스모크 테스트함. 시드 user 5·pet 1~2. HTTP `neighbor.http` |
-| 다음 | Main feeds/search·DM·알림 등 | 미착수 |
+| 1-12 | Main feeds/search | 타임라인 커서 + 통합 검색. HTTP `main.http` |
+| 다음 | DM·알림 등 | 미착수 |
 
 파일 업로드 상대경로: `images/{uuid}.ext`, `videos/{uuid}.ext` (`UPLOAD_DIR` / `D:/files/ultary-api`).

@@ -1,5 +1,7 @@
 package me._hanho.ultary.domain.user;
 
+import java.util.List;
+
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -21,6 +23,11 @@ public interface UserMapper {
 	int countByEmail(
 			@Param("email") String email,
 			@Param("excludeUserNo") Long excludeUserNo);
+
+	List<User> searchActiveByNickname(
+			@Param("viewerUserNo") Long viewerUserNo,
+			@Param("q") String q,
+			@Param("limit") int limit);
 
 	int insert(User user);
 

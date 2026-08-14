@@ -1,5 +1,6 @@
 package me._hanho.ultary.domain.feed;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.apache.ibatis.annotations.Mapper;
@@ -34,6 +35,18 @@ public interface FeedMapper {
 
 	List<Feed> findTaggedByUserNo(
 			@Param("userNo") Long userNo,
+			@Param("limit") int limit);
+
+	/** 본인 + 주민(requester ACCEPTED) 타임라인. cursor 이후(더 오래된) limit건 */
+	List<Feed> findMainTimeline(
+			@Param("viewerUserNo") Long viewerUserNo,
+			@Param("cursorCreatedAt") LocalDateTime cursorCreatedAt,
+			@Param("cursorFeedId") Long cursorFeedId,
+			@Param("limit") int limit);
+
+	List<Feed> searchVisible(
+			@Param("viewerUserNo") Long viewerUserNo,
+			@Param("q") String q,
 			@Param("limit") int limit);
 
 	int updateFeed(Feed feed);

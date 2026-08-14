@@ -20,6 +20,36 @@
 		deleted_by_user_no
 	</sql>
 
+	<sql id="visibleToViewerAndNotBlocked">
+		f.is_deleted = 0
+		AND u.withdrawal_status = 'ACTIVE'
+		AND (
+			f.user_no = #{viewerUserNo}
+			OR f.visibility = 'PUBLIC'
+			OR (
+				f.visibility = 'NEIGHBORS'
+				AND EXISTS (
+					SELECT 1
+					FROM ultary_neighbor n
+					WHERE n.status = 'ACCEPTED'
+					  AND (
+						(n.requester_user_no = #{viewerUserNo} AND n.receiver_user_no = f.user_no)
+						OR (n.requester_user_no = f.user_no AND n.receiver_user_no = #{viewerUserNo})
+					  )
+				)
+			)
+		)
+		AND NOT EXISTS (
+			SELECT 1
+			FROM ultary_user_block b
+			WHERE b.is_deleted = 0
+			  AND (
+				(b.blocker_user_no = #{viewerUserNo} AND b.blocked_user_no = f.user_no)
+				OR (b.blocker_user_no = f.user_no AND b.blocked_user_no = #{viewerUserNo})
+			  )
+		)
+	</sql>
+
 	<insert id="insertFeed" useGeneratedKeys="true" keyProperty="feedId" keyColumn="feed_id">
 		INSERT INTO ultary_feed (
 			user_no,
@@ -113,6 +143,65 @@
 				WHERE m.feed_id = f.feed_id
 			)
 		  )
+		ORDER BY f.created_at DESC, f.feed_id DESC
+		LIMIT #{limit}
+	</select>
+
+	<select id="findMainTimeline" resultType="me._hanho.ultary.domain.feed.model.Feed">
+		SELECT
+			f.feed_id,
+			f.user_no,
+			f.content,
+			f.visibility,
+			f.like_count,
+			f.comment_count,
+			f.store_count,
+			f.created_at,
+			f.updated_at,
+			f.is_deleted,
+			f.deleted_at,
+			f.deleted_by_user_no
+		FROM ultary_feed f
+		INNER JOIN ultary_user u ON u.user_no = f.user_no
+		WHERE <include refid="visibleToViewerAndNotBlocked"/>
+		  AND (
+			f.user_no = #{viewerUserNo}
+			OR EXISTS (
+				SELECT 1
+				FROM ultary_neighbor n
+				WHERE n.requester_user_no = #{viewerUserNo}
+				  AND n.receiver_user_no = f.user_no
+				  AND n.status = 'ACCEPTED'
+			)
+		  )
+		<if test="cursorCreatedAt != null and cursorFeedId != null">
+		  AND (
+			f.created_at &lt; #{cursorCreatedAt}
+			OR (f.created_at = #{cursorCreatedAt} AND f.feed_id &lt; #{cursorFeedId})
+		  )
+		</if>
+		ORDER BY f.created_at DESC, f.feed_id DESC
+		LIMIT #{limit}
+	</select>
+
+	<select id="searchVisible" resultType="me._hanho.ultary.domain.feed.model.Feed">
+		SELECT
+			f.feed_id,
+			f.user_no,
+			f.content,
+			f.visibility,
+			f.like_count,
+			f.comment_count,
+			f.store_count,
+			f.created_at,
+			f.updated_at,
+			f.is_deleted,
+			f.deleted_at,
+			f.deleted_by_user_no
+		FROM ultary_feed f
+		INNER JOIN ultary_user u ON u.user_no = f.user_no
+		WHERE <include refid="visibleToViewerAndNotBlocked"/>
+		  AND IFNULL(f.content, '') LIKE CONCAT('%', #{q}, '%')
 		ORDER BY f.created_at DESC, f.feed_id DESC
 		LIMIT #{limit}
 	</select>

@@ -36,4 +36,9 @@ public interface PetMapper {
 			@Param("excludePetId") Long excludePetId);
 
 	int countActiveByUserNo(@Param("userNo") Long userNo);
+
+	List<Pet> searchActive(
+			@Param("viewerUserNo") Long viewerUserNo,
+			@Param("q") String q,
+			@Param("limit") int limit);
 }

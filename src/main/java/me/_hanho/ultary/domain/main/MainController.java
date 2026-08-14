@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.RestController;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.response.ApiResponse;
+import me._hanho.ultary.domain.main.dto.response.MainFeedPageResponse;
+import me._hanho.ultary.domain.main.dto.response.MainSearchResponse;
 import me._hanho.ultary.domain.story.dto.response.StoryOwnerResponse;
 import me._hanho.ultary.domain.story.dto.response.StoryResponse;
 import me._hanho.ultary.security.principal.UserPrincipal;
@@ -42,18 +44,22 @@ public class MainController {
 	}
 
 	@GetMapping("/feeds")
-	public ApiResponse<Void> feeds() {
-		log.info("[feeds]");
-		mainService.getFeeds();
-		return ApiResponse.okEmpty("주민 게시글 조회 성공");
+	public ApiResponse<MainFeedPageResponse> feeds(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@RequestParam(required = false) Long cursorFeedId,
+			@RequestParam(required = false) Integer limit) {
+		log.info("[feeds] userNo={} cursorFeedId={} limit={}",
+				principal.getUserNo(), cursorFeedId, limit);
+		return ApiResponse.ok(mainService.getFeeds(principal, cursorFeedId, limit), "주민 게시글 조회 성공");
 	}
 
 	@GetMapping("/search")
-	public ApiResponse<Void> search(
-			@RequestParam(required = false) String q,
-			@RequestParam(required = false) String type) {
-		log.info("[search] q={}, type={}", q, type);
-		mainService.search(q, type);
-		return ApiResponse.okEmpty("검색 성공");
+	public ApiResponse<MainSearchResponse> search(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@RequestParam String q,
+			@RequestParam(required = false) String type,
+			@RequestParam(required = false) Integer limit) {
+		log.info("[search] userNo={} q={} type={}", principal.getUserNo(), q, type);
+		return ApiResponse.ok(mainService.search(principal, q, type, limit), "검색 성공");
 	}
 }

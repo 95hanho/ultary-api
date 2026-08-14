@@ -92,6 +92,15 @@ public class FeedService {
 		return toResponse(requireVisible(feedId, principal.getUserNo()), principal.getUserNo());
 	}
 
+	@Transactional(readOnly = true)
+	public List<FeedResponse> toResponses(List<Feed> feeds, Long viewerUserNo) {
+		List<FeedResponse> result = new ArrayList<>();
+		for (Feed feed : feeds) {
+			result.add(toResponse(feed, viewerUserNo));
+		}
+		return result;
+	}
+
 	@Transactional
 	public FeedResponse update(UserPrincipal principal, Long feedId, UpdateFeedRequest request) {
 		requireAuthor(feedId, principal.getUserNo());

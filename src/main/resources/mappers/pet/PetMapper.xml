@@ -142,4 +142,43 @@
 		  AND is_deleted = 0
 	</select>
 
+	<select id="searchActive" resultType="me._hanho.ultary.domain.pet.model.Pet">
+		SELECT
+			p.pet_id,
+			p.user_no,
+			p.mention_id,
+			p.mention_id_changed_at,
+			p.name,
+			p.species,
+			p.breed,
+			p.gender,
+			p.is_neutered,
+			p.birthday,
+			p.profile_file_id,
+			p.bio,
+			p.created_at,
+			p.updated_at,
+			p.is_deleted,
+			p.deleted_at
+		FROM ultary_pet p
+		INNER JOIN ultary_user u ON u.user_no = p.user_no
+			AND u.withdrawal_status = 'ACTIVE'
+		WHERE p.is_deleted = 0
+		  AND (
+			p.mention_id LIKE CONCAT('%', #{q}, '%')
+			OR p.name LIKE CONCAT('%', #{q}, '%')
+		  )
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM ultary_user_block b
+			WHERE b.is_deleted = 0
+			  AND (
+				(b.blocker_user_no = #{viewerUserNo} AND b.blocked_user_no = p.user_no)
+				OR (b.blocker_user_no = p.user_no AND b.blocked_user_no = #{viewerUserNo})
+			  )
+		  )
+		ORDER BY p.pet_id DESC
+		LIMIT #{limit}
+	</select>
+
 </mapper>

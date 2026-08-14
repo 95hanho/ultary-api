@@ -1,0 +1,52 @@
+@baseUrl = http://localhost:9377
+@accessToken = {{socialLogin.response.body.$.data.accessToken}}
+@nextCursor = {{mainFeeds.response.body.$.data.nextCursorFeedId}}
+
+### 0. 소셜 로그인 (시드 user 101)
+# @name socialLogin
+POST {{baseUrl}}/api/v1/auth/social/login
+Content-Type: application/json
+
+{
+  "provider": "GOOGLE",
+  "providerUserId": "google-myultary-test-001",
+  "email": "myultary.test@example.com",
+  "name": "마이울타리테스트"
+}
+
+### 1. 주민 스토리 있는 목록 (시드: 103)
+GET {{baseUrl}}/api/v1/main/stories/owners
+Authorization: Bearer {{accessToken}}
+
+### 2. 주민 스토리 조회 (본인 101)
+GET {{baseUrl}}/api/v1/main/stories?userNo=101
+Authorization: Bearer {{accessToken}}
+
+### 3a. 주민 게시글 타임라인 (본인 101 + 주민 102)
+# @name mainFeeds
+GET {{baseUrl}}/api/v1/main/feeds?limit=10
+Authorization: Bearer {{accessToken}}
+
+### 3b. 타임라인 다음 페이지
+GET {{baseUrl}}/api/v1/main/feeds?limit=10&cursorFeedId={{nextCursor}}
+Authorization: Bearer {{accessToken}}
+
+### 4a. 검색 ALL (산책)
+GET {{baseUrl}}/api/v1/main/search?q=산책&limit=10
+Authorization: Bearer {{accessToken}}
+
+### 4b. 검색 USER
+GET {{baseUrl}}/api/v1/main/search?q=마이울타리&type=USER
+Authorization: Bearer {{accessToken}}
+
+### 4c. 검색 PET (@ → %40, 미인코딩 시 클라이언트에 따라 깨질 수 있음)
+GET {{baseUrl}}/api/v1/main/search?q=%40choco&type=PET
+Authorization: Bearer {{accessToken}}
+
+### 4d. 검색 TAG (# → %23. 쿼리에 생 # 넣으면 fragment로 잘려 q/type이 비게 됨)
+GET {{baseUrl}}/api/v1/main/search?q=%23산책&type=TAG
+Authorization: Bearer {{accessToken}}
+
+### 4e. 검색 FEED
+GET {{baseUrl}}/api/v1/main/search?q=한강&type=FEED
+Authorization: Bearer {{accessToken}}

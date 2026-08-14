@@ -66,6 +66,24 @@
 		</if>
 	</select>
 
+	<select id="searchActiveByNickname" resultType="me._hanho.ultary.domain.user.model.User">
+		SELECT <include refid="userColumns"/>
+		FROM ultary_user u
+		WHERE u.withdrawal_status = 'ACTIVE'
+		  AND u.nickname LIKE CONCAT('%', #{q}, '%')
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM ultary_user_block b
+			WHERE b.is_deleted = 0
+			  AND (
+				(b.blocker_user_no = #{viewerUserNo} AND b.blocked_user_no = u.user_no)
+				OR (b.blocker_user_no = u.user_no AND b.blocked_user_no = #{viewerUserNo})
+			  )
+		  )
+		ORDER BY u.user_no DESC
+		LIMIT #{limit}
+	</select>
+
 	<insert id="insert" useGeneratedKeys="true" keyProperty="userNo" keyColumn="user_no">
 		INSERT INTO ultary_user (
 			password,
