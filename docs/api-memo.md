@@ -51,6 +51,8 @@ BFF: `/api/...` · Spring: `/api/v1/...`
 응답 `data`: accessToken, refreshToken, tokenType, expiresIn, **newUser**, **defaultNickname**  
 `defaultNickname === true` → UI에서 「닉네임을 변경해주세요.」(마이울타리 안내 / 마이페이지에서 변경)
 
+닉네임: 영문·한글만. 한글만 2~5자, 영문만 4~10자. 혼합 시 한글 1자=2·영문 1자=1, 가중치 합 4~10(한글 최대 5자).
+
 ### Redirect URI (로컬)
 
 - `http://localhost:3000/api/auth/social/google/callback`

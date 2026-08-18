@@ -53,7 +53,8 @@ import me._hanho.ultary.security.principal.UserPrincipal;
 public class AuthService {
 
 	private static final String NICKNAME_RANDOM_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-	private static final int NICKNAME_RANDOM_LENGTH = 8;
+	/** 영문 닉네임 최대 10자. google(6)+4, kakao(5)+5 */
+	private static final int NICKNAME_ENGLISH_MAX = 10;
 	private static final int NICKNAME_MAX_RETRY = 10;
 	/** ultary_user.name VARCHAR(20) */
 	private static final int USER_NAME_MAX = 20;
@@ -452,7 +453,9 @@ public class AuthService {
 
 	private String generateUniqueNickname(SocialProvider provider) {
 		for (int i = 0; i < NICKNAME_MAX_RETRY; i++) {
-			String nickname = provider.nicknamePrefix() + randomCode(NICKNAME_RANDOM_LENGTH);
+			String prefix = provider.nicknamePrefix();
+			int randomLength = Math.max(0, NICKNAME_ENGLISH_MAX - prefix.length());
+			String nickname = prefix + randomCode(randomLength);
 			if (userMapper.countByNickname(nickname, null) == 0) {
 				return nickname;
 			}

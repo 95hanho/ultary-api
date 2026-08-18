@@ -15,13 +15,11 @@ import org.springframework.web.bind.annotation.RestController;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.response.ApiResponse;
 import me._hanho.ultary.common.response.ChangeAvailabilityResponse;
-import me._hanho.ultary.common.validation.NicknameRules;
+import me._hanho.ultary.common.validation.ValidNickname;
 import me._hanho.ultary.domain.auth.dto.request.ChangeMyPasswordRequest;
 import me._hanho.ultary.domain.auth.dto.request.ChangeNicknameRequest;
 import me._hanho.ultary.domain.auth.dto.request.ChangePasswordRequest;
@@ -153,8 +151,7 @@ public class AuthController {
 	public ApiResponse<AvailabilityCheckResponse> checkNickname(
 			@RequestParam
 			@NotBlank(message = "닉네임은 필수입니다.")
-			@Size(max = 30, message = "닉네임은 30자 이하여야 합니다.")
-			@Pattern(regexp = NicknameRules.REGEX, message = NicknameRules.MESSAGE)
+			@ValidNickname
 			String nickname) {
 		log.info("[checkNickname] nickname={}", nickname);
 		return ApiResponse.ok(authService.checkNickname(nickname), "닉네임 중복확인 성공");

@@ -13,7 +13,7 @@
 --       · 이미지 위치 멘션 = ultary_feed_media_mention (승인 없음, 자유)
 --       · 공동작성 = ultary_feed_pet.role=COLLABORATOR (멘션된 피드 목록 / 삭제 권한)
 --   - # : 태그 hashtag (본문 태그, 상품·소개 태그). hashtag는 중복 가능·생성 후 불변, handle로 좁힘
---   - 닉네임 허용: 영문 대소문자 + 한글만 (^[A-Za-z가-힣]{1,30}$)
+--   - 닉네임 허용: 영문·한글만. 한글만 2~5자, 영문만 4~10자. 혼합 시 한글1자=2, 영문1자=1, 가중치 합 4~10 (한글 최대 5자)
 --   - mention_id / tag.handle 허용: 영문·숫자·언더바 (^[A-Za-z0-9_]{1,30}$), UNIQUE, utf8_general_ci라 대소문자 동일 취급
 --   - 최근 검색: user 컬럼이 아니라 ultary_user_search_history (다건·search_type)
 --   - 피드 삭제: 작성자(user_no) 또는 COLLABORATOR 펫 보호자. deleted_by_user_no에 실제 삭제자 기록
@@ -45,8 +45,7 @@ DROP TABLE IF EXISTS `ultary_ai_request_log`;
 DROP TABLE IF EXISTS `ultary_report`;
 DROP TABLE IF EXISTS `ultary_notification`;
 DROP TABLE IF EXISTS `ultary_story_view`;
-DROP Tedia_mention, feed_pet.role, user_search_history, nickname 규칙
---   v5: 펫 멘션 승인 제거, feed.deleted_by_user_no,ABLE IF EXISTS `ultary_story`;
+DROP TABLE IF EXISTS `ultary_story`;
 DROP TABLE IF EXISTS `ultary_user_search_history`;
 DROP TABLE IF EXISTS `ultary_tag_image`;
 DROP TABLE IF EXISTS `ultary_feed_tag`;
@@ -75,7 +74,7 @@ CREATE TABLE `ultary_user` (
   `user_no` INT(11) NOT NULL AUTO_INCREMENT,
   `password` VARCHAR(200) NULL DEFAULT NULL COMMENT 'BCrypt 해시. 소셜만 사용 시 NULL, 이후 설정 가능',
   `name` VARCHAR(20) NULL DEFAULT NULL,
-  `nickname` VARCHAR(30) NOT NULL COMMENT '표시 이름. 영문 대소문자+한글만. 소셜 가입 시 google|kakao + 랜덤영문',
+  `nickname` VARCHAR(30) NOT NULL COMMENT '표시 이름. 한글 2~5 / 영문 4~10 / 혼합은 한글1=2 가중치 합 4~10. 소셜 가입 시 google|kakao + 랜덤영문(총 10자)',
   `nickname_changed_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '닉네임 마지막 변경(또는 최초 부여) 시각. 생성 직후부터 7일간 재변경 불가',
   `is_default_nickname` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=자동 생성 닉네임(변경 유도 대상), 0=사용자가 직접 변경함',
   `email` VARCHAR(50) NULL DEFAULT NULL COMMENT '소셜에서 전달되거나 이후 등록. 비밀번호 로그인 식별자로 사용 가능',

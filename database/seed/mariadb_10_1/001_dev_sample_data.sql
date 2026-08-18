@@ -156,8 +156,8 @@ WHERE `user_no` IN (1, 2, 101, 102, 103, 104, 105)
      'seed.u105@example.com'
    )
    OR `nickname` IN (
-     '울타리견주', '울타리냥이', '마이울타리테스트', '시드이웃',
-     '시드산책러', '시드대기중', '시드팔로워'
+     '울타리견주', '울타리냥이', '울타리', '나리집사',
+     '산책러', '대기중', '팔로워'
    );
 
 SET FOREIGN_KEY_CHECKS = 1;
@@ -168,11 +168,11 @@ INSERT INTO `ultary_user` (
   `is_default_nickname`, `email`, `phone`, `bio`,
   `region_sido`, `region_sigungu`, `withdrawal_status`
 ) VALUES
-(101, '{noop}Test1234!', '한호', '마이울타리테스트', NOW(), 0, 'myultary.test@example.com', '01011112222', '강아지랑 산책하는 집사', '서울특별시', '마포구', 'ACTIVE'),
-(102, '{noop}Test1234!', '나리', '시드이웃', NOW(), 0, 'seed.neighbor@example.com', '01033334444', '고양이 집사', '서울특별시', '용산구', 'ACTIVE'),
-(103, '{noop}Test1234!', '민수', '시드산책러', NOW(), 0, 'seed.u103@example.com', '01055556666', '주말 산책러', '경기도', '성남시', 'ACTIVE'),
-(104, '{noop}Test1234!', '지우', '시드대기중', NOW(), 0, 'seed.u104@example.com', '01077778888', '요청 대기 중', '서울특별시', '강남구', 'ACTIVE'),
-(105, '{noop}Test1234!', '서연', '시드팔로워', NOW(), 0, 'seed.u105@example.com', '01099990000', '101의 이웃', '부산광역시', '해운대구', 'ACTIVE');
+(101, '{noop}Test1234!', '한호', '울타리', NOW(), 0, 'myultary.test@example.com', '01011112222', '강아지랑 산책하는 집사', '서울특별시', '마포구', 'ACTIVE'),
+(102, '{noop}Test1234!', '나리', '나리집사', NOW(), 0, 'seed.neighbor@example.com', '01033334444', '고양이 집사', '서울특별시', '용산구', 'ACTIVE'),
+(103, '{noop}Test1234!', '민수', '산책러', NOW(), 0, 'seed.u103@example.com', '01055556666', '주말 산책러', '경기도', '성남시', 'ACTIVE'),
+(104, '{noop}Test1234!', '지우', '대기중', NOW(), 0, 'seed.u104@example.com', '01077778888', '요청 대기 중', '서울특별시', '강남구', 'ACTIVE'),
+(105, '{noop}Test1234!', '서연', '팔로워', NOW(), 0, 'seed.u105@example.com', '01099990000', '101의 이웃', '부산광역시', '해운대구', 'ACTIVE');
 
 INSERT INTO `ultary_user_social` (
   `user_no`, `provider`, `provider_user_id`, `provider_email`
@@ -309,7 +309,7 @@ INSERT INTO `ultary_feed_store` (`feed_store_id`, `feed_id`, `user_no`) VALUES
 INSERT INTO `ultary_feed_comment` (
   `feed_comment_id`, `feed_id`, `user_no`, `content`
 ) VALUES
-(101, 101, 102, '초코 너무 귀엽다! @마이울타리테스트 @choco_01');
+(101, 101, 102, '초코 너무 귀엽다! @울타리 @choco_01');
 
 INSERT INTO `ultary_feed_comment_mention` (
   `feed_comment_mention_id`, `feed_comment_id`, `feed_reply_id`, `mentioned_user_no`, `mentioned_pet_id`
@@ -320,7 +320,7 @@ INSERT INTO `ultary_feed_comment_mention` (
 INSERT INTO `ultary_feed_reply` (
   `feed_reply_id`, `feed_comment_id`, `user_no`, `content`
 ) VALUES
-(101, 101, 101, '고마워! @시드이웃');
+(101, 101, 101, '고마워! @나리집사');
 
 INSERT INTO `ultary_feed_comment_mention` (
   `feed_comment_mention_id`, `feed_comment_id`, `feed_reply_id`, `mentioned_user_no`, `mentioned_pet_id`

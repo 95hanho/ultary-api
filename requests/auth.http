@@ -43,7 +43,7 @@ Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "nickname": "울타리닉네임"
+  "nickname": "울타리닉"
 }
 
 ### 3c. 회원정보 변경 (닉네임 제외)

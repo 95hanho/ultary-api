@@ -32,6 +32,7 @@ Spring Boot 3.4 / MyBatis / MariaDB 10.1 / 패키지 `me._hanho.ultary` / API pr
 - 완성 참고: auth, file, pet, tag, feed, myultary, story, neighbor, main
 - 식별자 변경은 전용 API + `change-availability` (일반 PATCH에 nickname/mentionId/handle/hashtag 넣지 않음)
 - `hashtag`·`pet.name` 생성 후 불변
+- 닉네임: 한글만 2~5자, 영문만 4~10자. 혼합 시 한글 1자=2·영문 1자=1, 가중치 합 4~10 (한글 최대 5자). `NicknameRules`
 - 쿨다운: nickname 7일 / mention_id·handle 30일 (`handle_changed_at` NULL이면 handle 최초 설정 자유)
 - 스토리: IMAGE|VIDEO, `expires_at = created_at + 24h`, 조회는 본인 또는 ACCEPTED 이웃. owners = requester ACCEPTED 주민 중 활성 스토리
 - 이웃: 주민=`requester` ACCEPTED, 이웃=`receiver` ACCEPTED. `pair_key=min:max` 한 쌍 1행. 유저 API는 `UserController` → `NeighborService`
