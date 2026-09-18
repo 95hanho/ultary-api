@@ -53,6 +53,8 @@ BFF: `/api/...` · Spring: `/api/v1/...`
 
 닉네임: 영문·한글만. 한글만 2~5자, 영문만 4~10자. 혼합 시 한글 1자=2·영문 1자=1, 가중치 합 4~10(한글 최대 5자).
 
+로그인 `phone`: DB·조회는 digits only(`^01[0-9]{8,9}$`). 요청에 하이픈/공백/`+82`가 있어도 서버에서 정규화. HTTP 예시는 항상 `"01011112222"`(JSON 문자열).
+
 ### Redirect URI (로컬)
 
 - `http://localhost:3000/api/auth/social/google/callback`

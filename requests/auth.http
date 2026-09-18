@@ -1,9 +1,14 @@
 @baseUrl = http://localhost:9377
-@accessToken = {{socialLogin.response.body.$.data.accessToken}}
-@refreshToken = {{socialLogin.response.body.$.data.refreshToken}}
+@accessToken = {{login.response.body.$.data.accessToken}}
+@refreshToken = {{login.response.body.$.data.refreshToken}}
 @phoneAuthToken = {{phone.response.body.$.data.phoneAuthToken}}
 @phoneAuthCompleteToken = {{phoneVerify.response.body.$.data.phoneAuthCompleteToken}}
 @passwordChangeToken = {{passwordToken.response.body.$.data.passwordChangeToken}}
+
+### 시드: database/seed/mariadb_10_1/001_dev_sample_data.sql
+### user 101 myultary.test@example.com / 01011112222 / Test1234!
+### social GOOGLE google-myultary-test-001
+### 아래 11a 로그인 또는 1c 시드 소셜 로그인 후 accessToken 사용
 
 ### 1a. 소셜 로그인 (Google · 신규 가입 포함) — FE/BFF가 OAuth 후 providerUserId 전달
 # (= 1b와 동일 API) POST /api/v1/auth/social/login
@@ -18,7 +23,7 @@ Content-Type: application/json
   "name": "구글유저"
 }
 
-### 1b. 소셜 로그인 (Kakao)
+### 1b. 소셜 로그인 (Kakao · 신규)
 # (= 1a와 동일 API) POST /api/v1/auth/social/login
 POST {{baseUrl}}/api/v1/auth/social/login
 Content-Type: application/json
@@ -27,6 +32,18 @@ Content-Type: application/json
   "provider": "KAKAO",
   "providerUserId": "kakao-test-user-001",
   "email": "kakao.user@example.com"
+}
+
+### 1c. 소셜 로그인 (시드 user 101) — main/feed 등 requests와 동일
+# @name socialLoginSeed
+POST {{baseUrl}}/api/v1/auth/social/login
+Content-Type: application/json
+
+{
+  "provider": "GOOGLE",
+  "providerUserId": "google-myultary-test-001",
+  "email": "myultary.test@example.com",
+  "name": "한호"
 }
 
 ### 2. Me
@@ -46,13 +63,13 @@ Content-Type: application/json
   "nickname": "울타리닉"
 }
 
-### 3c. 회원정보 변경 (닉네임 제외)
+### 3c. 회원정보 변경 (닉네임 제외 · 시드 지역)
 PATCH {{baseUrl}}/api/v1/auth/me
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "bio": "소개글",
+  "bio": "강아지랑 산책하는 집사",
   "regionSido": "서울특별시",
   "regionSigungu": "마포구"
 }
@@ -115,24 +132,33 @@ Content-Type: application/json
   "email": "phone.user@ultary.local"
 }
 
-### 11a. 로그인 (email + password)
+### 11a. 로그인 (email + password) — seed user_no=101
 # (= 11b와 동일 API) POST /api/v1/auth/login
 # @name login
 POST {{baseUrl}}/api/v1/auth/login
 Content-Type: application/json
 
 {
-  "email": "fe.smoke@example.com",
-  "password": "!aest1234!"
+  "email": "myultary.test@example.com",
+  "password": "Test1234!"
 }
 
-### 11b. 로그인 (phone + password)
+### 11b. 로그인 (phone + password) — seed · 숫자만
 # (= 11a와 동일 API) POST /api/v1/auth/login
 POST {{baseUrl}}/api/v1/auth/login
 Content-Type: application/json
 
 {
-  "phone": "01012345678",
+  "phone": "01011112222",
+  "password": "Test1234!"
+}
+
+### 11b-2. 로그인 (phone 하이픈) — 서버 정규화 후 200
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "phone": "010-1111-2222",
   "password": "Test1234!"
 }
 
@@ -142,7 +168,7 @@ POST {{baseUrl}}/api/v1/auth/password/token
 Content-Type: application/json
 
 {
-  "phone": "01012345678",
+  "phone": "01011112222",
   "phoneAuthCompleteToken": "{{phoneAuthCompleteToken}}"
 }
 

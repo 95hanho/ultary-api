@@ -2,42 +2,57 @@
 @accessToken = {{socialLogin.response.body.$.data.accessToken}}
 @petId = {{createPet.response.body.$.data.petId}}
 
-### 0. 소셜 로그인 (토큰 확보)
+# 시드 pet (user 101): 101 choco_01(초코), 102 mung_01(멍이) / file 100~103
+# 생성 테스트는 시드 mention_id와 겹치지 않는 값 사용
+
+### 0. 소셜 로그인 (시드 user 101)
 # @name socialLogin
 POST {{baseUrl}}/api/v1/auth/social/login
 Content-Type: application/json
 
 {
   "provider": "GOOGLE",
-  "providerUserId": "google-pet-test-001",
-  "email": "pet.test@example.com",
-  "name": "펫테스트"
+  "providerUserId": "google-myultary-test-001",
+  "email": "myultary.test@example.com",
+  "name": "한호"
 }
 
-### 1. 반려동물 등록
+### 0b. 시드 펫 목록 (choco_01, mung_01)
+GET {{baseUrl}}/api/v1/pets
+Authorization: Bearer {{accessToken}}
+
+### 0c. 시드 펫 수정 (petId=101) — name·mentionId 제외
+PATCH {{baseUrl}}/api/v1/pets/101
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "bio": "산책 좋아함",
+  "isNeutered": true
+}
+
+### 1. 반려동물 등록 (시드 choco_01과 충돌 방지 → pet_http_01)
 # @name createPet
 POST {{baseUrl}}/api/v1/pets
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "mentionId": "choco_01",
-  "name": "초코",
+  "mentionId": "pet_http_01",
+  "name": "테스트",
   "species": "DOG",
   "breed": "푸들",
   "gender": "MALE",
   "isNeutered": true,
   "birthday": "2020-05-01T00:00:00",
-  "bio": "산책 좋아함"
+  "bio": "http 테스트용"
 }
 
 ### 2. 내 반려동물 목록
-# (= 7번과 동일 API) GET /api/v1/pets
 GET {{baseUrl}}/api/v1/pets
 Authorization: Bearer {{accessToken}}
 
 ### 3a. 반려동물 수정 — bio 등 (name·mentionId 제외)
-# (= 4·5번과 동일 API) PATCH /api/v1/pets/{petId} · PetController.update
 PATCH {{baseUrl}}/api/v1/pets/{{petId}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
@@ -57,21 +72,19 @@ Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "mentionId": "choco_02"
+  "mentionId": "pet_http_02"
 }
 
-### 4. 프로필 이미지 연결 (fileId는 file.http 업로드 후 교체)
-# (= 3a·5번과 동일 API) PATCH /api/v1/pets/{petId} · body.profileFileId
+### 4. 프로필 이미지 연결 (시드 fileId=102)
 PATCH {{baseUrl}}/api/v1/pets/{{petId}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "profileFileId": 1
+  "profileFileId": 102
 }
 
 ### 5. 프로필 이미지 제거
-# (= 3a·4번과 동일 API) PATCH /api/v1/pets/{petId} · body.removeProfileFile=true
 PATCH {{baseUrl}}/api/v1/pets/{{petId}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
@@ -80,11 +93,10 @@ Content-Type: application/json
   "removeProfileFile": true
 }
 
-### 6. 반려동물 삭제
+### 6. 반려동물 삭제 (생성분만 — 시드 101·102는 건드리지 않음)
 DELETE {{baseUrl}}/api/v1/pets/{{petId}}
 Authorization: Bearer {{accessToken}}
 
-### 7. 삭제 후 목록보기 (없어야 함)
-# (= 2번과 동일 API) GET /api/v1/pets
+### 7. 삭제 후 목록보기 (시드 2마리만 남아야 함)
 GET {{baseUrl}}/api/v1/pets
 Authorization: Bearer {{accessToken}}

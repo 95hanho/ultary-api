@@ -4,19 +4,30 @@
 @commentId = {{createComment.response.body.$.data.feedCommentId}}
 @replyId = {{createReply.response.body.$.data.feedReplyId}}
 
-### 0. 소셜 로그인 (토큰 확보)
+# 시드: user 101 / feed 101·102 / file 100·104 / pet 101(choco_01) / tag 101(산책)·102(royalcanin)
+# 로그인: google-myultary-test-001 (nickname=울타리)
+
+### 0. 소셜 로그인 (시드 user 101)
 # @name socialLogin
 POST {{baseUrl}}/api/v1/auth/social/login
 Content-Type: application/json
 
 {
   "provider": "GOOGLE",
-  "providerUserId": "google-feed-test-001",
-  "email": "feed.test@example.com",
-  "name": "피드테스트"
+  "providerUserId": "google-myultary-test-001",
+  "email": "myultary.test@example.com",
+  "name": "한호"
 }
 
-### 1. 게시글 등록 (fileId·petId·tagId는 사전 생성 후 교체)
+### 0b. 시드 게시글 상세 (feed 101)
+GET {{baseUrl}}/api/v1/feeds/101
+Authorization: Bearer {{accessToken}}
+
+### 0c. 시드 게시글 상세 (feed 102 — user 102 작성, 이웃)
+GET {{baseUrl}}/api/v1/feeds/102
+Authorization: Bearer {{accessToken}}
+
+### 1. 게시글 등록 (시드 file/pet/tag ID 사용)
 # @name createFeed
 POST {{baseUrl}}/api/v1/feeds
 Authorization: Bearer {{accessToken}}
@@ -27,11 +38,11 @@ Content-Type: application/json
   "visibility": "PUBLIC",
   "media": [
     {
-      "fileId": 1,
+      "fileId": 100,
       "mediaType": "IMAGE",
       "mentions": [
         {
-          "petId": 1,
+          "petId": 101,
           "posX": 42.5,
           "posY": 60.0
         }
@@ -40,12 +51,12 @@ Content-Type: application/json
   ],
   "pets": [
     {
-      "petId": 1,
+      "petId": 101,
       "role": "COLLABORATOR",
       "isMain": true
     }
   ],
-  "tagIds": [1]
+  "tagIds": [101]
 }
 
 ### 2. 게시글 상세
@@ -86,17 +97,17 @@ Authorization: Bearer {{accessToken}}
 POST {{baseUrl}}/api/v1/feeds/{{feedId}}/share
 Authorization: Bearer {{accessToken}}
 
-### 7a. 댓글 작성 (@유저 / @펫 멘션)
+### 7a. 댓글 작성 (@유저 / @펫 — 시드 nickname=울타리, mention_id=choco_01)
 # @name createComment
 POST {{baseUrl}}/api/v1/feeds/{{feedId}}/comments
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "content": "귀엽다! @울타리닉네임 @choco_01",
+  "content": "귀엽다! @울타리 @choco_01",
   "mentions": [
-    { "userNo": 1 },
-    { "petId": 1 }
+    { "userNo": 101 },
+    { "petId": 101 }
   ]
 }
 
@@ -120,9 +131,9 @@ Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "content": "고마워! @울타리닉네임",
+  "content": "고마워! @나리집사",
   "mentions": [
-    { "userNo": 1 }
+    { "userNo": 102 }
   ]
 }
 

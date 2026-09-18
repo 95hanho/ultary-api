@@ -2,7 +2,10 @@
 @accessToken = {{socialLogin.response.body.$.data.accessToken}}
 @storyId = {{createStory.response.body.$.data.storyId}}
 
-### 0. 소셜 로그인
+# 시드: story 101(user101)·102(user103) / file 100·103
+# 로그인: user 101 (google-myultary-test-001)
+
+### 0. 소셜 로그인 (시드 user 101)
 # @name socialLogin
 POST {{baseUrl}}/api/v1/auth/social/login
 Content-Type: application/json
@@ -11,7 +14,7 @@ Content-Type: application/json
   "provider": "GOOGLE",
   "providerUserId": "google-myultary-test-001",
   "email": "myultary.test@example.com",
-  "name": "마이울타리테스트"
+  "name": "한호"
 }
 
 ### 1. 스토리 등록 (시드 fileId=100)
@@ -30,12 +33,16 @@ Content-Type: application/json
 GET {{baseUrl}}/api/v1/my-ultary/stories
 Authorization: Bearer {{accessToken}}
 
-### 3. 주민 중 스토리 있는 목록 (hasUnviewed)
+### 3. 주민 중 스토리 있는 목록 (시드: 주민 103 → story 102)
 GET {{baseUrl}}/api/v1/main/stories/owners
 Authorization: Bearer {{accessToken}}
 
-### 4. 특정 유저 스토리 조회 (본인 또는 ACCEPTED 이웃)
+### 4. 특정 유저 스토리 조회 (본인 101 또는 ACCEPTED 이웃)
 GET {{baseUrl}}/api/v1/main/stories?userNo=101
+Authorization: Bearer {{accessToken}}
+
+### 4b. 주민 103 스토리 조회 (시드 story 102)
+GET {{baseUrl}}/api/v1/main/stories?userNo=103
 Authorization: Bearer {{accessToken}}
 
 ### 5. 스토리 읽음 처리

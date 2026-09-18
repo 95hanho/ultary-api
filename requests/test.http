@@ -1,17 +1,16 @@
 @baseUrl = http://localhost:9377
 
 ### 1a. 평문 비밀번호 → DB용 인코딩 문자열 (local 프로필 전용)
-# (= 1b와 동일 API) POST /api/v1/test/password/encode
+# 시드 평문: Test1234! → DB에는 {noop}Test1234! 또는 아래 encode 결과
 # @name encodePassword
 POST {{baseUrl}}/api/v1/test/password/encode
 Content-Type: application/json
 
 {
-  "password": "!aest1234!"
+  "password": "Test1234!"
 }
 
 ### 1b. 규칙 위반 예시 (400 예상)
-# (= 1a와 동일 API) POST /api/v1/test/password/encode
 POST {{baseUrl}}/api/v1/test/password/encode
 Content-Type: application/json
 

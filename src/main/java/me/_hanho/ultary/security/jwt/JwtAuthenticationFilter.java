@@ -84,6 +84,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 				errorCode.getHttpStatus(),
 				errorCode.getMessage());
 		problemDetail.setProperty("code", errorCode.getCode());
+		problemDetail.setProperty("message", errorCode.getMessage());
 
 		objectMapper.writeValue(response.getWriter(), problemDetail);
 	}

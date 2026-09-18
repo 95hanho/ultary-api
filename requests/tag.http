@@ -2,40 +2,55 @@
 @accessToken = {{socialLogin.response.body.$.data.accessToken}}
 @tagId = {{createTag.response.body.$.data.tagId}}
 
-### 0. 소셜 로그인 (토큰 확보)
+# 시드 tag: 101 산책 / 102 royalcanin(+handle royal_canin_01) / 103 냥스타그램
+# 생성 테스트는 시드 hashtag·handle과 겹치지 않는 값 사용
+
+### 0. 소셜 로그인 (시드 user 101)
 # @name socialLogin
 POST {{baseUrl}}/api/v1/auth/social/login
 Content-Type: application/json
 
 {
   "provider": "GOOGLE",
-  "providerUserId": "google-tag-test-001",
-  "email": "tag.test@example.com",
-  "name": "태그테스트"
+  "providerUserId": "google-myultary-test-001",
+  "email": "myultary.test@example.com",
+  "name": "한호"
 }
 
-### 1a. 태그 등록 (hashtag 필수·이후 불변, handle 선택)
+### 0b. 시드 태그 상세 (tagId=102 royalcanin)
+GET {{baseUrl}}/api/v1/tags/102
+Authorization: Bearer {{accessToken}}
+
+### 0c. 시드 태그 검색
+GET {{baseUrl}}/api/v1/tags/search?q=royal&limit=20
+Authorization: Bearer {{accessToken}}
+
+### 0d. 시드 태그 추천
+GET {{baseUrl}}/api/v1/tags/recommend?q=roy&limit=10
+Authorization: Bearer {{accessToken}}
+
+### 1a. 태그 등록 (시드 royalcanin과 충돌 방지)
 # @name createTag
 POST {{baseUrl}}/api/v1/tags
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "hashtag": "royalcanin",
-  "title": "로얄캐닌 어덜트",
-  "handle": "royal_canin_01",
-  "content": "강아지 사료",
-  "link": "https://example.com/product/1",
-  "imageFileIds": []
+  "hashtag": "httptest",
+  "title": "HTTP 테스트 태그",
+  "handle": "http_tag_01",
+  "content": "http 전용",
+  "link": "https://example.com/http-tag",
+  "imageFileIds": [103]
 }
 
-### 1b. 태그 등록 (단순 해시태그 — handle/title 없음)
+### 1b. 태그 등록 (단순 해시태그)
 POST {{baseUrl}}/api/v1/tags
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "hashtag": "산책"
+  "hashtag": "httptest2"
 }
 
 ### 2. 태그 정보 조회
@@ -43,34 +58,33 @@ GET {{baseUrl}}/api/v1/tags/{{tagId}}
 Authorization: Bearer {{accessToken}}
 
 ### 3. 태그 검색 (hashtag·title·handle 부분일치)
-GET {{baseUrl}}/api/v1/tags/search?q=royal&limit=20
+GET {{baseUrl}}/api/v1/tags/search?q=http&limit=20
 Authorization: Bearer {{accessToken}}
 
 ### 4. 태그 추천 (입력 중 접두/부분일치, q 없으면 인기순)
-GET {{baseUrl}}/api/v1/tags/recommend?q=roy&limit=10
+GET {{baseUrl}}/api/v1/tags/recommend?q=http&limit=10
 Authorization: Bearer {{accessToken}}
 
 ### 5. 태그 수정 — title/content/link (hashtag·handle 제외)
-# (= clear* 플래그로 NULL 클리어 가능)
 PATCH {{baseUrl}}/api/v1/tags/{{tagId}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "title": "로얄캐닌 어덜트 (수정)",
-  "content": "중형견용",
-  "link": "https://example.com/product/1-updated"
+  "title": "HTTP 테스트 태그 (수정)",
+  "content": "수정됨",
+  "link": "https://example.com/http-tag-updated"
 }
 
 ### 6. handle 변경 가능 여부
 GET {{baseUrl}}/api/v1/tags/{{tagId}}/handle/change-availability
 Authorization: Bearer {{accessToken}}
 
-### 7. handle 변경/최초 설정 (설정·변경 후 30일 쿨다운 — 생성 시 handle 넣었으면 실패 예상)
+### 7. handle 변경 (생성 시 handle 넣었으면 30일 쿨다운으로 실패 예상)
 PATCH {{baseUrl}}/api/v1/tags/{{tagId}}/handle
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "handle": "royal_canin_02"
+  "handle": "http_tag_02"
 }

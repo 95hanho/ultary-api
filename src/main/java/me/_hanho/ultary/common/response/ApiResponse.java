@@ -26,4 +26,8 @@ public record ApiResponse<T>(
 	public static ApiResponse<Void> ok() {
 		return okEmpty("요청이 성공했습니다.");
 	}
+
+	public static <T> ApiResponse<T> fail(String code, String message) {
+		return new ApiResponse<>(false, code, message, null, Instant.now());
+	}
 }

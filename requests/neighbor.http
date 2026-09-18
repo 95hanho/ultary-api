@@ -4,6 +4,10 @@
 @neighborIdPending = 104
 @neighborIdAccepted = 101
 
+# 시드 neighbor:
+#   101: 101→102 ACCEPTED, 101→103 ACCEPTED, 105→101 ACCEPTED, 104→101 PENDING
+# 로그인: user 101 (울타리) / 필요 시 104 (대기중)
+
 ### 0. 소셜 로그인 (시드 user 101)
 # @name socialLogin
 POST {{baseUrl}}/api/v1/auth/social/login
@@ -13,14 +17,14 @@ Content-Type: application/json
   "provider": "GOOGLE",
   "providerUserId": "google-myultary-test-001",
   "email": "myultary.test@example.com",
-  "name": "마이울타리테스트"
+  "name": "한호"
 }
 
-### 1. 다른 유저 울타리 (102) — relationStatus=ACCEPTED
+### 1. 다른 유저 울타리 (102 나리집사) — relationStatus=ACCEPTED
 GET {{baseUrl}}/api/v1/users/102/ultary
 Authorization: Bearer {{accessToken}}
 
-### 2. 다른 유저 울타리 (104) — PENDING_RECEIVED
+### 2. 다른 유저 울타리 (104 대기중) — PENDING_RECEIVED
 GET {{baseUrl}}/api/v1/users/104/ultary
 Authorization: Bearer {{accessToken}}
 
@@ -32,7 +36,7 @@ Authorization: Bearer {{accessToken}}
 GET {{baseUrl}}/api/v1/users/101/neighbors?type=NEIGHBORS&limit=30
 Authorization: Bearer {{accessToken}}
 
-### 4. 주민 요청 (101 → 미연결 유저가 있으면) — 이미 연결된 102는 CONFLICT
+### 4. 주민 요청 (이미 ACCEPTED인 102는 CONFLICT 예상)
 POST {{baseUrl}}/api/v1/users/102/neighbors/request
 Authorization: Bearer {{accessToken}}
 
@@ -57,7 +61,7 @@ Authorization: Bearer {{accessToken}}
 DELETE {{baseUrl}}/api/v1/users/102/block
 Authorization: Bearer {{accessToken}}
 
-### 8. 요청자 측 로그인 (104) — 대기 요청 취소 테스트용
+### 8. 요청자 측 로그인 (시드 user 104 nickname=대기중)
 # @name socialLogin104
 POST {{baseUrl}}/api/v1/auth/social/login
 Content-Type: application/json
@@ -66,7 +70,7 @@ Content-Type: application/json
   "provider": "GOOGLE",
   "providerUserId": "google-seed-user-104",
   "email": "seed.u104@example.com",
-  "name": "시드대기중"
+  "name": "지우"
 }
 
 ### 8b. 요청 취소 (PENDING, 요청자만) — accept 전에 실행할 것

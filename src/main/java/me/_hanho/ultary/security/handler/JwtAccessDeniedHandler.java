@@ -35,6 +35,7 @@ public class JwtAccessDeniedHandler implements AccessDeniedHandler {
 				errorCode.getHttpStatus(),
 				errorCode.getMessage());
 		problemDetail.setProperty("code", errorCode.getCode());
+		problemDetail.setProperty("message", errorCode.getMessage());
 		problemDetail.setInstance(java.net.URI.create(request.getRequestURI()));
 
 		objectMapper.writeValue(response.getWriter(), problemDetail);

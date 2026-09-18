@@ -16,6 +16,7 @@ import me._hanho.ultary.common.exception.BusinessException;
 import me._hanho.ultary.common.exception.ErrorCode;
 import me._hanho.ultary.common.response.ChangeAvailabilityResponse;
 import me._hanho.ultary.common.validation.IdentityChangeCooldown;
+import me._hanho.ultary.common.validation.PhoneRules;
 import me._hanho.ultary.domain.auth.dto.request.ChangeMyPasswordRequest;
 import me._hanho.ultary.domain.auth.dto.request.ChangeNicknameRequest;
 import me._hanho.ultary.domain.auth.dto.request.ChangePasswordRequest;
@@ -34,7 +35,6 @@ import me._hanho.ultary.domain.auth.dto.response.PhoneAuthResponse;
 import me._hanho.ultary.domain.auth.dto.response.PhoneVerifyResponse;
 import me._hanho.ultary.domain.auth.dto.response.SocialLoginResponse;
 import me._hanho.ultary.domain.auth.dto.response.TokenResponse;
-import me._hanho.ultary.domain.auth.TokenMapper;
 import me._hanho.ultary.domain.auth.model.SocialProvider;
 import me._hanho.ultary.domain.auth.model.Token;
 import me._hanho.ultary.domain.auth.support.PhoneAuthCodeStore;
@@ -164,9 +164,11 @@ public class AuthService {
 	@Transactional
 	public TokenResponse login(LoginRequest request, HttpServletRequest httpRequest) {
 		User user = resolveLoginUser(request);
+
 		if (user == null
 				|| !StringUtils.hasText(user.getPassword())
 				|| !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+
 			throw new BusinessException(ErrorCode.LOGIN_FAILED);
 		}
 		if (!"ACTIVE".equals(user.getWithdrawalStatus())) {
@@ -326,13 +328,13 @@ public class AuthService {
 	}
 
 	public PhoneAuthResponse requestPhoneAuth(PhoneAuthRequest request) {
-		String phone = request.getPhone();
+		String phone = PhoneRules.normalize(request.getPhone());
 		String code = String.format("%06d", secureRandom.nextInt(1_000_000));
 		long ttlSeconds = jwtProperties.getExpiration().getPhoneauth();
 
 		phoneAuthCodeStore.save(phone, code, ttlSeconds);
 		// TODO: SMS 연동. 로컬 확인용으로 인증번호 로그 출력
-		log.info("[phoneAuth] phone={}, code={}", phone, code);
+		log.info("[phoneAuth] phone={}, code={}", PhoneRules.maskForLog(phone), code);
 
 		String phoneAuthToken = jwtTokenProvider.createPhoneAuthToken(phone);
 		return PhoneAuthResponse.builder().phoneAuthToken(phoneAuthToken).build();
@@ -359,8 +361,9 @@ public class AuthService {
 	@Transactional(readOnly = true)
 	public PasswordTokenResponse createPasswordToken(PasswordTokenRequest request) {
 		Claims claims = jwtTokenProvider.parsePhoneAuthCompleteToken(request.getPhoneAuthCompleteToken());
-		String phone = jwtTokenProvider.getPhone(claims);
-		if (!phone.equals(request.getPhone())) {
+		String phone = PhoneRules.normalize(jwtTokenProvider.getPhone(claims));
+		String requestPhone = PhoneRules.normalize(request.getPhone());
+		if (phone == null || !phone.equals(requestPhone)) {
 			throw new BusinessException(ErrorCode.PHONE_AUTH_FAILED);
 		}
 
@@ -476,7 +479,15 @@ public class AuthService {
 			return userMapper.findByEmail(request.getEmail().trim());
 		}
 		if (StringUtils.hasText(request.getPhone())) {
-			return userMapper.findByPhone(request.getPhone().trim());
+			String raw = request.getPhone();
+			String phone = PhoneRules.normalize(raw);
+			log.info("[login] phone rawLen={} normalized={}",
+					raw.trim().length(),
+					PhoneRules.maskForLog(phone));
+			if (!PhoneRules.isValid(phone)) {
+				return null;
+			}
+			return userMapper.findByPhone(phone);
 		}
 		return null;
 	}

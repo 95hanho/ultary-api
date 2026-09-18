@@ -10,8 +10,10 @@
 --   images/ec188795-ad0f-4f76-9d92-5a1df48550d3.jpg
 --   videos/c7c8c642-4735-456d-97be-f399256a0aaf.mp4
 --
--- 시드: user 101~105, pet 101~107, file 100~104, feed/story 유지
--- HTTP: my-ultary / story / neighbor → user 101 (google-myultary-test-001)
+-- 시드: user 101~105 (울타리/나리집사/산책러/대기중/팔로워)
+--       pet 101~107, file 100~104, feed 101~102, tag 101~103, story 101~102
+--       neighbor 101~104 (101↔102·103 ACCEPTED, 105→101 ACCEPTED, 104→101 PENDING)
+-- HTTP: main/my-ultary/story/neighbor/feed/pet/tag → user 101 (google-myultary-test-001)
 -- ============================================================
 
 SET NAMES utf8;
@@ -334,7 +336,7 @@ INSERT INTO `ultary_story` (
   `created_at`, `expires_at`
 ) VALUES
 (101, 101, 100, 'IMAGE', NULL, NULL, '오늘 산책 스토리', NOW(), DATE_ADD(NOW(), INTERVAL 24 HOUR)),
-(102, 103, 103, 'IMAGE', NULL, NULL, '시드산책러 스토리', NOW(), DATE_ADD(NOW(), INTERVAL 24 HOUR));
+(102, 103, 103, 'IMAGE', NULL, NULL, '산책러 스토리', NOW(), DATE_ADD(NOW(), INTERVAL 24 HOUR));
 
 ALTER TABLE `ultary_user` AUTO_INCREMENT = 200;
 ALTER TABLE `ultary_file` AUTO_INCREMENT = 200;

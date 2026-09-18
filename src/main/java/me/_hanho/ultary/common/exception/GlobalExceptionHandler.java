@@ -17,21 +17,21 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import me._hanho.ultary.common.response.ApiResponse;
 
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+	/** 비즈니스 오류는 성공 응답과 대칭인 ApiResponse(success=false) */
 	@ExceptionHandler(BusinessException.class)
-	public ResponseEntity<ProblemDetail> handleBusinessException(
+	public ResponseEntity<ApiResponse<Void>> handleBusinessException(
 			BusinessException ex,
 			HttpServletRequest request) {
 		ErrorCode errorCode = ex.getErrorCode();
-		ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
-				errorCode.getHttpStatus(),
-				ex.getMessage());
-		enrichProblemDetail(problemDetail, errorCode.getCode(), request.getRequestURI());
-		return ResponseEntity.status(errorCode.getHttpStatus()).body(problemDetail);
+		return ResponseEntity
+				.status(errorCode.getHttpStatus())
+				.body(ApiResponse.fail(errorCode.getCode(), ex.getMessage()));
 	}
 
 	@ExceptionHandler(MethodArgumentNotValidException.class)
@@ -101,6 +101,7 @@ public class GlobalExceptionHandler {
 
 	private void enrichProblemDetail(ProblemDetail problemDetail, String code, String instance) {
 		problemDetail.setProperty("code", code);
+		problemDetail.setProperty("message", problemDetail.getDetail());
 		problemDetail.setInstance(URI.create(instance));
 	}
 }
