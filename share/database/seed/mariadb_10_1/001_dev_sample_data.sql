@@ -1,6 +1,6 @@
 -- ============================================================
 -- ULTARY 로컬/개발용 샘플 데이터 (schema_version 7)
--- 실행: 001_init_schema.sql 이후. 운영에서는 실행하지 않음.
+-- 실행: share/database/schema/.../001_init_schema.sql 이후. 운영에서는 실행하지 않음.
 -- 재실행: CLEANUP 후 INSERT (그대로 다시 실행 가능).
 --
 -- 실제 업로드 파일 (UPLOAD_DIR, 예: D:/files/ultary-api):

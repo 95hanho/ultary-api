@@ -1,5 +1,8 @@
 # Ultary API 메모
 
+> FE BFF 아키텍처·구현 가이드: [`docs/bff/`](../../docs/bff/README.md)  
+> 입력 검사: [`share/validation/`](../validation/README.md) · 계약: [`API_CONTRACT.md`](./API_CONTRACT.md)
+
 > 인스타 벤치마킹 · 반려동물 전용 SNS  
 > 팔로우 = **주민**, 팔로워 = **이웃**  
 > 계정마다 반려동물 등록 및 태그명 생성 (태그명, 이름, 종, 부가설명 등)
@@ -54,6 +57,8 @@ BFF: `/api/...` · Spring: `/api/v1/...`
 닉네임: 영문·한글만. 한글만 2~5자, 영문만 4~10자. 혼합 시 한글 1자=2·영문 1자=1, 가중치 합 4~10(한글 최대 5자).
 
 로그인 `phone`: DB·조회는 digits only(`^01[0-9]{8,9}$`). 요청에 하이픈/공백/`+82`가 있어도 서버에서 정규화. HTTP 예시는 항상 `"01011112222"`(JSON 문자열).
+
+입력 검사 공통 스펙: `share/validation/rules.json` (닉네임·비번·폰·handle·hashtag). Bean Validation 실패 시 `ApiResponse` `success:false` + `message` + `data`(필드 맵).
 
 ### Redirect URI (로컬)
 
@@ -252,11 +257,12 @@ BFF: `/api/...` · Spring: `/api/v1/...`
 - 코드 상수: `src/lib/api/endpoints.ts` (`bffEndpoints` / `springEndpoints`)
 - BFF 스켈레톤: `src/app/api/**/route.ts`
 - REST Client 틀: `http/bff.http` (프론트) · Spring: `requests/*.http`
-- DB 스키마: `database/schema/mariadb_10_1/001_init_schema.sql` (**schema_version 7**, 스토리 포함)
-- 로컬 시드(선택): `database/seed/mariadb_10_1/001_dev_sample_data.sql`  
+- DB 스키마: `share/database/schema/mariadb_10_1/001_init_schema.sql` (**schema_version 7**, 스토리 포함)
+- 로컬 시드(선택): `share/database/seed/mariadb_10_1/001_dev_sample_data.sql`  
   - 스키마 직후 실행. **재실행 가능**(CLEANUP 후 INSERT). 운영/최종 배포에서는 실행하지 않음.  
   - `ultary_file`은 업로드 디렉터리에 있는 실제 파일만 (`images/…`, `videos/…`).  
   - 시드 user **101~105** (펫 유저당 1~2). HTTP: `my-ultary` / `story` / `neighbor` → 101 (`google-myultary-test-001`)
+- 입력 검사 공통 스펙: `share/validation/` (`rules.json`)
 
 ### Spring 구현 진행 (BE)
 

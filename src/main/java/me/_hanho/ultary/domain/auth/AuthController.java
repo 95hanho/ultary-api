@@ -41,7 +41,7 @@ import me._hanho.ultary.domain.auth.dto.response.TokenResponse;
 import me._hanho.ultary.security.principal.UserPrincipal;
 
 /**
- * 경로 원본: ultary-web springEndpoints.auth / docs/api-memo.md §1
+ * 경로 원본: ultary-web springEndpoints.auth / share/docs/api-memo.md §1
  * 소셜 OAuth(시작/콜백)는 FE/BFF 담당. BE는 DB 조회·가입·연동만 처리.
  */
 @Slf4j

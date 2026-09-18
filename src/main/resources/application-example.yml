@@ -26,6 +26,7 @@ spring:
       filter:
         enabled: true
     problemdetails:
+      # true면 Boot 기본 ProblemDetail 사용. 검증 오류는 GlobalExceptionHandler가 ApiResponse로 덮어씀.
       enabled: true
 
   # ==============================
