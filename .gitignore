@@ -36,11 +36,12 @@ out/
 ### VS Code ###
 .vscode/
 
-### Properties ###
+### Properties / Spring config (로컬 전용 · git 제외) ###
 src/main/resources/application.properties
 src/main/resources/application.yml
 src/main/resources/application-prod.yml
 src/main/resources/application-local.yml
+# 템플릿은 src/main/resources/config-samples/ 에 두고 git 공유
 
 ### Logs ###
 spy.log

@@ -10,10 +10,10 @@ spring:
     # p6spy 사용 시 필수 드라이버
     driver-class-name: com.p6spy.engine.spy.P6SpyDriver
 
-    # 로컬 DB
-    url: jdbc:p6spy:mariadb://203.245.44.21:3306/ehfqntuqntu
+    # 로컬/개발 DB URL
+    url: jdbc:p6spy:mariadb://HOST:3306/DATABASE
 
-    # DB 계정 정보 (환경변수로 주입)
+    # DB 계정 (공유 금지 - 복사 후 채움)
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
 
@@ -25,5 +25,4 @@ spring:
   # ==============================
   servlet:
     multipart:
-      # location: D:/files/ultary-api
       location: ${UPLOAD_DIR:D:/files/ultary-api}

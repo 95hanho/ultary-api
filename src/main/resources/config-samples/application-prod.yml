@@ -4,15 +4,15 @@ spring:
       on-profile: prod
 
   # ==============================
-  # DB 설정 (MariaDB + p6spy) - Prod (cafe24)
+  # DB 설정 (MariaDB) - Prod
   # ==============================
   datasource:
     driver-class-name: org.mariadb.jdbc.Driver
 
-    # cafe24 운영 DB
-    url: jdbc:mariadb://localhost:3306/ehfqntuqntu
+    # 운영 DB URL
+    url: jdbc:mariadb://localhost:3306/DATABASE
 
-    # DB 계정 정보 (환경변수로 주입)
+    # DB 계정 (공유 금지 - 복사 후 채움 / 환경변수 권장)
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
 
@@ -20,8 +20,8 @@ spring:
       default-auto-commit: false
 
   # ==============================
-  # 파일 업로드 경로 - Prod (cafe24)
+  # 파일 업로드 경로 - Prod
   # ==============================
   servlet:
     multipart:
-      location: ${UPLOAD_DIR:/home/hosting_users/ehfqntuqntu/files/ultary-api}
+      location: ${UPLOAD_DIR:/path/to/ultary-api-files}
