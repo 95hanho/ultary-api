@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 
 import lombok.Builder;
 import lombok.Getter;
+import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
 
 @Getter
 @Builder
@@ -20,6 +21,7 @@ public class PetResponse {
 	private boolean neutered;
 	private LocalDateTime birthday;
 	private Long profileFileId;
+	private FileSummaryResponse profileFile;
 	private String bio;
 	private LocalDateTime createdAt;
 	private LocalDateTime updatedAt;

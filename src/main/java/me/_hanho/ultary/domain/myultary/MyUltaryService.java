@@ -1,7 +1,10 @@
 package me._hanho.ultary.domain.myultary;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +20,7 @@ import me._hanho.ultary.domain.feed.dto.response.FeedResponse;
 import me._hanho.ultary.domain.feed.model.Feed;
 import me._hanho.ultary.domain.feed.model.FeedMedia;
 import me._hanho.ultary.domain.file.FileService;
+import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
 import me._hanho.ultary.domain.myultary.dto.request.UpdateMyBioRequest;
 import me._hanho.ultary.domain.myultary.dto.request.UpdateMyProfileImageRequest;
 import me._hanho.ultary.domain.myultary.dto.response.FeedGridItemResponse;
@@ -54,6 +58,7 @@ public class MyUltaryService {
 				.nickname(user.getNickname())
 				.defaultNickname(Boolean.TRUE.equals(user.getIsDefaultNickname()))
 				.profileFileId(user.getProfileFileId())
+				.profileFile(fileService.findSummary(user.getProfileFileId()))
 				.bio(user.getBio())
 				.regionSido(user.getRegionSido())
 				.regionSigungu(user.getRegionSigungu())
@@ -141,16 +146,43 @@ public class MyUltaryService {
 	}
 
 	private List<FeedGridItemResponse> toGridItems(List<Feed> feeds) {
-		List<FeedGridItemResponse> items = new ArrayList<>();
+		if (feeds == null || feeds.isEmpty()) {
+			return List.of();
+		}
+		Set<Long> fileIds = new HashSet<>();
+		List<FeedMedia> covers = new ArrayList<>();
+		List<Integer> mediaCounts = new ArrayList<>();
 		for (Feed feed : feeds) {
 			List<FeedMedia> mediaList = feedMapper.findMediaByFeedId(feed.getFeedId());
 			FeedMedia cover = mediaList.isEmpty() ? null : mediaList.get(0);
+			covers.add(cover);
+			mediaCounts.add(mediaList.size());
+			if (cover != null) {
+				if (cover.getFileId() != null) {
+					fileIds.add(cover.getFileId());
+				}
+				if (cover.getThumbnailFileId() != null) {
+					fileIds.add(cover.getThumbnailFileId());
+				}
+			}
+		}
+		Map<Long, FileSummaryResponse> files = fileService.findSummaries(fileIds);
+		List<FeedGridItemResponse> items = new ArrayList<>();
+		for (int i = 0; i < feeds.size(); i++) {
+			Feed feed = feeds.get(i);
+			FeedMedia cover = covers.get(i);
 			items.add(FeedGridItemResponse.builder()
 					.feedId(feed.getFeedId())
 					.coverFileId(cover != null ? cover.getFileId() : null)
+					.coverFile(cover == null || cover.getFileId() == null
+							? null
+							: files.get(cover.getFileId()))
 					.coverThumbnailFileId(cover != null ? cover.getThumbnailFileId() : null)
+					.coverThumbnailFile(cover == null || cover.getThumbnailFileId() == null
+							? null
+							: files.get(cover.getThumbnailFileId()))
 					.coverMediaType(cover != null ? cover.getMediaType() : null)
-					.mediaCount(mediaList.size())
+					.mediaCount(mediaCounts.get(i))
 					.likeCount(feed.getLikeCount())
 					.commentCount(feed.getCommentCount())
 					.createdAt(feed.getCreatedAt())

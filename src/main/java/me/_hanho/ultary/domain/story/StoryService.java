@@ -1,8 +1,10 @@
 package me._hanho.ultary.domain.story;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 import org.springframework.stereotype.Service;
@@ -14,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.exception.BusinessException;
 import me._hanho.ultary.common.exception.ErrorCode;
 import me._hanho.ultary.domain.file.FileService;
+import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
 import me._hanho.ultary.domain.file.model.FileMeta;
 import me._hanho.ultary.domain.story.dto.request.CreateStoryRequest;
 import me._hanho.ultary.domain.story.dto.response.StoryOwnerResponse;
@@ -148,14 +151,31 @@ public class StoryService {
 		User author = userMapper.findActiveByUserNo(story.getUserNo());
 		boolean viewedByMe = story.getUserNo().equals(viewerUserNo)
 				|| storyMapper.countView(story.getStoryId(), viewerUserNo) > 0;
+		Set<Long> fileIds = new HashSet<>();
+		fileIds.add(story.getFileId());
+		if (story.getThumbnailFileId() != null) {
+			fileIds.add(story.getThumbnailFileId());
+		}
+		Integer authorProfileFileId = author != null ? author.getProfileFileId() : null;
+		if (authorProfileFileId != null) {
+			fileIds.add(authorProfileFileId.longValue());
+		}
+		Map<Long, FileSummaryResponse> files = fileService.findSummaries(fileIds);
 		return StoryResponse.builder()
 				.storyId(story.getStoryId())
 				.userNo(story.getUserNo())
 				.authorNickname(author != null ? author.getNickname() : null)
-				.authorProfileFileId(author != null ? author.getProfileFileId() : null)
+				.authorProfileFileId(authorProfileFileId)
+				.authorProfileFile(authorProfileFileId == null
+						? null
+						: files.get(authorProfileFileId.longValue()))
 				.fileId(story.getFileId())
+				.file(files.get(story.getFileId()))
 				.mediaType(story.getMediaType())
 				.thumbnailFileId(story.getThumbnailFileId())
+				.thumbnailFile(story.getThumbnailFileId() == null
+						? null
+						: files.get(story.getThumbnailFileId()))
 				.durationSec(story.getDurationSec())
 				.caption(story.getCaption())
 				.createdAt(story.getCreatedAt())

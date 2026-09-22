@@ -38,6 +38,7 @@ import me._hanho.ultary.domain.auth.dto.response.TokenResponse;
 import me._hanho.ultary.domain.auth.model.SocialProvider;
 import me._hanho.ultary.domain.auth.model.Token;
 import me._hanho.ultary.domain.auth.support.PhoneAuthCodeStore;
+import me._hanho.ultary.domain.file.FileService;
 import me._hanho.ultary.domain.user.UserMapper;
 import me._hanho.ultary.domain.user.UserSocialMapper;
 import me._hanho.ultary.domain.user.model.User;
@@ -70,6 +71,7 @@ public class AuthService {
 	private final JwtTokenProvider jwtTokenProvider;
 	private final JwtProperties jwtProperties;
 	private final PhoneAuthCodeStore phoneAuthCodeStore;
+	private final FileService fileService;
 	private final SecureRandom secureRandom = new SecureRandom();
 
 	/**
@@ -363,6 +365,8 @@ public class AuthService {
 		Claims claims = jwtTokenProvider.parsePhoneAuthCompleteToken(request.getPhoneAuthCompleteToken());
 		String phone = PhoneRules.normalize(jwtTokenProvider.getPhone(claims));
 		String requestPhone = PhoneRules.normalize(request.getPhone());
+		System.out.println("phone = " + phone);
+		System.out.println("requestPhone = " + requestPhone);
 		if (phone == null || !phone.equals(requestPhone)) {
 			throw new BusinessException(ErrorCode.PHONE_AUTH_FAILED);
 		}
@@ -502,6 +506,7 @@ public class AuthService {
 				.email(user.getEmail())
 				.phone(user.getPhone())
 				.profileFileId(user.getProfileFileId())
+				.profileFile(fileService.findSummary(user.getProfileFileId()))
 				.bio(user.getBio())
 				.regionSido(user.getRegionSido())
 				.regionSigungu(user.getRegionSigungu())

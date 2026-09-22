@@ -183,6 +183,7 @@ public class PetService {
 				.neutered(Boolean.TRUE.equals(pet.getIsNeutered()))
 				.birthday(pet.getBirthday())
 				.profileFileId(pet.getProfileFileId())
+				.profileFile(fileService.findSummary(pet.getProfileFileId()))
 				.bio(pet.getBio())
 				.createdAt(pet.getCreatedAt())
 				.updatedAt(pet.getUpdatedAt())

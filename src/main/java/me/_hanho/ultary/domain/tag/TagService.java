@@ -1,6 +1,7 @@
 package me._hanho.ultary.domain.tag;
 
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,6 +14,7 @@ import me._hanho.ultary.common.exception.ErrorCode;
 import me._hanho.ultary.common.response.ChangeAvailabilityResponse;
 import me._hanho.ultary.common.validation.IdentityChangeCooldown;
 import me._hanho.ultary.domain.file.FileService;
+import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
 import me._hanho.ultary.domain.tag.dto.request.ChangeTagHandleRequest;
 import me._hanho.ultary.domain.tag.dto.request.CreateTagRequest;
 import me._hanho.ultary.domain.tag.dto.request.UpdateTagRequest;
@@ -192,6 +194,12 @@ public class TagService {
 
 	private TagResponse toResponse(Tag tag) {
 		List<Long> imageFileIds = tagMapper.findImageFileIdsByTagId(tag.getTagId());
+		List<Long> ids = imageFileIds != null ? imageFileIds : List.of();
+		Map<Long, FileSummaryResponse> files = fileService.findSummaries(ids);
+		List<FileSummaryResponse> images = ids.stream()
+				.map(files::get)
+				.filter(f -> f != null)
+				.toList();
 		return TagResponse.builder()
 				.tagId(tag.getTagId())
 				.hashtag(tag.getHashtag())
@@ -202,7 +210,8 @@ public class TagService {
 				.link(tag.getLink())
 				.useCount(tag.getUseCount())
 				.createdByUserNo(tag.getCreatedByUserNo())
-				.imageFileIds(imageFileIds != null ? imageFileIds : List.of())
+				.imageFileIds(ids)
+				.images(images)
 				.createdAt(tag.getCreatedAt())
 				.updatedAt(tag.getUpdatedAt())
 				.build();

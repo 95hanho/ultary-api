@@ -13,8 +13,11 @@
 		mime_type,
 		file_size,
 		file_path,
-		copyright,
-		copyright_url,
+		source_type,
+		author_name,
+		source_url,
+		license_url,
+		copyright_notice,
 		uploaded_by_user_no,
 		uploaded_by_admin_no,
 		created_at,
@@ -29,6 +32,16 @@
 		  AND is_deleted = 0
 	</select>
 
+	<select id="findActiveByFileIds" resultType="me._hanho.ultary.domain.file.model.FileMeta">
+		SELECT <include refid="fileColumns"/>
+		FROM ultary_file
+		WHERE is_deleted = 0
+		  AND file_id IN
+		<foreach collection="fileIds" item="id" open="(" separator="," close=")">
+			#{id}
+		</foreach>
+	</select>
+
 	<insert id="insert" useGeneratedKeys="true" keyProperty="fileId" keyColumn="file_id">
 		INSERT INTO ultary_file (
 			original_name,
@@ -37,8 +50,11 @@
 			mime_type,
 			file_size,
 			file_path,
-			copyright,
-			copyright_url,
+			source_type,
+			author_name,
+			source_url,
+			license_url,
+			copyright_notice,
 			uploaded_by_user_no,
 			uploaded_by_admin_no
 		) VALUES (
@@ -48,8 +64,11 @@
 			#{mimeType},
 			#{fileSize},
 			#{filePath},
-			#{copyright},
-			#{copyrightUrl},
+			#{sourceType},
+			#{authorName},
+			#{sourceUrl},
+			#{licenseUrl},
+			#{copyrightNotice},
 			#{uploadedByUserNo},
 			#{uploadedByAdminNo}
 		)

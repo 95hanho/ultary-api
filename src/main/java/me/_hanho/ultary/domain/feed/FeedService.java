@@ -1,9 +1,11 @@
 package me._hanho.ultary.domain.feed;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 import org.springframework.stereotype.Service;
@@ -38,6 +40,7 @@ import me._hanho.ultary.domain.feed.model.FeedPet;
 import me._hanho.ultary.domain.feed.model.FeedReply;
 import me._hanho.ultary.domain.feed.model.FeedStore;
 import me._hanho.ultary.domain.file.FileService;
+import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
 import me._hanho.ultary.domain.file.model.FileMeta;
 import me._hanho.ultary.domain.pet.PetMapper;
 import me._hanho.ultary.domain.pet.model.Pet;
@@ -89,14 +92,33 @@ public class FeedService {
 
 	@Transactional(readOnly = true)
 	public FeedResponse getDetail(UserPrincipal principal, Long feedId) {
-		return toResponse(requireVisible(feedId, principal.getUserNo()), principal.getUserNo());
+		Long viewerUserNo = principal == null ? null : principal.getUserNo();
+		return toResponse(requireVisible(feedId, viewerUserNo), viewerUserNo);
 	}
 
 	@Transactional(readOnly = true)
 	public List<FeedResponse> toResponses(List<Feed> feeds, Long viewerUserNo) {
+		if (feeds == null || feeds.isEmpty()) {
+			return List.of();
+		}
+		Set<Long> fileIds = new HashSet<>();
+		Map<Long, List<FeedMedia>> mediaByFeed = new HashMap<>();
+		for (Feed feed : feeds) {
+			List<FeedMedia> mediaList = feedMapper.findMediaByFeedId(feed.getFeedId());
+			mediaByFeed.put(feed.getFeedId(), mediaList);
+			for (FeedMedia media : mediaList) {
+				if (media.getFileId() != null) {
+					fileIds.add(media.getFileId());
+				}
+				if (media.getThumbnailFileId() != null) {
+					fileIds.add(media.getThumbnailFileId());
+				}
+			}
+		}
+		Map<Long, FileSummaryResponse> files = fileService.findSummaries(fileIds);
 		List<FeedResponse> result = new ArrayList<>();
 		for (Feed feed : feeds) {
-			result.add(toResponse(feed, viewerUserNo));
+			result.add(toResponse(feed, viewerUserNo, mediaByFeed.get(feed.getFeedId()), files));
 		}
 		return result;
 	}
@@ -453,6 +475,12 @@ public class FeedService {
 
 	private Feed requireVisible(Long feedId, Long viewerUserNo) {
 		Feed feed = requireActive(feedId);
+		if (viewerUserNo == null) {
+			if (!"PUBLIC".equals(feed.getVisibility())) {
+				throw new BusinessException(ErrorCode.FEED_NOT_FOUND);
+			}
+			return feed;
+		}
 		if ("PRIVATE".equals(feed.getVisibility()) && !feed.getUserNo().equals(viewerUserNo)) {
 			throw new BusinessException(ErrorCode.FEED_NOT_FOUND);
 		}
@@ -497,10 +525,28 @@ public class FeedService {
 	}
 
 	private FeedResponse toResponse(Feed feed, Long viewerUserNo) {
-		User author = userMapper.findActiveByUserNo(feed.getUserNo());
 		List<FeedMedia> mediaList = feedMapper.findMediaByFeedId(feed.getFeedId());
-		List<FeedResponse.MediaItem> mediaItems = new ArrayList<>();
+		Set<Long> fileIds = new HashSet<>();
 		for (FeedMedia media : mediaList) {
+			if (media.getFileId() != null) {
+				fileIds.add(media.getFileId());
+			}
+			if (media.getThumbnailFileId() != null) {
+				fileIds.add(media.getThumbnailFileId());
+			}
+		}
+		return toResponse(feed, viewerUserNo, mediaList, fileService.findSummaries(fileIds));
+	}
+
+	private FeedResponse toResponse(
+			Feed feed,
+			Long viewerUserNo,
+			List<FeedMedia> mediaList,
+			Map<Long, FileSummaryResponse> files) {
+		User author = userMapper.findActiveByUserNo(feed.getUserNo());
+		List<FeedResponse.MediaItem> mediaItems = new ArrayList<>();
+		List<FeedMedia> resolvedMedia = mediaList != null ? mediaList : List.of();
+		for (FeedMedia media : resolvedMedia) {
 			List<FeedResponse.MentionItem> mentions = feedMapper.findMentionsByFeedMediaId(media.getFeedMediaId())
 					.stream()
 					.map(m -> FeedResponse.MentionItem.builder()
@@ -512,8 +558,12 @@ public class FeedService {
 			mediaItems.add(FeedResponse.MediaItem.builder()
 					.feedMediaId(media.getFeedMediaId())
 					.fileId(media.getFileId())
+					.file(files.get(media.getFileId()))
 					.mediaType(media.getMediaType())
 					.thumbnailFileId(media.getThumbnailFileId())
+					.thumbnailFile(media.getThumbnailFileId() == null
+							? null
+							: files.get(media.getThumbnailFileId()))
 					.durationSec(media.getDurationSec())
 					.sortOrder(media.getSortOrder())
 					.mentions(mentions)

@@ -1,8 +1,11 @@
 package me._hanho.ultary.domain.main;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,17 +19,21 @@ import me._hanho.ultary.domain.feed.FeedMapper;
 import me._hanho.ultary.domain.feed.FeedService;
 import me._hanho.ultary.domain.feed.dto.response.FeedResponse;
 import me._hanho.ultary.domain.feed.model.Feed;
+import me._hanho.ultary.domain.file.FileService;
+import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
 import me._hanho.ultary.domain.main.dto.response.MainFeedPageResponse;
 import me._hanho.ultary.domain.main.dto.response.MainSearchPetItem;
 import me._hanho.ultary.domain.main.dto.response.MainSearchResponse;
 import me._hanho.ultary.domain.main.dto.response.MainSearchUserItem;
 import me._hanho.ultary.domain.pet.PetMapper;
+import me._hanho.ultary.domain.pet.model.Pet;
 import me._hanho.ultary.domain.story.StoryService;
 import me._hanho.ultary.domain.story.dto.response.StoryOwnerResponse;
 import me._hanho.ultary.domain.story.dto.response.StoryResponse;
 import me._hanho.ultary.domain.tag.TagService;
 import me._hanho.ultary.domain.tag.dto.response.TagResponse;
 import me._hanho.ultary.domain.user.UserMapper;
+import me._hanho.ultary.domain.user.model.User;
 import me._hanho.ultary.security.principal.UserPrincipal;
 
 @Slf4j
@@ -45,6 +52,7 @@ public class MainService {
 	private final UserMapper userMapper;
 	private final PetMapper petMapper;
 	private final TagService tagService;
+	private final FileService fileService;
 
 	@Transactional(readOnly = true)
 	public List<StoryOwnerResponse> getStoryOwners(UserPrincipal principal) {
@@ -98,17 +106,39 @@ public class MainService {
 		List<FeedResponse> feeds = Collections.emptyList();
 
 		if (all || "USER".equals(searchType)) {
-			users = userMapper.searchActiveByNickname(principal.getUserNo(), query, resolved).stream()
-					.map(u -> MainSearchUserItem.builder()
-							.userNo(u.getUserNo())
-							.nickname(u.getNickname())
-							.profileFileId(u.getProfileFileId())
-							.bio(u.getBio())
-							.build())
+			List<User> userRows = userMapper.searchActiveByNickname(principal.getUserNo(), query, resolved);
+			Set<Long> profileIds = new HashSet<>();
+			for (User u : userRows) {
+				if (u.getProfileFileId() != null) {
+					profileIds.add(u.getProfileFileId().longValue());
+				}
+			}
+			Map<Long, FileSummaryResponse> files = fileService.findSummaries(profileIds);
+			users = userRows.stream()
+					.map(u -> {
+						Long profileId = u.getProfileFileId() == null
+								? null
+								: u.getProfileFileId().longValue();
+						return MainSearchUserItem.builder()
+								.userNo(u.getUserNo())
+								.nickname(u.getNickname())
+								.profileFileId(u.getProfileFileId())
+								.profileFile(profileId == null ? null : files.get(profileId))
+								.bio(u.getBio())
+								.build();
+					})
 					.toList();
 		}
 		if (all || "PET".equals(searchType)) {
-			pets = petMapper.searchActive(principal.getUserNo(), query, resolved).stream()
+			List<Pet> petRows = petMapper.searchActive(principal.getUserNo(), query, resolved);
+			Set<Long> profileIds = new HashSet<>();
+			for (Pet p : petRows) {
+				if (p.getProfileFileId() != null) {
+					profileIds.add(p.getProfileFileId());
+				}
+			}
+			Map<Long, FileSummaryResponse> files = fileService.findSummaries(profileIds);
+			pets = petRows.stream()
 					.map(p -> MainSearchPetItem.builder()
 							.petId(p.getPetId())
 							.userNo(p.getUserNo())
@@ -116,6 +146,9 @@ public class MainService {
 							.name(p.getName())
 							.species(p.getSpecies())
 							.profileFileId(p.getProfileFileId())
+							.profileFile(p.getProfileFileId() == null
+									? null
+									: files.get(p.getProfileFileId()))
 							.build())
 					.toList();
 		}

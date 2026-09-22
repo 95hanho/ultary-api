@@ -43,6 +43,9 @@ src/main/resources/application-prod.yml
 src/main/resources/application-local.yml
 # 템플릿은 src/main/resources/config-samples/ 에 두고 git 공유
 
+### MCP (DB 비밀번호 등) ###
+mcp/mariadb/.env
+
 ### Logs ###
 spy.log
 *.log

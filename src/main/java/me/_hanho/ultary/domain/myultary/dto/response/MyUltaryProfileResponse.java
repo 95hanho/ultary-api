@@ -2,6 +2,7 @@ package me._hanho.ultary.domain.myultary.dto.response;
 
 import lombok.Builder;
 import lombok.Getter;
+import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
 
 @Getter
 @Builder
@@ -11,6 +12,7 @@ public class MyUltaryProfileResponse {
 	private String nickname;
 	private boolean defaultNickname;
 	private Integer profileFileId;
+	private FileSummaryResponse profileFile;
 	private String bio;
 	private String regionSido;
 	private String regionSigungu;

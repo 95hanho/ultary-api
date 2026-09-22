@@ -17,8 +17,12 @@ public class FileMeta {
 	private String mimeType;
 	private Integer fileSize;
 	private String filePath;
-	private String copyright;
-	private String copyrightUrl;
+	/** OWNED | UNSPLASH | AI | ETC */
+	private String sourceType;
+	private String authorName;
+	private String sourceUrl;
+	private String licenseUrl;
+	private String copyrightNotice;
 	private Long uploadedByUserNo;
 	private Long uploadedByAdminNo;
 	private LocalDateTime createdAt;

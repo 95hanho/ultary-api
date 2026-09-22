@@ -1,7 +1,7 @@
 @baseUrl = http://localhost:9377
 @accessToken = {{socialLogin.response.body.$.data.accessToken}}
 
-# 시드: user 101 / feed 101·102 / file 100~104 / story 101 / pet choco_01·mung_01
+# 시드: user 101 / feed 101~103 / CDN file 110~141 / story 101~104 / pet choco_01·mung_01
 # 로그인: google-myultary-test-001 (nickname=울타리)
 
 ### 0. 소셜 로그인 (시드 user 101)
@@ -36,13 +36,13 @@ Authorization: Bearer {{accessToken}}
 GET {{baseUrl}}/api/v1/my-ultary/tagged-feeds?limit=30
 Authorization: Bearer {{accessToken}}
 
-### 6a. 프로필 사진 변경 (시드 fileId=100~103 이미지)
+### 6a. 프로필 사진 변경 (시드 fileId=121 post2.jpg — user 101 소유)
 PATCH {{baseUrl}}/api/v1/my-ultary/profile-image
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "profileFileId": 103
+  "profileFileId": 121
 }
 
 ### 6b. 프로필 사진 제거
@@ -76,29 +76,27 @@ Content-Type: application/json
 GET {{baseUrl}}/api/v1/my-ultary/stories
 Authorization: Bearer {{accessToken}}
 
-### 8b. 스토리 등록 (이미지 — 시드 fileId=100)
+### 8b. 스토리 등록 (이미지 — 시드 fileId=130)
 # @name createStory
 POST {{baseUrl}}/api/v1/my-ultary/stories
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "fileId": 100,
+  "fileId": 130,
   "mediaType": "IMAGE",
   "caption": "오늘 산책"
 }
 
-### 8c. 스토리 등록 (영상 — 시드 fileId=104, 썸네일 103)
+### 8c. 스토리 등록 (이미지 추가 — 시드 fileId=121; CDN 시드에 VIDEO 없음)
 POST {{baseUrl}}/api/v1/my-ultary/stories
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "fileId": 104,
-  "mediaType": "VIDEO",
-  "thumbnailFileId": 103,
-  "durationSec": 12,
-  "caption": "짧은 영상"
+  "fileId": 121,
+  "mediaType": "IMAGE",
+  "caption": "추가 스토리"
 }
 
 ### 8d. 스토리 삭제

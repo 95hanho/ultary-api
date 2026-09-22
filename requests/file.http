@@ -2,8 +2,9 @@
 @accessToken = {{socialLogin.response.body.$.data.accessToken}}
 @fileId = {{uploadImage.response.body.$.data.fileId}}
 
-# 업로드 전용 테스트 유저 (시드와 무관). 시드 file_id는 100~104 (images/…, videos/…).
-# 피드·스토리 등에서 쓸 때는 시드 로그인(google-myultary-test-001) + fileId 100~104.
+# 업로드 전용 테스트 유저 (시드와 무관).
+# CDN 시드 file_id: 110~114 프로필 / 120~124 포스트 / 130~133 스토리 / 140~141 상품
+# 피드·스토리 등: 시드 로그인(google-myultary-test-001) + 위 fileId (file_path=CDN 절대 URL)
 
 ### 0. 소셜 로그인 (토큰 확보)
 # @name socialLogin

@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 
 import lombok.Builder;
 import lombok.Getter;
+import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
 
 @Getter
 @Builder
@@ -19,6 +20,7 @@ public class MeResponse {
 	private String email;
 	private String phone;
 	private Integer profileFileId;
+	private FileSummaryResponse profileFile;
 	private String bio;
 	private String regionSido;
 	private String regionSigungu;

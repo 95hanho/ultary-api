@@ -55,7 +55,7 @@ public class FeedController {
 	public ApiResponse<FeedResponse> detail(
 			@AuthenticationPrincipal UserPrincipal principal,
 			@PathVariable Long feedId) {
-		log.info("[detail] feedId={}", feedId);
+		log.info("[detail] feedId={} guest={}", feedId, principal == null);
 		return ApiResponse.ok(feedService.getDetail(principal, feedId), "게시글 조회 성공");
 	}
 

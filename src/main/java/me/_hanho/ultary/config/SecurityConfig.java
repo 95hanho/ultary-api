@@ -3,6 +3,7 @@ package me._hanho.ultary.config;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -41,7 +42,6 @@ public class SecurityConfig {
 						.accessDeniedHandler(jwtAccessDeniedHandler))
 				.authorizeHttpRequests(auth -> auth
 						.requestMatchers(
-								// 로그인 없이 되는 API 목록
 								"/api/v1/health/**",
 								"/api/v1/auth/login",
 								"/api/v1/auth/refresh",
@@ -54,6 +54,8 @@ public class SecurityConfig {
 								"/api/v1/auth/social/login",
 								"/api/v1/test/**")
 						.permitAll()
+						// 공유 게시글 단건: PUBLIC은 비로그인 허용 (spring-auth-api.md)
+						.requestMatchers(HttpMethod.GET, "/api/v1/feeds/*").permitAll()
 						.requestMatchers("/api/v1/**").authenticated()
 						.anyRequest().permitAll())
 				.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

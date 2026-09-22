@@ -6,6 +6,7 @@ import java.util.List;
 
 import lombok.Builder;
 import lombok.Getter;
+import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
 
 @Getter
 @Builder
@@ -32,8 +33,10 @@ public class FeedResponse {
 	public static class MediaItem {
 		private Long feedMediaId;
 		private Long fileId;
+		private FileSummaryResponse file;
 		private String mediaType;
 		private Long thumbnailFileId;
+		private FileSummaryResponse thumbnailFile;
 		private Integer durationSec;
 		private Integer sortOrder;
 		private List<MentionItem> mentions;

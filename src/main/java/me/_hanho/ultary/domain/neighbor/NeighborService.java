@@ -1,8 +1,11 @@
 package me._hanho.ultary.domain.neighbor;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,6 +16,8 @@ import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.exception.BusinessException;
 import me._hanho.ultary.common.exception.ErrorCode;
 import me._hanho.ultary.domain.feed.FeedMapper;
+import me._hanho.ultary.domain.file.FileService;
+import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
 import me._hanho.ultary.domain.neighbor.dto.response.NeighborListItemResponse;
 import me._hanho.ultary.domain.neighbor.dto.response.NeighborRelationResponse;
 import me._hanho.ultary.domain.neighbor.dto.response.UserUltaryResponse;
@@ -40,6 +45,7 @@ public class NeighborService {
 	private final PetMapper petMapper;
 	private final FeedMapper feedMapper;
 	private final StoryService storyService;
+	private final FileService fileService;
 
 	@Transactional(readOnly = true)
 	public UserUltaryResponse getUltary(UserPrincipal principal, Long targetUserNo) {
@@ -61,6 +67,7 @@ public class NeighborService {
 				.nickname(target.getNickname())
 				.defaultNickname(Boolean.TRUE.equals(target.getIsDefaultNickname()))
 				.profileFileId(target.getProfileFileId())
+				.profileFile(fileService.findSummary(target.getProfileFileId()))
 				.bio(target.getBio())
 				.regionSido(target.getRegionSido())
 				.regionSigungu(target.getRegionSigungu())
@@ -92,12 +99,21 @@ public class NeighborService {
 				: neighborMapper.findAcceptedResidents(targetUserNo, resolvedLimit);
 
 		List<NeighborListItemResponse> result = new ArrayList<>();
+		Set<Long> profileIds = new HashSet<>();
 		for (NeighborListRow row : rows) {
+			if (row.getProfileFileId() != null) {
+				profileIds.add(row.getProfileFileId().longValue());
+			}
+		}
+		Map<Long, FileSummaryResponse> files = fileService.findSummaries(profileIds);
+		for (NeighborListRow row : rows) {
+			Long profileId = row.getProfileFileId() == null ? null : row.getProfileFileId().longValue();
 			result.add(NeighborListItemResponse.builder()
 					.neighborId(row.getNeighborId())
 					.userNo(row.getUserNo())
 					.nickname(row.getNickname())
 					.profileFileId(row.getProfileFileId())
+					.profileFile(profileId == null ? null : files.get(profileId))
 					.status(row.getStatus())
 					.listType(row.getListType())
 					.hasStory(storyService.hasActiveStory(row.getUserNo()))

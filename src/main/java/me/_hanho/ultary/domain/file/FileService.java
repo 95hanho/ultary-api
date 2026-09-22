@@ -4,9 +4,15 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
@@ -21,7 +27,7 @@ import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.exception.BusinessException;
 import me._hanho.ultary.common.exception.ErrorCode;
 import me._hanho.ultary.domain.file.dto.response.FileResponse;
-import me._hanho.ultary.domain.file.FileMapper;
+import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
 import me._hanho.ultary.domain.file.model.FileMeta;
 
 @Slf4j
@@ -72,6 +78,7 @@ public class FileService {
 		meta.setMimeType(file.getContentType());
 		meta.setFileSize(toIntSize(file.getSize()));
 		meta.setFilePath(relativePath);
+		meta.setSourceType(FileSourceType.OWNED);
 		meta.setUploadedByUserNo(userNo);
 
 		fileMapper.insert(meta);
@@ -84,9 +91,50 @@ public class FileService {
 		return toResponse(requireActive(fileId));
 	}
 
+	/** 단건 요약. 없거나 삭제면 null. */
+	@Transactional(readOnly = true)
+	public FileSummaryResponse findSummary(Long fileId) {
+		if (fileId == null) {
+			return null;
+		}
+		FileMeta meta = fileMapper.findActiveByFileId(fileId);
+		return meta == null ? null : toSummary(meta);
+	}
+
+	/** Integer PK(profile_file_id 등)용. */
+	@Transactional(readOnly = true)
+	public FileSummaryResponse findSummary(Integer fileId) {
+		return fileId == null ? null : findSummary(fileId.longValue());
+	}
+
+	/**
+	 * 목록 응답용 배치 조회. 없는 id는 맵에 넣지 않음.
+	 */
+	@Transactional(readOnly = true)
+	public Map<Long, FileSummaryResponse> findSummaries(Collection<Long> fileIds) {
+		if (fileIds == null || fileIds.isEmpty()) {
+			return Collections.emptyMap();
+		}
+		Set<Long> ids = fileIds.stream()
+				.filter(Objects::nonNull)
+				.collect(Collectors.toSet());
+		if (ids.isEmpty()) {
+			return Collections.emptyMap();
+		}
+		Map<Long, FileSummaryResponse> map = new HashMap<>();
+		for (FileMeta meta : fileMapper.findActiveByFileIds(ids)) {
+			map.put(meta.getFileId(), toSummary(meta));
+		}
+		return map;
+	}
+
 	@Transactional(readOnly = true)
 	public Resource getContent(Long fileId) {
 		FileMeta meta = requireActive(fileId);
+		if (isRemotePath(meta.getFilePath())) {
+			throw new BusinessException(ErrorCode.INVALID_INPUT,
+					"원격(CDN) 파일은 filePath를 직접 사용하세요.");
+		}
 		Path path = resolveAbsolutePath(meta.getFilePath());
 		if (!Files.isRegularFile(path)) {
 			log.warn("[getContent] disk missing fileId={} path={}", fileId, path);
@@ -188,6 +236,14 @@ public class FileService {
 		return Paths.get(uploadDir).resolve(relativePath).normalize();
 	}
 
+	private static boolean isRemotePath(String filePath) {
+		if (!StringUtils.hasText(filePath)) {
+			return false;
+		}
+		String lower = filePath.toLowerCase(Locale.ROOT);
+		return lower.startsWith("http://") || lower.startsWith("https://");
+	}
+
 	private String extractExt(String originalFileName) {
 		int pos = originalFileName.lastIndexOf('.');
 		if (pos < 0 || pos == originalFileName.length() - 1) {
@@ -219,8 +275,27 @@ public class FileService {
 				.mimeType(meta.getMimeType())
 				.fileSize(meta.getFileSize())
 				.filePath(meta.getFilePath())
+				.sourceType(meta.getSourceType())
+				.authorName(meta.getAuthorName())
+				.sourceUrl(meta.getSourceUrl())
+				.licenseUrl(meta.getLicenseUrl())
+				.copyrightNotice(meta.getCopyrightNotice())
 				.uploadedByUserNo(meta.getUploadedByUserNo())
 				.createdAt(meta.getCreatedAt())
+				.build();
+	}
+
+	public FileSummaryResponse toSummary(FileMeta meta) {
+		return FileSummaryResponse.builder()
+				.fileId(meta.getFileId())
+				.filePath(meta.getFilePath())
+				.mimeType(meta.getMimeType())
+				.extension(meta.getExtension())
+				.sourceType(meta.getSourceType())
+				.authorName(meta.getAuthorName())
+				.sourceUrl(meta.getSourceUrl())
+				.licenseUrl(meta.getLicenseUrl())
+				.copyrightNotice(meta.getCopyrightNotice())
 				.build();
 	}
 

@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 
 import lombok.Builder;
 import lombok.Getter;
+import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
 
 @Getter
 @Builder
@@ -13,9 +14,12 @@ public class StoryResponse {
 	private Long userNo;
 	private String authorNickname;
 	private Integer authorProfileFileId;
+	private FileSummaryResponse authorProfileFile;
 	private Long fileId;
+	private FileSummaryResponse file;
 	private String mediaType;
 	private Long thumbnailFileId;
+	private FileSummaryResponse thumbnailFile;
 	private Integer durationSec;
 	private String caption;
 	private LocalDateTime createdAt;

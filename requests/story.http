@@ -2,7 +2,7 @@
 @accessToken = {{socialLogin.response.body.$.data.accessToken}}
 @storyId = {{createStory.response.body.$.data.storyId}}
 
-# 시드: story 101(user101)·102(user103) / file 100·103
+# 시드: story 101(u101)·102(u102)·103(u103)·104(u105) / file 130~133(CDN)
 # 로그인: user 101 (google-myultary-test-001)
 
 ### 0. 소셜 로그인 (시드 user 101)
@@ -17,14 +17,14 @@ Content-Type: application/json
   "name": "한호"
 }
 
-### 1. 스토리 등록 (시드 fileId=100)
+### 1. 스토리 등록 (시드 fileId=130 story.png)
 # @name createStory
 POST {{baseUrl}}/api/v1/my-ultary/stories
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "fileId": 100,
+  "fileId": 130,
   "mediaType": "IMAGE",
   "caption": "24시간 스토리"
 }
@@ -33,7 +33,7 @@ Content-Type: application/json
 GET {{baseUrl}}/api/v1/my-ultary/stories
 Authorization: Bearer {{accessToken}}
 
-### 3. 주민 중 스토리 있는 목록 (시드: 주민 103 → story 102)
+### 3. 주민 중 스토리 있는 목록 (시드: 주민 102·103 → story 102·103)
 GET {{baseUrl}}/api/v1/main/stories/owners
 Authorization: Bearer {{accessToken}}
 
@@ -41,7 +41,7 @@ Authorization: Bearer {{accessToken}}
 GET {{baseUrl}}/api/v1/main/stories?userNo=101
 Authorization: Bearer {{accessToken}}
 
-### 4b. 주민 103 스토리 조회 (시드 story 102)
+### 4b. 주민 103 스토리 조회 (시드 story 103)
 GET {{baseUrl}}/api/v1/main/stories?userNo=103
 Authorization: Bearer {{accessToken}}
 

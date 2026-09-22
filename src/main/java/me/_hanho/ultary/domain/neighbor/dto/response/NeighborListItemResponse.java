@@ -2,6 +2,7 @@ package me._hanho.ultary.domain.neighbor.dto.response;
 
 import lombok.Builder;
 import lombok.Getter;
+import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
 
 @Getter
 @Builder
@@ -12,6 +13,7 @@ public class NeighborListItemResponse {
 	private Long userNo;
 	private String nickname;
 	private Integer profileFileId;
+	private FileSummaryResponse profileFile;
 	/** PENDING | ACCEPTED | REJECTED | BLOCKED */
 	private String status;
 	/** RESIDENTS(내가 요청) | NEIGHBORS(상대가 요청) */
