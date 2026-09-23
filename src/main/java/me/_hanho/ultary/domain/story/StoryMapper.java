@@ -31,6 +31,9 @@ public interface StoryMapper {
 			@Param("storyId") Long storyId,
 			@Param("viewerUserNo") Long viewerUserNo);
 
+	/** local 테스트: 내 스토리 읽음 전부 삭제 */
+	int deleteViewsByViewerUserNo(@Param("viewerUserNo") Long viewerUserNo);
+
 	List<StoryOwnerRow> findResidentOwnersWithActiveStories(@Param("viewerUserNo") Long viewerUserNo);
 
 	int countUnviewedActiveByOwner(

@@ -92,6 +92,11 @@
 		  AND viewer_user_no = #{viewerUserNo}
 	</select>
 
+	<delete id="deleteViewsByViewerUserNo">
+		DELETE FROM ultary_story_view
+		WHERE viewer_user_no = #{viewerUserNo}
+	</delete>
+
 	<select id="findResidentOwnersWithActiveStories" resultType="me._hanho.ultary.domain.story.model.StoryOwnerRow">
 		SELECT
 			u.user_no AS userNo,

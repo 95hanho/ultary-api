@@ -2,8 +2,8 @@
 @accessToken = {{socialLogin.response.body.$.data.accessToken}}
 @nextCursor = {{mainFeeds.response.body.$.data.nextCursorFeedId}}
 
-# 시드(001_dev_sample_data.sql): user 101~105 / feed 101~103 / story 101~104 / CDN file 110~141 / pet 101~107 / tag 101~103
-# 로그인: user 101 (nickname=울타리, google-myultary-test-001)
+# 시드(001_dev_sample_data.sql): user 101~105 / feed 101~103 / story 101~110 (주민 102·103 각 4개) / CDN file 110~141 / pet 101~107 / tag 101~103
+# 로그인: user 101 (nickname=울타리, google-myultary-test-001 / phone 01011112222)
 
 ### 0. 소셜 로그인 (시드 user 101)
 # @name socialLogin
@@ -17,12 +17,13 @@ Content-Type: application/json
   "name": "한호"
 }
 
-### 1. 주민 스토리 있는 목록 (시드: 주민 102·103 → story 102·103)
-# 링 메타만: userNo, nickname, profileFileId, storyCount, hasUnviewed (미디어 URL 없음)
+### 1. 주민 스토리 있는 목록 (시드: 주민 102·103 각 storyCount=4)
+# 링 메타만. 정렬: hasUnviewed=true 먼저 → 그다음 최신 스토리 순
 GET {{baseUrl}}/api/v1/main/stories/owners
 Authorization: Bearer {{accessToken}}
 
-### 2. 주민 스토리 조회 (본인 101) — 탭 후 본문(file.filePath 포함)
+### 2. 주민 스토리 조회 (본인 101) — 탭 후 본문(file.filePath + viewedByMe)
+# 항목마다 viewedByMe. FE: 첫 false부터 재생, 전부 true면 0부터. 넘기며 POST /stories/{id}/view
 GET {{baseUrl}}/api/v1/main/stories?userNo=101
 Authorization: Bearer {{accessToken}}
 

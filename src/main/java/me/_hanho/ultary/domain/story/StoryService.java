@@ -1,6 +1,7 @@
 package me._hanho.ultary.domain.story;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -104,6 +105,8 @@ public class StoryService {
 					.hasUnviewed(unviewed > 0)
 					.build());
 		}
+		// 미열람 링 먼저, 같은 그룹은 최신 스토리 순(SQL ORDER) 유지
+		result.sort(Comparator.comparing(o -> !Boolean.TRUE.equals(o.getHasUnviewed())));
 		return result;
 	}
 

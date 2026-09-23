@@ -1,4 +1,19 @@
 @baseUrl = http://localhost:9377
+@accessToken = {{socialLogin.response.body.$.data.accessToken}}
+
+# local 프로필 전용 (/api/v1/test/**). prod 빌드·prod 프로필에서는 빈 미등록 → 404
+
+### 0. 소셜 로그인 (시드 user 101 — 읽음 초기화용 토큰)
+# @name socialLogin
+POST {{baseUrl}}/api/v1/auth/social/login
+Content-Type: application/json
+
+{
+  "provider": "GOOGLE",
+  "providerUserId": "google-myultary-test-001",
+  "email": "myultary.test@example.com",
+  "name": "한호"
+}
 
 ### 1a. 평문 비밀번호 → DB용 인코딩 문자열 (local 프로필 전용)
 # 시드 평문: Test1234! → DB에는 {noop}Test1234! 또는 아래 encode 결과
@@ -17,3 +32,8 @@ Content-Type: application/json
 {
   "password": "test1234"
 }
+
+### 2. 내 스토리 읽음 전부 초기화 (local + Bearer)
+# FE: development에서만 호출. 응답 deletedCount = 지운 ultary_story_view 행 수
+DELETE {{baseUrl}}/api/v1/test/story-views
+Authorization: Bearer {{accessToken}}
