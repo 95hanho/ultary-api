@@ -21,7 +21,9 @@
 
 	<sql id="activeStoryCondition">
 		is_deleted = 0
+		<!-- TEST: 24h 만료 비활성
 		AND expires_at &gt; NOW()
+		-->
 	</sql>
 
 	<insert id="insert" useGeneratedKeys="true" keyProperty="storyId" keyColumn="story_id">
@@ -40,7 +42,8 @@
 			#{thumbnailFileId},
 			#{durationSec},
 			#{caption},
-			DATE_ADD(NOW(), INTERVAL 24 HOUR)
+			<!-- TEST: DATE_ADD(NOW(), INTERVAL 24 HOUR) -->
+			'2099-12-31 23:59:59'
 		)
 	</insert>
 
@@ -108,7 +111,9 @@
 			AND u.withdrawal_status = 'ACTIVE'
 		INNER JOIN ultary_story s ON s.user_no = u.user_no
 			AND s.is_deleted = 0
+			<!-- TEST: 24h 만료 비활성
 			AND s.expires_at &gt; NOW()
+			-->
 		WHERE n.requester_user_no = #{viewerUserNo}
 		  AND n.status = 'ACCEPTED'
 		GROUP BY u.user_no, u.nickname, u.profile_file_id
@@ -120,7 +125,9 @@
 		FROM ultary_story s
 		WHERE s.user_no = #{ownerUserNo}
 		  AND s.is_deleted = 0
+		  <!-- TEST: 24h 만료 비활성
 		  AND s.expires_at &gt; NOW()
+		  -->
 		  AND NOT EXISTS (
 			SELECT 1
 			FROM ultary_story_view v
