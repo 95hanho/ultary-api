@@ -14,6 +14,7 @@ public class FeedComment {
 	private Long feedId;
 	private Long userNo;
 	private String content;
+	private Integer likeCount;
 	private LocalDateTime createdAt;
 	private LocalDateTime updatedAt;
 	private Boolean isDeleted;
@@ -21,4 +22,6 @@ public class FeedComment {
 
 	/** 조인 조회용 */
 	private String authorNickname;
+	/** 조인 조회용. 미등록이면 null */
+	private Integer authorProfileFileId;
 }

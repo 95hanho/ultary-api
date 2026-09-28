@@ -32,12 +32,14 @@ import me._hanho.ultary.domain.feed.dto.response.FeedResponse;
 import me._hanho.ultary.domain.feed.dto.response.FeedShareResponse;
 import me._hanho.ultary.domain.feed.model.Feed;
 import me._hanho.ultary.domain.feed.model.FeedComment;
+import me._hanho.ultary.domain.feed.model.FeedCommentLike;
 import me._hanho.ultary.domain.feed.model.FeedCommentMention;
 import me._hanho.ultary.domain.feed.model.FeedLike;
 import me._hanho.ultary.domain.feed.model.FeedMedia;
 import me._hanho.ultary.domain.feed.model.FeedMediaMention;
 import me._hanho.ultary.domain.feed.model.FeedPet;
 import me._hanho.ultary.domain.feed.model.FeedReply;
+import me._hanho.ultary.domain.feed.model.FeedReplyLike;
 import me._hanho.ultary.domain.feed.model.FeedStore;
 import me._hanho.ultary.domain.file.FileService;
 import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
@@ -103,7 +105,10 @@ public class FeedService {
 		}
 		Set<Long> fileIds = new HashSet<>();
 		Map<Long, List<FeedMedia>> mediaByFeed = new HashMap<>();
+		Map<Long, User> authors = new HashMap<>();
 		for (Feed feed : feeds) {
+			authors.computeIfAbsent(feed.getUserNo(), userMapper::findActiveByUserNo);
+			collectAuthorProfileId(fileIds, authors.get(feed.getUserNo()));
 			List<FeedMedia> mediaList = feedMapper.findMediaByFeedId(feed.getFeedId());
 			mediaByFeed.put(feed.getFeedId(), mediaList);
 			for (FeedMedia media : mediaList) {
@@ -118,7 +123,12 @@ public class FeedService {
 		Map<Long, FileSummaryResponse> files = fileService.findSummaries(fileIds);
 		List<FeedResponse> result = new ArrayList<>();
 		for (Feed feed : feeds) {
-			result.add(toResponse(feed, viewerUserNo, mediaByFeed.get(feed.getFeedId()), files));
+			result.add(toResponse(
+					feed,
+					viewerUserNo,
+					authors.get(feed.getUserNo()),
+					mediaByFeed.get(feed.getFeedId()),
+					files));
 		}
 		return result;
 	}
@@ -238,8 +248,33 @@ public class FeedService {
 		List<FeedComment> comments = feedMapper.findActiveComments(feedId, resolveLimit(limit));
 		int totalThreadCount = feedMapper.countActiveCommentsAndReplies(feedId);
 		boolean embedReplies = totalThreadCount <= INLINE_REPLY_THRESHOLD;
+		Long viewerUserNo = principal.getUserNo();
+		Set<Long> likedCommentIds = activeLikedCommentIds(
+				comments.stream().map(FeedComment::getFeedCommentId).toList(),
+				viewerUserNo);
+		Map<Long, List<FeedReply>> repliesByComment = new HashMap<>();
+		Set<Long> profileIds = new HashSet<>();
+		for (FeedComment comment : comments) {
+			collectProfileId(profileIds, comment.getAuthorProfileFileId());
+			if (embedReplies) {
+				List<FeedReply> replyRows = feedMapper.findActiveReplies(comment.getFeedCommentId(), MAX_LIST_LIMIT);
+				repliesByComment.put(comment.getFeedCommentId(), replyRows);
+				for (FeedReply reply : replyRows) {
+					collectProfileId(profileIds, reply.getAuthorProfileFileId());
+				}
+			}
+		}
+		Map<Long, FileSummaryResponse> profiles = fileService.findSummaries(profileIds);
 		return comments.stream()
-				.map(comment -> toCommentResponse(comment, embedReplies))
+				.map(comment -> toCommentResponse(
+						comment,
+						embedReplies,
+						viewerUserNo,
+						likedCommentIds,
+						profiles,
+						embedReplies
+								? repliesByComment.getOrDefault(comment.getFeedCommentId(), List.of())
+								: null))
 				.toList();
 	}
 
@@ -255,7 +290,7 @@ public class FeedService {
 		insertCommentMentions(comment.getFeedCommentId(), null, request.getMentions());
 		feedMapper.adjustCommentCount(feedId, 1);
 		log.info("[createComment] feedId={} commentId={}", feedId, comment.getFeedCommentId());
-		return toCommentResponse(requireComment(feedId, comment.getFeedCommentId()), false);
+		return toCommentResponse(requireComment(feedId, comment.getFeedCommentId()), false, principal.getUserNo(), null);
 	}
 
 	@Transactional
@@ -267,7 +302,7 @@ public class FeedService {
 		if (updated == 0) {
 			throw new BusinessException(ErrorCode.FORBIDDEN);
 		}
-		return toCommentResponse(requireComment(feedId, commentId), false);
+		return toCommentResponse(requireComment(feedId, commentId), false, principal.getUserNo(), null);
 	}
 
 	@Transactional
@@ -289,13 +324,50 @@ public class FeedService {
 		log.info("[deleteComment] feedId={} commentId={} by={}", feedId, commentId, principal.getUserNo());
 	}
 
+	@Transactional
+	public FeedCommentResponse likeComment(UserPrincipal principal, Long feedId, Long commentId) {
+		requireVisible(feedId, principal.getUserNo());
+		requireComment(feedId, commentId);
+		FeedCommentLike existing = feedMapper.findCommentLike(commentId, principal.getUserNo());
+		if (existing == null) {
+			feedMapper.insertCommentLike(commentId, principal.getUserNo());
+			feedMapper.adjustCommentLikeCount(commentId, 1);
+		} else if (Boolean.TRUE.equals(existing.getIsDeleted())) {
+			if (feedMapper.restoreCommentLike(commentId, principal.getUserNo()) > 0) {
+				feedMapper.adjustCommentLikeCount(commentId, 1);
+			}
+		}
+		log.info("[likeComment] feedId={} commentId={} userNo={}", feedId, commentId, principal.getUserNo());
+		return toCommentResponse(requireComment(feedId, commentId), false, principal.getUserNo(), null);
+	}
+
+	@Transactional
+	public FeedCommentResponse unlikeComment(UserPrincipal principal, Long feedId, Long commentId) {
+		requireVisible(feedId, principal.getUserNo());
+		requireComment(feedId, commentId);
+		if (feedMapper.softDeleteCommentLike(commentId, principal.getUserNo()) > 0) {
+			feedMapper.adjustCommentLikeCount(commentId, -1);
+		}
+		log.info("[unlikeComment] feedId={} commentId={} userNo={}", feedId, commentId, principal.getUserNo());
+		return toCommentResponse(requireComment(feedId, commentId), false, principal.getUserNo(), null);
+	}
+
 	@Transactional(readOnly = true)
 	public List<FeedReplyResponse> getReplies(
 			UserPrincipal principal, Long feedId, Long commentId, Integer limit) {
 		requireVisible(feedId, principal.getUserNo());
 		requireComment(feedId, commentId);
-		return feedMapper.findActiveReplies(commentId, resolveLimit(limit)).stream()
-				.map(this::toReplyResponse)
+		List<FeedReply> replies = feedMapper.findActiveReplies(commentId, resolveLimit(limit));
+		Set<Long> likedReplyIds = activeLikedReplyIds(
+				replies.stream().map(FeedReply::getFeedReplyId).toList(),
+				principal.getUserNo());
+		Set<Long> profileIds = new HashSet<>();
+		for (FeedReply reply : replies) {
+			collectProfileId(profileIds, reply.getAuthorProfileFileId());
+		}
+		Map<Long, FileSummaryResponse> profiles = fileService.findSummaries(profileIds);
+		return replies.stream()
+				.map(reply -> toReplyResponse(reply, principal.getUserNo(), likedReplyIds, profiles))
 				.toList();
 	}
 
@@ -311,7 +383,7 @@ public class FeedService {
 		feedMapper.insertReply(reply);
 		insertCommentMentions(null, reply.getFeedReplyId(), request.getMentions());
 		log.info("[createReply] commentId={} replyId={}", commentId, reply.getFeedReplyId());
-		return toReplyResponse(requireReply(commentId, reply.getFeedReplyId()));
+		return toReplyResponse(requireReply(commentId, reply.getFeedReplyId()), principal.getUserNo(), null);
 	}
 
 	@Transactional
@@ -328,7 +400,39 @@ public class FeedService {
 		if (updated == 0) {
 			throw new BusinessException(ErrorCode.FORBIDDEN);
 		}
-		return toReplyResponse(requireReply(commentId, replyId));
+		return toReplyResponse(requireReply(commentId, replyId), principal.getUserNo(), null);
+	}
+
+	@Transactional
+	public FeedReplyResponse likeReply(
+			UserPrincipal principal, Long feedId, Long commentId, Long replyId) {
+		requireVisible(feedId, principal.getUserNo());
+		requireComment(feedId, commentId);
+		requireReply(commentId, replyId);
+		FeedReplyLike existing = feedMapper.findReplyLike(replyId, principal.getUserNo());
+		if (existing == null) {
+			feedMapper.insertReplyLike(replyId, principal.getUserNo());
+			feedMapper.adjustReplyLikeCount(replyId, 1);
+		} else if (Boolean.TRUE.equals(existing.getIsDeleted())) {
+			if (feedMapper.restoreReplyLike(replyId, principal.getUserNo()) > 0) {
+				feedMapper.adjustReplyLikeCount(replyId, 1);
+			}
+		}
+		log.info("[likeReply] replyId={} userNo={}", replyId, principal.getUserNo());
+		return toReplyResponse(requireReply(commentId, replyId), principal.getUserNo(), null);
+	}
+
+	@Transactional
+	public FeedReplyResponse unlikeReply(
+			UserPrincipal principal, Long feedId, Long commentId, Long replyId) {
+		requireVisible(feedId, principal.getUserNo());
+		requireComment(feedId, commentId);
+		requireReply(commentId, replyId);
+		if (feedMapper.softDeleteReplyLike(replyId, principal.getUserNo()) > 0) {
+			feedMapper.adjustReplyLikeCount(replyId, -1);
+		}
+		log.info("[unlikeReply] replyId={} userNo={}", replyId, principal.getUserNo());
+		return toReplyResponse(requireReply(commentId, replyId), principal.getUserNo(), null);
 	}
 
 	@Transactional
@@ -525,8 +629,10 @@ public class FeedService {
 	}
 
 	private FeedResponse toResponse(Feed feed, Long viewerUserNo) {
+		User author = userMapper.findActiveByUserNo(feed.getUserNo());
 		List<FeedMedia> mediaList = feedMapper.findMediaByFeedId(feed.getFeedId());
 		Set<Long> fileIds = new HashSet<>();
+		collectAuthorProfileId(fileIds, author);
 		for (FeedMedia media : mediaList) {
 			if (media.getFileId() != null) {
 				fileIds.add(media.getFileId());
@@ -535,15 +641,21 @@ public class FeedService {
 				fileIds.add(media.getThumbnailFileId());
 			}
 		}
-		return toResponse(feed, viewerUserNo, mediaList, fileService.findSummaries(fileIds));
+		return toResponse(feed, viewerUserNo, author, mediaList, fileService.findSummaries(fileIds));
+	}
+
+	private static void collectAuthorProfileId(Set<Long> fileIds, User author) {
+		if (author != null && author.getProfileFileId() != null) {
+			fileIds.add(author.getProfileFileId().longValue());
+		}
 	}
 
 	private FeedResponse toResponse(
 			Feed feed,
 			Long viewerUserNo,
+			User author,
 			List<FeedMedia> mediaList,
 			Map<Long, FileSummaryResponse> files) {
-		User author = userMapper.findActiveByUserNo(feed.getUserNo());
 		List<FeedResponse.MediaItem> mediaItems = new ArrayList<>();
 		List<FeedMedia> resolvedMedia = mediaList != null ? mediaList : List.of();
 		for (FeedMedia media : resolvedMedia) {
@@ -588,10 +700,14 @@ public class FeedService {
 			storedByMe = store != null && !Boolean.TRUE.equals(store.getIsDeleted());
 		}
 
+		Integer authorProfileFileId = author != null ? author.getProfileFileId() : null;
 		return FeedResponse.builder()
 				.feedId(feed.getFeedId())
 				.userNo(feed.getUserNo())
 				.authorNickname(author != null ? author.getNickname() : null)
+				.authorProfileFile(authorProfileFileId == null
+						? null
+						: files.get(authorProfileFileId.longValue()))
 				.content(feed.getContent())
 				.visibility(feed.getVisibility())
 				.likeCount(feed.getLikeCount())
@@ -672,25 +788,51 @@ public class FeedService {
 		return result;
 	}
 
-	private FeedCommentResponse toCommentResponse(FeedComment comment, boolean embedReplies) {
-		String nickname = comment.getAuthorNickname();
-		if (nickname == null) {
-			User user = userMapper.findActiveByUserNo(comment.getUserNo());
-			nickname = user != null ? user.getNickname() : null;
-		}
+	private FeedCommentResponse toCommentResponse(
+			FeedComment comment,
+			boolean embedReplies,
+			Long viewerUserNo,
+			Set<Long> likedCommentIds) {
+		return toCommentResponse(comment, embedReplies, viewerUserNo, likedCommentIds, null, null);
+	}
+
+	private FeedCommentResponse toCommentResponse(
+			FeedComment comment,
+			boolean embedReplies,
+			Long viewerUserNo,
+			Set<Long> likedCommentIds,
+			Map<Long, FileSummaryResponse> profiles,
+			List<FeedReply> preloadedReplies) {
+		AuthorProfile author = resolveAuthor(
+				comment.getUserNo(),
+				comment.getAuthorNickname(),
+				comment.getAuthorProfileFileId(),
+				profiles);
 		int replyCount = feedMapper.countActiveRepliesByCommentId(comment.getFeedCommentId());
 		List<FeedReplyResponse> replies = null;
 		if (embedReplies) {
-			replies = feedMapper.findActiveReplies(comment.getFeedCommentId(), MAX_LIST_LIMIT).stream()
-					.map(this::toReplyResponse)
+			List<FeedReply> replyRows = preloadedReplies != null
+					? preloadedReplies
+					: feedMapper.findActiveReplies(comment.getFeedCommentId(), MAX_LIST_LIMIT);
+			Set<Long> likedReplyIds = activeLikedReplyIds(
+					replyRows.stream().map(FeedReply::getFeedReplyId).toList(),
+					viewerUserNo);
+			replies = replyRows.stream()
+					.map(reply -> toReplyResponse(reply, viewerUserNo, likedReplyIds, profiles))
 					.toList();
 		}
+		boolean likedByMe = likedCommentIds != null
+				? likedCommentIds.contains(comment.getFeedCommentId())
+				: isCommentLikedBy(comment.getFeedCommentId(), viewerUserNo);
 		return FeedCommentResponse.builder()
 				.feedCommentId(comment.getFeedCommentId())
 				.feedId(comment.getFeedId())
 				.userNo(comment.getUserNo())
-				.authorNickname(nickname)
+				.authorNickname(author.nickname())
+				.authorProfileFile(author.profileFile())
 				.content(comment.getContent())
+				.likeCount(comment.getLikeCount() == null ? 0 : comment.getLikeCount())
+				.likedByMe(likedByMe)
 				.mentions(toMentionResponses(feedMapper.findMentionsByCommentId(comment.getFeedCommentId())))
 				.replyCount(replyCount)
 				.replies(replies)
@@ -699,22 +841,95 @@ public class FeedService {
 				.build();
 	}
 
-	private FeedReplyResponse toReplyResponse(FeedReply reply) {
-		String nickname = reply.getAuthorNickname();
-		if (nickname == null) {
-			User user = userMapper.findActiveByUserNo(reply.getUserNo());
-			nickname = user != null ? user.getNickname() : null;
-		}
+	private FeedReplyResponse toReplyResponse(FeedReply reply, Long viewerUserNo, Set<Long> likedReplyIds) {
+		return toReplyResponse(reply, viewerUserNo, likedReplyIds, null);
+	}
+
+	private FeedReplyResponse toReplyResponse(
+			FeedReply reply,
+			Long viewerUserNo,
+			Set<Long> likedReplyIds,
+			Map<Long, FileSummaryResponse> profiles) {
+		AuthorProfile author = resolveAuthor(
+				reply.getUserNo(),
+				reply.getAuthorNickname(),
+				reply.getAuthorProfileFileId(),
+				profiles);
+		boolean likedByMe = likedReplyIds != null
+				? likedReplyIds.contains(reply.getFeedReplyId())
+				: isReplyLikedBy(reply.getFeedReplyId(), viewerUserNo);
 		return FeedReplyResponse.builder()
 				.feedReplyId(reply.getFeedReplyId())
 				.feedCommentId(reply.getFeedCommentId())
 				.userNo(reply.getUserNo())
-				.authorNickname(nickname)
+				.authorNickname(author.nickname())
+				.authorProfileFile(author.profileFile())
 				.content(reply.getContent())
+				.likeCount(reply.getLikeCount() == null ? 0 : reply.getLikeCount())
+				.likedByMe(likedByMe)
 				.mentions(toMentionResponses(feedMapper.findMentionsByReplyId(reply.getFeedReplyId())))
 				.createdAt(reply.getCreatedAt())
 				.updatedAt(reply.getUpdatedAt())
 				.build();
+	}
+
+	private static void collectProfileId(Set<Long> profileIds, Integer profileFileId) {
+		if (profileFileId != null) {
+			profileIds.add(profileFileId.longValue());
+		}
+	}
+
+	private AuthorProfile resolveAuthor(
+			Long userNo,
+			String nickname,
+			Integer profileFileId,
+			Map<Long, FileSummaryResponse> profiles) {
+		if (nickname == null) {
+			User user = userMapper.findActiveByUserNo(userNo);
+			nickname = user != null ? user.getNickname() : null;
+			profileFileId = user != null ? user.getProfileFileId() : null;
+		}
+		if (profileFileId == null) {
+			return new AuthorProfile(nickname, null);
+		}
+		Long fileId = profileFileId.longValue();
+		FileSummaryResponse profileFile = profiles != null
+				? profiles.get(fileId)
+				: fileService.findSummary(profileFileId);
+		return new AuthorProfile(nickname, profileFile);
+	}
+
+	private record AuthorProfile(String nickname, FileSummaryResponse profileFile) {
+	}
+
+	private boolean isCommentLikedBy(Long commentId, Long viewerUserNo) {
+		if (viewerUserNo == null) {
+			return false;
+		}
+		FeedCommentLike like = feedMapper.findCommentLike(commentId, viewerUserNo);
+		return like != null && !Boolean.TRUE.equals(like.getIsDeleted());
+	}
+
+	private boolean isReplyLikedBy(Long replyId, Long viewerUserNo) {
+		if (viewerUserNo == null) {
+			return false;
+		}
+		FeedReplyLike like = feedMapper.findReplyLike(replyId, viewerUserNo);
+		return like != null && !Boolean.TRUE.equals(like.getIsDeleted());
+	}
+
+	private Set<Long> activeLikedCommentIds(List<Long> commentIds, Long viewerUserNo) {
+		if (viewerUserNo == null || commentIds == null || commentIds.isEmpty()) {
+			return Set.of();
+		}
+		return new HashSet<>(feedMapper.findActiveLikedCommentIds(commentIds, viewerUserNo));
+	}
+
+	private Set<Long> activeLikedReplyIds(List<Long> replyIds, Long viewerUserNo) {
+		if (viewerUserNo == null || replyIds == null || replyIds.isEmpty()) {
+			return Set.of();
+		}
+		return new HashSet<>(feedMapper.findActiveLikedReplyIds(replyIds, viewerUserNo));
 	}
 
 	private int resolveLimit(Integer limit) {

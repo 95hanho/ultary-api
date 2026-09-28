@@ -33,7 +33,7 @@ Content-Type: application/json
 GET {{baseUrl}}/api/v1/my-ultary/stories
 Authorization: Bearer {{accessToken}}
 
-### 3. 주민 중 스토리 있는 목록 (시드: 주민 102·103 → story 102·103)
+### 3. 주민 중 스토리 있는 목록 (시드: 주민 102·103, profileFile=profile2/3)
 GET {{baseUrl}}/api/v1/main/stories/owners
 Authorization: Bearer {{accessToken}}
 

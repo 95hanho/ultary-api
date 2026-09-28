@@ -1,6 +1,7 @@
 package me._hanho.ultary.domain.feed;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 
 import org.apache.ibatis.annotations.Mapper;
@@ -8,12 +9,14 @@ import org.apache.ibatis.annotations.Param;
 
 import me._hanho.ultary.domain.feed.model.Feed;
 import me._hanho.ultary.domain.feed.model.FeedComment;
+import me._hanho.ultary.domain.feed.model.FeedCommentLike;
 import me._hanho.ultary.domain.feed.model.FeedCommentMention;
 import me._hanho.ultary.domain.feed.model.FeedLike;
 import me._hanho.ultary.domain.feed.model.FeedMedia;
 import me._hanho.ultary.domain.feed.model.FeedMediaMention;
 import me._hanho.ultary.domain.feed.model.FeedPet;
 import me._hanho.ultary.domain.feed.model.FeedReply;
+import me._hanho.ultary.domain.feed.model.FeedReplyLike;
 import me._hanho.ultary.domain.feed.model.FeedStore;
 
 @Mapper
@@ -42,6 +45,14 @@ public interface FeedMapper {
 			@Param("viewerUserNo") Long viewerUserNo,
 			@Param("cursorCreatedAt") LocalDateTime cursorCreatedAt,
 			@Param("cursorFeedId") Long cursorFeedId,
+			@Param("limit") int limit);
+
+	/**
+	 * 조회 가능한 전체 피드 최신순 limit건.
+	 * 추천 알고리즘 추가 전 임시 조회.
+	 */
+	List<Feed> findVisibleFeeds(
+			@Param("viewerUserNo") Long viewerUserNo,
 			@Param("limit") int limit);
 
 	List<Feed> searchVisible(
@@ -154,6 +165,30 @@ public interface FeedMapper {
 			@Param("feedId") Long feedId,
 			@Param("delta") int delta);
 
+	FeedCommentLike findCommentLike(
+			@Param("commentId") Long commentId,
+			@Param("userNo") Long userNo);
+
+	int insertCommentLike(
+			@Param("commentId") Long commentId,
+			@Param("userNo") Long userNo);
+
+	int restoreCommentLike(
+			@Param("commentId") Long commentId,
+			@Param("userNo") Long userNo);
+
+	int softDeleteCommentLike(
+			@Param("commentId") Long commentId,
+			@Param("userNo") Long userNo);
+
+	int adjustCommentLikeCount(
+			@Param("commentId") Long commentId,
+			@Param("delta") int delta);
+
+	List<Long> findActiveLikedCommentIds(
+			@Param("commentIds") Collection<Long> commentIds,
+			@Param("userNo") Long userNo);
+
 	int insertReply(FeedReply reply);
 
 	FeedReply findActiveReply(
@@ -177,6 +212,30 @@ public interface FeedMapper {
 			@Param("replyId") Long replyId,
 			@Param("commentId") Long commentId,
 			@Param("feedAuthorUserNo") Long feedAuthorUserNo);
+
+	FeedReplyLike findReplyLike(
+			@Param("replyId") Long replyId,
+			@Param("userNo") Long userNo);
+
+	int insertReplyLike(
+			@Param("replyId") Long replyId,
+			@Param("userNo") Long userNo);
+
+	int restoreReplyLike(
+			@Param("replyId") Long replyId,
+			@Param("userNo") Long userNo);
+
+	int softDeleteReplyLike(
+			@Param("replyId") Long replyId,
+			@Param("userNo") Long userNo);
+
+	int adjustReplyLikeCount(
+			@Param("replyId") Long replyId,
+			@Param("delta") int delta);
+
+	List<Long> findActiveLikedReplyIds(
+			@Param("replyIds") Collection<Long> replyIds,
+			@Param("userNo") Long userNo);
 
 	int insertCommentMention(FeedCommentMention mention);
 

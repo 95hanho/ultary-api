@@ -90,6 +90,31 @@ public class MainService {
 				.build();
 	}
 
+	/**
+	 * 메인 추천 게시글.
+	 * 나중에 추천 알고리즘 추가해야함. 지금은 조회 가능한 전체 피드를 최신순 limit건.
+	 */
+	@Transactional(readOnly = true)
+	public List<FeedResponse> getRecommendedFeeds(UserPrincipal principal, Integer limit) {
+		return listVisibleFeeds(principal, limit);
+	}
+
+	/**
+	 * 검색 화면 추천 게시글.
+	 * 나중에 추천 알고리즘 추가해야함. 지금은 조회 가능한 전체 피드를 최신순 limit건.
+	 */
+	@Transactional(readOnly = true)
+	public List<FeedResponse> getSearchRecommendedFeeds(UserPrincipal principal, Integer limit) {
+		return listVisibleFeeds(principal, limit);
+	}
+
+	private List<FeedResponse> listVisibleFeeds(UserPrincipal principal, Integer limit) {
+		int pageSize = resolveLimit(limit, DEFAULT_FEED_LIMIT, MAX_FEED_LIMIT);
+		return feedService.toResponses(
+				feedMapper.findVisibleFeeds(principal.getUserNo(), pageSize),
+				principal.getUserNo());
+	}
+
 	@Transactional(readOnly = true)
 	public MainSearchResponse search(UserPrincipal principal, String q, String type, Integer limit) {
 		String query = normalizeQuery(q);

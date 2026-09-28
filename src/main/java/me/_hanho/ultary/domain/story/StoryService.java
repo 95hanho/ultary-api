@@ -94,13 +94,22 @@ public class StoryService {
 	@Transactional(readOnly = true)
 	public List<StoryOwnerResponse> listResidentOwners(UserPrincipal principal) {
 		List<StoryOwnerRow> rows = storyMapper.findResidentOwnersWithActiveStories(principal.getUserNo());
+		Set<Long> profileIds = new HashSet<>();
+		for (StoryOwnerRow row : rows) {
+			if (row.getProfileFileId() != null) {
+				profileIds.add(row.getProfileFileId().longValue());
+			}
+		}
+		Map<Long, FileSummaryResponse> files = fileService.findSummaries(profileIds);
 		List<StoryOwnerResponse> result = new ArrayList<>();
 		for (StoryOwnerRow row : rows) {
 			int unviewed = storyMapper.countUnviewedActiveByOwner(row.getUserNo(), principal.getUserNo());
+			Long profileId = row.getProfileFileId() == null ? null : row.getProfileFileId().longValue();
 			result.add(StoryOwnerResponse.builder()
 					.userNo(row.getUserNo())
 					.nickname(row.getNickname())
 					.profileFileId(row.getProfileFileId())
+					.profileFile(profileId == null ? null : files.get(profileId))
 					.storyCount(row.getStoryCount())
 					.hasUnviewed(unviewed > 0)
 					.build());

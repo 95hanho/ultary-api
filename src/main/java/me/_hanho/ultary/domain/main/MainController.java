@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.response.ApiResponse;
+import me._hanho.ultary.domain.feed.dto.response.FeedResponse;
 import me._hanho.ultary.domain.main.dto.response.MainFeedPageResponse;
 import me._hanho.ultary.domain.main.dto.response.MainSearchResponse;
 import me._hanho.ultary.domain.story.dto.response.StoryOwnerResponse;
@@ -53,6 +54,15 @@ public class MainController {
 		return ApiResponse.ok(mainService.getFeeds(principal, cursorFeedId, limit), "주민 게시글 조회 성공");
 	}
 
+	/** 나중에 추천 알고리즘 추가해야함. 지금은 조회 가능한 전체 피드를 limit건 */
+	@GetMapping("/feeds/recommended")
+	public ApiResponse<List<FeedResponse>> recommendedFeeds(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@RequestParam(required = false) Integer limit) {
+		log.info("[recommendedFeeds] userNo={} limit={}", principal.getUserNo(), limit);
+		return ApiResponse.ok(mainService.getRecommendedFeeds(principal, limit), "메인 추천 게시글 조회 성공");
+	}
+
 	@GetMapping("/search")
 	public ApiResponse<MainSearchResponse> search(
 			@AuthenticationPrincipal UserPrincipal principal,
@@ -61,5 +71,16 @@ public class MainController {
 			@RequestParam(required = false) Integer limit) {
 		log.info("[search] userNo={} q={} type={}", principal.getUserNo(), q, type);
 		return ApiResponse.ok(mainService.search(principal, q, type, limit), "검색 성공");
+	}
+
+	/** 나중에 추천 알고리즘 추가해야함. 지금은 조회 가능한 전체 피드를 limit건 */
+	@GetMapping("/search/recommended")
+	public ApiResponse<List<FeedResponse>> searchRecommendedFeeds(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@RequestParam(required = false) Integer limit) {
+		log.info("[searchRecommendedFeeds] userNo={} limit={}", principal.getUserNo(), limit);
+		return ApiResponse.ok(
+				mainService.getSearchRecommendedFeeds(principal, limit),
+				"검색 추천 게시글 조회 성공");
 	}
 }

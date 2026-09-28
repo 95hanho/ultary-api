@@ -115,7 +115,16 @@ Content-Type: application/json
 }
 
 ### 7b. 댓글 목록 (댓글+답글 합 ≤10이면 replies 포함, 초과면 replies=null)
+# 각 댓글·포함 답글: likeCount, likedByMe, authorProfileFile(없으면 null)
 GET {{baseUrl}}/api/v1/feeds/{{feedId}}/comments?limit=50
+Authorization: Bearer {{accessToken}}
+
+### 7e. 댓글 좋아요 (시드 comment 101 또는 7a 생성분)
+POST {{baseUrl}}/api/v1/feeds/101/comments/101/like
+Authorization: Bearer {{accessToken}}
+
+### 7f. 댓글 좋아요 취소
+DELETE {{baseUrl}}/api/v1/feeds/101/comments/101/like
 Authorization: Bearer {{accessToken}}
 
 ### 7c. 댓글 수정
@@ -140,8 +149,16 @@ Content-Type: application/json
   ]
 }
 
-### 8b. 답글 목록
+### 8b. 답글 목록 (likeCount, likedByMe, authorProfileFile)
 GET {{baseUrl}}/api/v1/feeds/{{feedId}}/comments/{{commentId}}/replies?limit=50
+Authorization: Bearer {{accessToken}}
+
+### 8e. 답글 좋아요 (시드 reply 101)
+POST {{baseUrl}}/api/v1/feeds/101/comments/101/replies/101/like
+Authorization: Bearer {{accessToken}}
+
+### 8f. 답글 좋아요 취소
+DELETE {{baseUrl}}/api/v1/feeds/101/comments/101/replies/101/like
 Authorization: Bearer {{accessToken}}
 
 ### 8c. 답글 수정

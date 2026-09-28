@@ -184,6 +184,28 @@
 		LIMIT #{limit}
 	</select>
 
+	<!-- 나중에 추천 알고리즘 추가해야함. 지금은 조회 가능한 전체 피드를 최신순 limit건 -->
+	<select id="findVisibleFeeds" resultType="me._hanho.ultary.domain.feed.model.Feed">
+		SELECT
+			f.feed_id,
+			f.user_no,
+			f.content,
+			f.visibility,
+			f.like_count,
+			f.comment_count,
+			f.store_count,
+			f.created_at,
+			f.updated_at,
+			f.is_deleted,
+			f.deleted_at,
+			f.deleted_by_user_no
+		FROM ultary_feed f
+		INNER JOIN ultary_user u ON u.user_no = f.user_no
+		WHERE <include refid="visibleToViewerAndNotBlocked"/>
+		ORDER BY f.created_at DESC, f.feed_id DESC
+		LIMIT #{limit}
+	</select>
+
 	<select id="searchVisible" resultType="me._hanho.ultary.domain.feed.model.Feed">
 		SELECT
 			f.feed_id,
@@ -487,6 +509,7 @@
 			feed_id,
 			user_no,
 			content,
+			like_count,
 			created_at,
 			updated_at,
 			is_deleted,
@@ -503,11 +526,13 @@
 			c.feed_id,
 			c.user_no,
 			c.content,
+			c.like_count,
 			c.created_at,
 			c.updated_at,
 			c.is_deleted,
 			c.deleted_at,
-			u.nickname AS authorNickname
+			u.nickname AS authorNickname,
+			u.profile_file_id AS authorProfileFileId
 		FROM ultary_feed_comment c
 		INNER JOIN ultary_user u ON u.user_no = c.user_no
 		WHERE c.feed_id = #{feedId}
@@ -607,6 +632,7 @@
 			feed_comment_id,
 			user_no,
 			content,
+			like_count,
 			created_at,
 			updated_at,
 			is_deleted,
@@ -623,11 +649,13 @@
 			r.feed_comment_id,
 			r.user_no,
 			r.content,
+			r.like_count,
 			r.created_at,
 			r.updated_at,
 			r.is_deleted,
 			r.deleted_at,
-			u.nickname AS authorNickname
+			u.nickname AS authorNickname,
+			u.profile_file_id AS authorProfileFileId
 		FROM ultary_feed_reply r
 		INNER JOIN ultary_user u ON u.user_no = r.user_no
 		WHERE r.feed_comment_id = #{commentId}
@@ -672,6 +700,116 @@
 			  AND f.is_deleted = 0
 		  )
 	</update>
+
+	<select id="findCommentLike" resultType="me._hanho.ultary.domain.feed.model.FeedCommentLike">
+		SELECT
+			feed_comment_like_id,
+			feed_comment_id,
+			user_no,
+			created_at,
+			is_deleted,
+			deleted_at
+		FROM ultary_feed_comment_like
+		WHERE feed_comment_id = #{commentId}
+		  AND user_no = #{userNo}
+	</select>
+
+	<insert id="insertCommentLike">
+		INSERT INTO ultary_feed_comment_like (feed_comment_id, user_no, is_deleted, deleted_at)
+		VALUES (#{commentId}, #{userNo}, 0, NULL)
+	</insert>
+
+	<update id="restoreCommentLike">
+		UPDATE ultary_feed_comment_like
+		SET is_deleted = 0,
+			deleted_at = NULL,
+			created_at = NOW()
+		WHERE feed_comment_id = #{commentId}
+		  AND user_no = #{userNo}
+		  AND is_deleted = 1
+	</update>
+
+	<update id="softDeleteCommentLike">
+		UPDATE ultary_feed_comment_like
+		SET is_deleted = 1,
+			deleted_at = NOW()
+		WHERE feed_comment_id = #{commentId}
+		  AND user_no = #{userNo}
+		  AND is_deleted = 0
+	</update>
+
+	<update id="adjustCommentLikeCount">
+		UPDATE ultary_feed_comment
+		SET like_count = GREATEST(like_count + #{delta}, 0)
+		WHERE feed_comment_id = #{commentId}
+		  AND is_deleted = 0
+	</update>
+
+	<select id="findActiveLikedCommentIds" resultType="long">
+		SELECT feed_comment_id
+		FROM ultary_feed_comment_like
+		WHERE user_no = #{userNo}
+		  AND is_deleted = 0
+		  AND feed_comment_id IN
+		<foreach collection="commentIds" item="id" open="(" separator="," close=")">
+			#{id}
+		</foreach>
+	</select>
+
+	<select id="findReplyLike" resultType="me._hanho.ultary.domain.feed.model.FeedReplyLike">
+		SELECT
+			feed_reply_like_id,
+			feed_reply_id,
+			user_no,
+			created_at,
+			is_deleted,
+			deleted_at
+		FROM ultary_feed_reply_like
+		WHERE feed_reply_id = #{replyId}
+		  AND user_no = #{userNo}
+	</select>
+
+	<insert id="insertReplyLike">
+		INSERT INTO ultary_feed_reply_like (feed_reply_id, user_no, is_deleted, deleted_at)
+		VALUES (#{replyId}, #{userNo}, 0, NULL)
+	</insert>
+
+	<update id="restoreReplyLike">
+		UPDATE ultary_feed_reply_like
+		SET is_deleted = 0,
+			deleted_at = NULL,
+			created_at = NOW()
+		WHERE feed_reply_id = #{replyId}
+		  AND user_no = #{userNo}
+		  AND is_deleted = 1
+	</update>
+
+	<update id="softDeleteReplyLike">
+		UPDATE ultary_feed_reply_like
+		SET is_deleted = 1,
+			deleted_at = NOW()
+		WHERE feed_reply_id = #{replyId}
+		  AND user_no = #{userNo}
+		  AND is_deleted = 0
+	</update>
+
+	<update id="adjustReplyLikeCount">
+		UPDATE ultary_feed_reply
+		SET like_count = GREATEST(like_count + #{delta}, 0)
+		WHERE feed_reply_id = #{replyId}
+		  AND is_deleted = 0
+	</update>
+
+	<select id="findActiveLikedReplyIds" resultType="long">
+		SELECT feed_reply_id
+		FROM ultary_feed_reply_like
+		WHERE user_no = #{userNo}
+		  AND is_deleted = 0
+		  AND feed_reply_id IN
+		<foreach collection="replyIds" item="id" open="(" separator="," close=")">
+			#{id}
+		</foreach>
+	</select>
 
 	<insert id="insertCommentMention" useGeneratedKeys="true" keyProperty="feedCommentMentionId" keyColumn="feed_comment_mention_id">
 		INSERT INTO ultary_feed_comment_mention (

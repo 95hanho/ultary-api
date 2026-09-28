@@ -165,6 +165,24 @@ public class FeedController {
 		return ApiResponse.okEmpty("댓글 삭제 성공");
 	}
 
+	@PostMapping("/{feedId}/comments/{commentId}/like")
+	public ApiResponse<FeedCommentResponse> likeComment(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@PathVariable Long feedId,
+			@PathVariable Long commentId) {
+		log.info("[likeComment] feedId={} commentId={}", feedId, commentId);
+		return ApiResponse.ok(feedService.likeComment(principal, feedId, commentId), "댓글 좋아요 성공");
+	}
+
+	@DeleteMapping("/{feedId}/comments/{commentId}/like")
+	public ApiResponse<FeedCommentResponse> unlikeComment(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@PathVariable Long feedId,
+			@PathVariable Long commentId) {
+		log.info("[unlikeComment] feedId={} commentId={}", feedId, commentId);
+		return ApiResponse.ok(feedService.unlikeComment(principal, feedId, commentId), "댓글 좋아요 취소 성공");
+	}
+
 	@GetMapping("/{feedId}/comments/{commentId}/replies")
 	public ApiResponse<List<FeedReplyResponse>> replies(
 			@AuthenticationPrincipal UserPrincipal principal,
@@ -207,5 +225,29 @@ public class FeedController {
 		log.info("[deleteReply] feedId={} commentId={} replyId={}", feedId, commentId, replyId);
 		feedService.deleteReply(principal, feedId, commentId, replyId);
 		return ApiResponse.okEmpty("답글 삭제 성공");
+	}
+
+	@PostMapping("/{feedId}/comments/{commentId}/replies/{replyId}/like")
+	public ApiResponse<FeedReplyResponse> likeReply(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@PathVariable Long feedId,
+			@PathVariable Long commentId,
+			@PathVariable Long replyId) {
+		log.info("[likeReply] feedId={} commentId={} replyId={}", feedId, commentId, replyId);
+		return ApiResponse.ok(
+				feedService.likeReply(principal, feedId, commentId, replyId),
+				"답글 좋아요 성공");
+	}
+
+	@DeleteMapping("/{feedId}/comments/{commentId}/replies/{replyId}/like")
+	public ApiResponse<FeedReplyResponse> unlikeReply(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@PathVariable Long feedId,
+			@PathVariable Long commentId,
+			@PathVariable Long replyId) {
+		log.info("[unlikeReply] feedId={} commentId={} replyId={}", feedId, commentId, replyId);
+		return ApiResponse.ok(
+				feedService.unlikeReply(principal, feedId, commentId, replyId),
+				"답글 좋아요 취소 성공");
 	}
 }

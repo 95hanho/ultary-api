@@ -5,6 +5,7 @@ import java.util.List;
 
 import lombok.Builder;
 import lombok.Getter;
+import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
 
 @Getter
 @Builder
@@ -14,7 +15,11 @@ public class FeedReplyResponse {
 	private Long feedCommentId;
 	private Long userNo;
 	private String authorNickname;
+	/** 작성자 프로필. 미등록·삭제 파일이면 null */
+	private FileSummaryResponse authorProfileFile;
 	private String content;
+	private Integer likeCount;
+	private Boolean likedByMe;
 	private List<CommentMentionResponse> mentions;
 	private LocalDateTime createdAt;
 	private LocalDateTime updatedAt;
