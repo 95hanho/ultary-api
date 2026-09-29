@@ -167,6 +167,22 @@ public class FileService {
 		log.info("[softDelete] fileId={} userNo={}", fileId, userNo);
 	}
 
+	/**
+	 * 펫 프로필에서 빠진 파일. 다른 곳에서 아직 쓰면 그대로 두고, 참조가 없으면 삭제 표시.
+	 */
+	@Transactional
+	public void releaseIfUnused(Long fileId) {
+		if (fileId == null) {
+			return;
+		}
+		if (fileMapper.countLiveReferences(fileId) > 0) {
+			log.info("[releaseIfUnused] keep fileId={} still referenced", fileId);
+			return;
+		}
+		int updated = fileMapper.softDelete(fileId);
+		log.info("[releaseIfUnused] fileId={} markedDeleted={}", fileId, updated);
+	}
+
 	private MediaKind resolveMediaKind(String hint, String extension, String contentType) {
 		String normalized = hint == null ? "AUTO" : hint.trim().toUpperCase(Locale.ROOT);
 		return switch (normalized) {

@@ -1,5 +1,6 @@
 package me._hanho.ultary.domain.main;
 
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -25,15 +26,22 @@ import me._hanho.ultary.domain.main.dto.response.MainFeedPageResponse;
 import me._hanho.ultary.domain.main.dto.response.MainSearchPetItem;
 import me._hanho.ultary.domain.main.dto.response.MainSearchResponse;
 import me._hanho.ultary.domain.main.dto.response.MainSearchUserItem;
+import me._hanho.ultary.domain.main.dto.response.SearchHistoryItemResponse;
+import me._hanho.ultary.domain.main.dto.response.SearchHistoryPageResponse;
 import me._hanho.ultary.domain.pet.PetMapper;
+import me._hanho.ultary.domain.pet.PetService;
 import me._hanho.ultary.domain.pet.model.Pet;
 import me._hanho.ultary.domain.story.StoryService;
 import me._hanho.ultary.domain.story.dto.response.StoryOwnerResponse;
 import me._hanho.ultary.domain.story.dto.response.StoryResponse;
 import me._hanho.ultary.domain.tag.TagService;
 import me._hanho.ultary.domain.tag.dto.response.TagResponse;
+import me._hanho.ultary.domain.user.UserBlockMapper;
 import me._hanho.ultary.domain.user.UserMapper;
+import me._hanho.ultary.domain.user.UserSearchHistoryMapper;
+import me._hanho.ultary.domain.user.model.SearchHistoryRow;
 import me._hanho.ultary.domain.user.model.User;
+import me._hanho.ultary.domain.user.model.UserSearchHistory;
 import me._hanho.ultary.security.principal.UserPrincipal;
 
 @Slf4j
@@ -46,11 +54,17 @@ public class MainService {
 	private static final int DEFAULT_SEARCH_LIMIT = 10;
 	private static final int MAX_SEARCH_LIMIT = 20;
 
+	private static final int RECENT_SEARCH_LIMIT = 5;
+	private static final int RECENT_SEARCH_MORE_LIMIT = 20;
+
 	private final StoryService storyService;
 	private final FeedMapper feedMapper;
 	private final FeedService feedService;
 	private final UserMapper userMapper;
+	private final UserBlockMapper userBlockMapper;
+	private final UserSearchHistoryMapper userSearchHistoryMapper;
 	private final PetMapper petMapper;
+	private final PetService petService;
 	private final TagService tagService;
 	private final FileService fileService;
 
@@ -115,6 +129,98 @@ public class MainService {
 				principal.getUserNo());
 	}
 
+	/** 검색창을 열었을 때 최근 울타리 5건 */
+	@Transactional(readOnly = true)
+	public SearchHistoryPageResponse getRecentSearches(UserPrincipal principal) {
+		return pageRecentSearches(principal, null, RECENT_SEARCH_LIMIT);
+	}
+
+	/** 최근 검색 더보기. 직전 nextCursorHistoryId 기준으로 20건 */
+	@Transactional(readOnly = true)
+	public SearchHistoryPageResponse getMoreRecentSearches(UserPrincipal principal, Long cursorHistoryId) {
+		if (cursorHistoryId == null) {
+			throw new BusinessException(ErrorCode.INVALID_INPUT, "cursorHistoryId는 필수입니다.");
+		}
+		return pageRecentSearches(principal, cursorHistoryId, RECENT_SEARCH_MORE_LIMIT);
+	}
+
+	/** 검색 후 그 유저 울타리에 들어갈 때 저장. 같은 울타리는 searched_at만 갱신 */
+	@Transactional
+	public SearchHistoryItemResponse saveRecentSearch(UserPrincipal principal, Long targetUserNo) {
+		if (targetUserNo == null) {
+			throw new BusinessException(ErrorCode.INVALID_INPUT, "targetUserNo는 필수입니다.");
+		}
+		User target = userMapper.findActiveByUserNo(targetUserNo);
+		if (target == null) {
+			throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+		}
+		if (userBlockMapper.findActiveEitherWay(principal.getUserNo(), targetUserNo) != null) {
+			throw new BusinessException(ErrorCode.USER_BLOCKED);
+		}
+		userSearchHistoryMapper.upsert(principal.getUserNo(), targetUserNo);
+		SearchHistoryRow row = userSearchHistoryMapper.findByPair(principal.getUserNo(), targetUserNo);
+		log.info("[saveRecentSearch] userNo={} targetUserNo={}", principal.getUserNo(), targetUserNo);
+		return toHistoryItem(row, fileService.findSummary(row.getProfileFileId()));
+	}
+
+	/** 모두 지우기. 목록에 안 보이는 탈퇴·차단 대상 행도 함께 삭제 */
+	@Transactional
+	public void clearRecentSearches(UserPrincipal principal) {
+		int deleted = userSearchHistoryMapper.deleteByUserNo(principal.getUserNo());
+		log.info("[clearRecentSearches] userNo={} deleted={}", principal.getUserNo(), deleted);
+	}
+
+	private SearchHistoryPageResponse pageRecentSearches(
+			UserPrincipal principal, Long cursorHistoryId, int pageSize) {
+		LocalDateTime cursorSearchedAt = null;
+		Long cursorId = null;
+		if (cursorHistoryId != null) {
+			UserSearchHistory cursor = userSearchHistoryMapper.findOwnById(
+					principal.getUserNo(), cursorHistoryId);
+			if (cursor == null) {
+				throw new BusinessException(ErrorCode.INVALID_INPUT, "커서가 올바르지 않습니다.");
+			}
+			cursorSearchedAt = cursor.getSearchedAt();
+			cursorId = cursor.getUserSearchHistoryId();
+		}
+		List<SearchHistoryRow> rows = userSearchHistoryMapper.findRecent(
+				principal.getUserNo(), cursorSearchedAt, cursorId, pageSize + 1);
+		Long nextCursor = null;
+		if (rows.size() > pageSize) {
+			rows = List.copyOf(rows.subList(0, pageSize));
+			nextCursor = rows.get(rows.size() - 1).getUserSearchHistoryId();
+		}
+		Set<Long> profileIds = new HashSet<>();
+		for (SearchHistoryRow row : rows) {
+			if (row.getProfileFileId() != null) {
+				profileIds.add(row.getProfileFileId().longValue());
+			}
+		}
+		Map<Long, FileSummaryResponse> files = fileService.findSummaries(profileIds);
+		List<SearchHistoryItemResponse> items = rows.stream()
+				.map(row -> toHistoryItem(
+						row,
+						row.getProfileFileId() == null
+								? null
+								: files.get(row.getProfileFileId().longValue())))
+				.toList();
+		return SearchHistoryPageResponse.builder()
+				.items(items)
+				.nextCursorHistoryId(nextCursor)
+				.build();
+	}
+
+	private SearchHistoryItemResponse toHistoryItem(SearchHistoryRow row, FileSummaryResponse profileFile) {
+		return SearchHistoryItemResponse.builder()
+				.userSearchHistoryId(row.getUserSearchHistoryId())
+				.userNo(row.getTargetUserNo())
+				.nickname(row.getNickname())
+				.profileFileId(row.getProfileFileId())
+				.profileFile(profileFile)
+				.searchedAt(row.getSearchedAt())
+				.build();
+	}
+
 	@Transactional(readOnly = true)
 	public MainSearchResponse search(UserPrincipal principal, String q, String type, Integer limit) {
 		String query = normalizeQuery(q);
@@ -132,22 +238,21 @@ public class MainService {
 
 		if (all || "USER".equals(searchType)) {
 			List<User> userRows = userMapper.searchActiveByNickname(principal.getUserNo(), query, resolved);
+			Map<Long, Integer> profileByUser = petService.representativeProfileFileIds(
+					userRows.stream().map(User::getUserNo).toList());
 			Set<Long> profileIds = new HashSet<>();
-			for (User u : userRows) {
-				if (u.getProfileFileId() != null) {
-					profileIds.add(u.getProfileFileId().longValue());
-				}
+			for (Integer profileFileId : profileByUser.values()) {
+				profileIds.add(profileFileId.longValue());
 			}
 			Map<Long, FileSummaryResponse> files = fileService.findSummaries(profileIds);
 			users = userRows.stream()
 					.map(u -> {
-						Long profileId = u.getProfileFileId() == null
-								? null
-								: u.getProfileFileId().longValue();
+						Integer profileFileId = profileByUser.get(u.getUserNo());
+						Long profileId = profileFileId == null ? null : profileFileId.longValue();
 						return MainSearchUserItem.builder()
 								.userNo(u.getUserNo())
 								.nickname(u.getNickname())
-								.profileFileId(u.getProfileFileId())
+								.profileFileId(profileFileId)
 								.profileFile(profileId == null ? null : files.get(profileId))
 								.bio(u.getBio())
 								.build();

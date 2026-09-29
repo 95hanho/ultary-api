@@ -17,6 +17,7 @@
 		is_neutered,
 		birthday,
 		profile_file_id,
+		priority,
 		bio,
 		created_at,
 		updated_at,
@@ -29,7 +30,7 @@
 		FROM ultary_pet
 		WHERE user_no = #{userNo}
 		  AND is_deleted = 0
-		ORDER BY pet_id ASC
+		ORDER BY priority ASC, pet_id ASC
 	</select>
 
 	<select id="findActiveByPetId" resultType="me._hanho.ultary.domain.pet.model.Pet">
@@ -58,6 +59,7 @@
 			is_neutered,
 			birthday,
 			profile_file_id,
+			priority,
 			bio
 		) VALUES (
 			#{userNo},
@@ -69,6 +71,7 @@
 			#{isNeutered},
 			#{birthday},
 			#{profileFileId},
+			#{priority},
 			#{bio}
 		)
 	</insert>
@@ -99,6 +102,9 @@
 			</if>
 			<if test="bio != null">
 				bio = NULLIF(#{bio}, ''),
+			</if>
+			<if test="priority != null">
+				priority = #{priority},
 			</if>
 			updated_at = NOW()
 		WHERE pet_id = #{petId}
@@ -155,6 +161,7 @@
 			p.is_neutered,
 			p.birthday,
 			p.profile_file_id,
+			p.priority,
 			p.bio,
 			p.created_at,
 			p.updated_at,
@@ -179,6 +186,47 @@
 		  )
 		ORDER BY p.pet_id DESC
 		LIMIT #{limit}
+	</select>
+
+	<select id="findMaxPriority" resultType="java.lang.Integer">
+		SELECT MAX(priority)
+		FROM ultary_pet
+		WHERE user_no = #{userNo}
+		  AND is_deleted = 0
+	</select>
+
+	<select id="findRepresentativeProfileFileId" resultType="java.lang.Integer">
+		SELECT profile_file_id
+		FROM ultary_pet
+		WHERE user_no = #{userNo}
+		  AND is_deleted = 0
+		  AND profile_file_id IS NOT NULL
+		ORDER BY priority ASC, pet_id ASC
+		LIMIT 1
+	</select>
+
+	<select id="findRepresentativeProfiles" resultType="me._hanho.ultary.domain.pet.model.RepresentativePetProfile">
+		SELECT
+			p.user_no AS userNo,
+			p.profile_file_id AS profileFileId
+		FROM ultary_pet p
+		WHERE p.is_deleted = 0
+		  AND p.profile_file_id IS NOT NULL
+		  AND p.user_no IN
+		<foreach collection="userNos" item="userNo" open="(" separator="," close=")">
+			#{userNo}
+		</foreach>
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM ultary_pet p2
+			WHERE p2.user_no = p.user_no
+			  AND p2.is_deleted = 0
+			  AND p2.profile_file_id IS NOT NULL
+			  AND (
+				p2.priority &lt; p.priority
+				OR (p2.priority = p.priority AND p2.pet_id &lt; p.pet_id)
+			  )
+		  )
 	</select>
 
 </mapper>

@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="me._hanho.ultary.domain.user.UserSearchHistoryMapper">
+
+	<select id="findOwnById" resultType="me._hanho.ultary.domain.user.model.UserSearchHistory">
+		SELECT
+			user_search_history_id,
+			user_no,
+			target_user_no,
+			searched_at
+		FROM ultary_user_search_history
+		WHERE user_search_history_id = #{userSearchHistoryId}
+		  AND user_no = #{viewerUserNo}
+	</select>
+
+	<select id="findRecent" resultType="me._hanho.ultary.domain.user.model.SearchHistoryRow">
+		SELECT
+			h.user_search_history_id,
+			h.target_user_no,
+			h.searched_at,
+			u.nickname,
+			(
+				SELECT rp.profile_file_id
+				FROM ultary_pet rp
+				WHERE rp.user_no = u.user_no
+				  AND rp.is_deleted = 0
+				  AND rp.profile_file_id IS NOT NULL
+				ORDER BY rp.priority ASC, rp.pet_id ASC
+				LIMIT 1
+			) AS profileFileId
+		FROM ultary_user_search_history h
+		INNER JOIN ultary_user u
+			ON u.user_no = h.target_user_no
+		   AND u.withdrawal_status = 'ACTIVE'
+		WHERE h.user_no = #{viewerUserNo}
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM ultary_user_block b
+			WHERE b.is_deleted = 0
+			  AND (
+				(b.blocker_user_no = #{viewerUserNo} AND b.blocked_user_no = h.target_user_no)
+				OR (b.blocker_user_no = h.target_user_no AND b.blocked_user_no = #{viewerUserNo})
+			  )
+		  )
+		<if test="cursorSearchedAt != null and cursorHistoryId != null">
+		  AND (
+			h.searched_at &lt; #{cursorSearchedAt}
+			OR (
+				h.searched_at = #{cursorSearchedAt}
+				AND h.user_search_history_id &lt; #{cursorHistoryId}
+			)
+		  )
+		</if>
+		ORDER BY h.searched_at DESC, h.user_search_history_id DESC
+		LIMIT #{limit}
+	</select>
+
+	<insert id="upsert">
+		INSERT INTO ultary_user_search_history (
+			user_no,
+			target_user_no,
+			searched_at
+		) VALUES (
+			#{userNo},
+			#{targetUserNo},
+			NOW()
+		)
+		ON DUPLICATE KEY UPDATE searched_at = NOW()
+	</insert>
+
+	<select id="findByPair" resultType="me._hanho.ultary.domain.user.model.SearchHistoryRow">
+		SELECT
+			h.user_search_history_id,
+			h.target_user_no,
+			h.searched_at,
+			u.nickname,
+			(
+				SELECT rp.profile_file_id
+				FROM ultary_pet rp
+				WHERE rp.user_no = u.user_no
+				  AND rp.is_deleted = 0
+				  AND rp.profile_file_id IS NOT NULL
+				ORDER BY rp.priority ASC, rp.pet_id ASC
+				LIMIT 1
+			) AS profileFileId
+		FROM ultary_user_search_history h
+		INNER JOIN ultary_user u ON u.user_no = h.target_user_no
+		WHERE h.user_no = #{viewerUserNo}
+		  AND h.target_user_no = #{targetUserNo}
+	</select>
+
+	<delete id="deleteByUserNo">
+		DELETE FROM ultary_user_search_history
+		WHERE user_no = #{userNo}
+	</delete>
+
+</mapper>

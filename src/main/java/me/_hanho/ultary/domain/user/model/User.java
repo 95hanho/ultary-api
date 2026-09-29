@@ -19,7 +19,6 @@ public class User {
 	private Boolean isDefaultNickname;
 	private String email;
 	private String phone;
-	private Integer profileFileId;
 	private String bio;
 	private String regionSido;
 	private String regionSigungu;

@@ -2,6 +2,7 @@ package me._hanho.ultary.domain.pet.dto.request;
 
 import java.time.LocalDateTime;
 
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -36,6 +37,10 @@ public class CreatePetRequest {
 
 	/** 사전 업로드한 프로필 이미지 fileId */
 	private Long profileFileId;
+
+	/** 없으면 내 펫 맨 뒤. 작을수록 우선, 1이 가장 높음 */
+	@Min(value = 1, message = "우선순위는 1 이상이어야 합니다.")
+	private Integer priority;
 
 	@Size(max = 300, message = "소개글은 300자 이하여야 합니다.")
 	private String bio;

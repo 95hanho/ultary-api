@@ -5,15 +5,14 @@ import java.time.LocalDateTime;
 import lombok.Getter;
 import lombok.Setter;
 
-/** ultary_user_search_history — 검색 후 들어간 유저 울타리 */
+/** 최근 검색 목록 조인 행. 대상은 들어간 울타리 주인 */
 @Getter
 @Setter
-public class UserSearchHistory {
+public class SearchHistoryRow {
 
 	private Long userSearchHistoryId;
-	/** 검색 후 울타리에 들어간 사용자 */
-	private Long userNo;
-	/** 들어간 울타리 주인 */
 	private Long targetUserNo;
+	private String nickname;
+	private Integer profileFileId;
 	private LocalDateTime searchedAt;
 }

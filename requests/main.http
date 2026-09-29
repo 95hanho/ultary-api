@@ -23,7 +23,7 @@ GET {{baseUrl}}/api/v1/main/stories/owners
 Authorization: Bearer {{accessToken}}
 
 ### 2. 주민 스토리 조회 (본인 101) — 탭 후 본문(file.filePath + viewedByMe)
-# 항목마다 viewedByMe. FE: 첫 false부터 재생, 전부 true면 0부터. 넘기며 POST /stories/{id}/view
+# 항목마다 viewedByMe. 본인 스토리도 읽음 기록이 있을 때만 true. FE: 첫 false부터 재생, 전부 true면 0부터
 GET {{baseUrl}}/api/v1/main/stories?userNo=101
 Authorization: Bearer {{accessToken}}
 
@@ -67,4 +67,30 @@ Authorization: Bearer {{accessToken}}
 ### 6. 검색 추천 게시글
 # 나중에 추천 알고리즘 추가해야함. 지금은 조회 가능한 전체 피드를 최신순 limit건 (기본 10, 최대 20)
 GET {{baseUrl}}/api/v1/main/search/recommended?limit=9
+Authorization: Bearer {{accessToken}}
+
+### 7. 최근 검색 5건 (검색창을 열 때)
+# 검색 후 들어간 유저 울타리. items[] userNo/nickname/profileFile. nextCursorHistoryId 있으면 8번
+# @name recentSearch
+GET {{baseUrl}}/api/v1/main/search/recent
+Authorization: Bearer {{accessToken}}
+
+### 8. 최근 검색 더보기 (20건)
+# 7번 또는 직전 8번 응답의 nextCursorHistoryId. null 이면 끝
+@cursorHistoryId = {{recentSearch.response.body.$.data.nextCursorHistoryId}}
+GET {{baseUrl}}/api/v1/main/search/recent/more?cursorHistoryId={{cursorHistoryId}}
+Authorization: Bearer {{accessToken}}
+
+### 9. 최근 검색 저장 (검색 후 그 울타리에 들어갈 때)
+# 같은 targetUserNo면 새 행 없이 searched_at만 갱신. 시드 주민 102
+POST {{baseUrl}}/api/v1/main/search/recent
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "targetUserNo": 102
+}
+
+### 10. 최근 검색 모두 지우기
+DELETE {{baseUrl}}/api/v1/main/search/recent
 Authorization: Bearer {{accessToken}}

@@ -49,9 +49,4 @@ public interface UserMapper {
 			@Param("userNo") Long userNo,
 			@Param("bio") String bio,
 			@Param("clearBio") boolean clearBio);
-
-	int updateProfileFileId(
-			@Param("userNo") Long userNo,
-			@Param("profileFileId") Long profileFileId,
-			@Param("clearProfileFile") boolean clearProfileFile);
 }

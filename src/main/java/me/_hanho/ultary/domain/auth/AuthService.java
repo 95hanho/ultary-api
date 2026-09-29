@@ -39,6 +39,7 @@ import me._hanho.ultary.domain.auth.model.SocialProvider;
 import me._hanho.ultary.domain.auth.model.Token;
 import me._hanho.ultary.domain.auth.support.PhoneAuthCodeStore;
 import me._hanho.ultary.domain.file.FileService;
+import me._hanho.ultary.domain.pet.PetService;
 import me._hanho.ultary.domain.user.UserMapper;
 import me._hanho.ultary.domain.user.UserSocialMapper;
 import me._hanho.ultary.domain.user.model.User;
@@ -72,6 +73,7 @@ public class AuthService {
 	private final JwtProperties jwtProperties;
 	private final PhoneAuthCodeStore phoneAuthCodeStore;
 	private final FileService fileService;
+	private final PetService petService;
 	private final SecureRandom secureRandom = new SecureRandom();
 
 	/**
@@ -497,6 +499,7 @@ public class AuthService {
 	}
 
 	private MeResponse toMeResponse(User user) {
+		Integer profileFileId = petService.representativeProfileFileId(user.getUserNo());
 		return MeResponse.builder()
 				.userNo(user.getUserNo())
 				.name(user.getName())
@@ -505,8 +508,8 @@ public class AuthService {
 				.hasPassword(StringUtils.hasText(user.getPassword()))
 				.email(user.getEmail())
 				.phone(user.getPhone())
-				.profileFileId(user.getProfileFileId())
-				.profileFile(fileService.findSummary(user.getProfileFileId()))
+				.profileFileId(profileFileId)
+				.profileFile(fileService.findSummary(profileFileId))
 				.bio(user.getBio())
 				.regionSido(user.getRegionSido())
 				.regionSigungu(user.getRegionSigungu())

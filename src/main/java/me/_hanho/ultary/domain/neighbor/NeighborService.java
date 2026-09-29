@@ -24,6 +24,7 @@ import me._hanho.ultary.domain.neighbor.dto.response.UserUltaryResponse;
 import me._hanho.ultary.domain.neighbor.model.Neighbor;
 import me._hanho.ultary.domain.neighbor.model.NeighborListRow;
 import me._hanho.ultary.domain.pet.PetMapper;
+import me._hanho.ultary.domain.pet.PetService;
 import me._hanho.ultary.domain.story.StoryService;
 import me._hanho.ultary.domain.user.UserBlockMapper;
 import me._hanho.ultary.domain.user.UserMapper;
@@ -43,9 +44,22 @@ public class NeighborService {
 	private final UserBlockMapper userBlockMapper;
 	private final UserMapper userMapper;
 	private final PetMapper petMapper;
+	private final PetService petService;
 	private final FeedMapper feedMapper;
 	private final StoryService storyService;
 	private final FileService fileService;
+
+	/** 울타리 조회와 같다. 없는 유저 404, 상대가 나를 차단하면 403 */
+	@Transactional(readOnly = true)
+	public void assertCanViewUltary(UserPrincipal principal, Long targetUserNo) {
+		requireActiveUser(targetUserNo);
+		if (principal.getUserNo().equals(targetUserNo)) {
+			return;
+		}
+		if (userBlockMapper.findActiveByPair(targetUserNo, principal.getUserNo()) != null) {
+			throw new BusinessException(ErrorCode.USER_BLOCKED);
+		}
+	}
 
 	@Transactional(readOnly = true)
 	public UserUltaryResponse getUltary(UserPrincipal principal, Long targetUserNo) {
@@ -62,16 +76,18 @@ public class NeighborService {
 		String relationStatus = resolveRelationStatus(me, neighbor, blockedByMe);
 		Long neighborId = neighbor == null ? null : neighbor.getNeighborId();
 
+		Integer profileFileId = petService.representativeProfileFileId(target.getUserNo());
 		return UserUltaryResponse.builder()
 				.userNo(target.getUserNo())
 				.nickname(target.getNickname())
 				.defaultNickname(Boolean.TRUE.equals(target.getIsDefaultNickname()))
-				.profileFileId(target.getProfileFileId())
-				.profileFile(fileService.findSummary(target.getProfileFileId()))
+				.profileFileId(profileFileId)
+				.profileFile(fileService.findSummary(profileFileId))
 				.bio(target.getBio())
 				.regionSido(target.getRegionSido())
 				.regionSigungu(target.getRegionSigungu())
 				.hasStory(storyService.hasActiveStory(targetUserNo))
+				.hasUnviewed(storyService.hasUnviewedStory(targetUserNo, me))
 				.residentCount(neighborMapper.countAcceptedAsRequester(targetUserNo))
 				.neighborCount(neighborMapper.countAcceptedAsReceiver(targetUserNo))
 				.petCount(petMapper.countActiveByUserNo(targetUserNo))

@@ -14,10 +14,14 @@ import org.springframework.web.bind.annotation.RestController;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.response.ApiResponse;
+import me._hanho.ultary.domain.myultary.MyUltaryService;
+import me._hanho.ultary.domain.myultary.dto.response.FeedGridItemResponse;
 import me._hanho.ultary.domain.neighbor.NeighborService;
 import me._hanho.ultary.domain.neighbor.dto.response.NeighborListItemResponse;
 import me._hanho.ultary.domain.neighbor.dto.response.NeighborRelationResponse;
 import me._hanho.ultary.domain.neighbor.dto.response.UserUltaryResponse;
+import me._hanho.ultary.domain.pet.PetService;
+import me._hanho.ultary.domain.pet.dto.response.PetResponse;
 import me._hanho.ultary.security.principal.UserPrincipal;
 
 /** 경로 원본: springEndpoints.users / api-memo.md §7 */
@@ -28,6 +32,8 @@ import me._hanho.ultary.security.principal.UserPrincipal;
 public class UserController {
 
 	private final NeighborService neighborService;
+	private final PetService petService;
+	private final MyUltaryService myUltaryService;
 
 	@GetMapping("/{userNo}/ultary")
 	public ApiResponse<UserUltaryResponse> ultary(
@@ -35,6 +41,31 @@ public class UserController {
 			@PathVariable Long userNo) {
 		log.info("[ultary] me={} userNo={}", principal.getUserNo(), userNo);
 		return ApiResponse.ok(neighborService.getUltary(principal, userNo), "유저 울타리 조회 성공");
+	}
+
+	/** 그 유저의 펫. 정렬은 GET /pets 와 같다 */
+	@GetMapping("/{userNo}/pets")
+	public ApiResponse<List<PetResponse>> pets(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@PathVariable Long userNo) {
+		log.info("[pets] me={} userNo={}", principal.getUserNo(), userNo);
+		neighborService.assertCanViewUltary(principal, userNo);
+		return ApiResponse.ok(petService.listByOwner(userNo), "반려동물 목록 조회 성공");
+	}
+
+	/** 그 유저의 게시글 그리드. limit 또는 size. 본인이면 내 그리드와 같다 */
+	@GetMapping("/{userNo}/feeds")
+	public ApiResponse<List<FeedGridItemResponse>> feeds(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@PathVariable Long userNo,
+			@RequestParam(required = false) Integer limit,
+			@RequestParam(required = false) Integer size) {
+		log.info("[feeds] me={} userNo={} limit={} size={}", principal.getUserNo(), userNo, limit, size);
+		neighborService.assertCanViewUltary(principal, userNo);
+		Integer pageSize = size != null ? size : limit;
+		return ApiResponse.ok(
+				myUltaryService.getFeedsOf(principal, userNo, pageSize),
+				"유저 게시글 목록 조회 성공");
 	}
 
 	@GetMapping("/{userNo}/neighbors")

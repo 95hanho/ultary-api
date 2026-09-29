@@ -23,7 +23,7 @@ public class StoryController {
 
 	private final StoryService storyService;
 
-	/** 스토리 읽음 처리 (본인 스토리는 기록하지 않음) */
+	/** 스토리 읽음 처리. 본인 스토리도 ultary_story_view에 기록 */
 	@PostMapping("/{storyId}/view")
 	public ApiResponse<StoryResponse> markViewed(
 			@AuthenticationPrincipal UserPrincipal principal,

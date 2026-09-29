@@ -17,6 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.exception.BusinessException;
 import me._hanho.ultary.common.exception.ErrorCode;
 import me._hanho.ultary.domain.file.FileService;
+import me._hanho.ultary.domain.pet.PetService;
 import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
 import me._hanho.ultary.domain.file.model.FileMeta;
 import me._hanho.ultary.domain.story.dto.request.CreateStoryRequest;
@@ -38,6 +39,7 @@ public class StoryService {
 	private final StoryMapper storyMapper;
 	private final FileService fileService;
 	private final UserMapper userMapper;
+	private final PetService petService;
 
 	@Transactional
 	public StoryResponse create(UserPrincipal principal, CreateStoryRequest request) {
@@ -91,6 +93,12 @@ public class StoryService {
 		return storyMapper.countActiveByUserNo(userNo) > 0;
 	}
 
+	/** 조회자 기준. 활성 스토리 중 안 읽은 것이 1개라도 있으면 true. 스토리가 없으면 false */
+	@Transactional(readOnly = true)
+	public boolean hasUnviewedStory(Long ownerUserNo, Long viewerUserNo) {
+		return storyMapper.countUnviewedActiveByOwner(ownerUserNo, viewerUserNo) > 0;
+	}
+
 	@Transactional(readOnly = true)
 	public List<StoryOwnerResponse> listResidentOwners(UserPrincipal principal) {
 		List<StoryOwnerRow> rows = storyMapper.findResidentOwnersWithActiveStories(principal.getUserNo());
@@ -134,9 +142,7 @@ public class StoryService {
 	public StoryResponse markViewed(UserPrincipal principal, Long storyId) {
 		Story story = requireActive(storyId);
 		assertCanViewOwnerStories(principal.getUserNo(), story.getUserNo());
-		if (!story.getUserNo().equals(principal.getUserNo())) {
-			storyMapper.insertViewIgnoreDuplicate(storyId, principal.getUserNo());
-		}
+		storyMapper.insertViewIgnoreDuplicate(storyId, principal.getUserNo());
 		log.info("[markViewed] storyId={} viewer={}", storyId, principal.getUserNo());
 		return toResponse(story, principal.getUserNo());
 	}
@@ -161,14 +167,15 @@ public class StoryService {
 
 	private StoryResponse toResponse(Story story, Long viewerUserNo) {
 		User author = userMapper.findActiveByUserNo(story.getUserNo());
-		boolean viewedByMe = story.getUserNo().equals(viewerUserNo)
-				|| storyMapper.countView(story.getStoryId(), viewerUserNo) > 0;
+		boolean viewedByMe = storyMapper.countView(story.getStoryId(), viewerUserNo) > 0;
 		Set<Long> fileIds = new HashSet<>();
 		fileIds.add(story.getFileId());
 		if (story.getThumbnailFileId() != null) {
 			fileIds.add(story.getThumbnailFileId());
 		}
-		Integer authorProfileFileId = author != null ? author.getProfileFileId() : null;
+		Integer authorProfileFileId = author == null
+				? null
+				: petService.representativeProfileFileId(author.getUserNo());
 		if (authorProfileFileId != null) {
 			fileIds.add(authorProfileFileId.longValue());
 		}

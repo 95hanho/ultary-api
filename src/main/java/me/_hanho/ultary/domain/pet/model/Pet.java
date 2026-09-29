@@ -24,6 +24,8 @@ public class Pet {
 	private Boolean isNeutered;
 	private LocalDateTime birthday;
 	private Long profileFileId;
+	/** 작을수록 우선. 1이 가장 높음 */
+	private Integer priority;
 	private String bio;
 	private LocalDateTime createdAt;
 	private LocalDateTime updatedAt;

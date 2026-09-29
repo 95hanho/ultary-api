@@ -112,7 +112,15 @@
 			n.neighbor_id AS neighborId,
 			u.user_no AS userNo,
 			u.nickname AS nickname,
-			u.profile_file_id AS profileFileId,
+			(
+				SELECT rp.profile_file_id
+				FROM ultary_pet rp
+				WHERE rp.user_no = u.user_no
+				  AND rp.is_deleted = 0
+				  AND rp.profile_file_id IS NOT NULL
+				ORDER BY rp.priority ASC, rp.pet_id ASC
+				LIMIT 1
+			) AS profileFileId,
 			n.status AS status,
 			'RESIDENTS' AS listType
 		FROM ultary_neighbor n
@@ -129,7 +137,15 @@
 			n.neighbor_id AS neighborId,
 			u.user_no AS userNo,
 			u.nickname AS nickname,
-			u.profile_file_id AS profileFileId,
+			(
+				SELECT rp.profile_file_id
+				FROM ultary_pet rp
+				WHERE rp.user_no = u.user_no
+				  AND rp.is_deleted = 0
+				  AND rp.profile_file_id IS NOT NULL
+				ORDER BY rp.priority ASC, rp.pet_id ASC
+				LIMIT 1
+			) AS profileFileId,
 			n.status AS status,
 			'NEIGHBORS' AS listType
 		FROM ultary_neighbor n

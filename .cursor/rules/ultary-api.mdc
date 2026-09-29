@@ -19,8 +19,8 @@ Spring Boot 3.4 / MyBatis / MariaDB 10.1 / 패키지 `me._hanho.ultary` / API pr
 
 ## 진행 상태 (커밋 메시지와 함께 갱신)
 
-- 스키마: **v9** (댓글·답글 좋아요 `ultary_feed_comment_like` / `ultary_feed_reply_like`. v8 파일 출처 컬럼 유지)
-- 완료(스모크): auth, file, pet, tag, feed, myultary, story, neighbor(block 포함), **main**(feeds/search/recommended)
+- 스키마: **v11** (유저 `profile_file_id` 없음. 표시 사진은 사진 있는 펫 중 `priority`가 가장 높은 것. v10 최근 검색은 들어간 유저 울타리만)
+- 완료(스모크): auth, file, pet, tag, feed, myultary, story, neighbor(block 포함), **main**(feeds/search/recommended/최근검색)
 - 로컬 시드(선택): `share/database/seed/mariadb_10_1/001_dev_sample_data.sql` — 재실행 가능, 운영에서는 제외. user **101~105**, pet 유저당 1~2. HTTP는 user 101 / `google-myultary-test-001`
 - HTTP: `requests/my-ultary.http`, `requests/story.http`, `requests/neighbor.http`, `requests/main.http` 등
 - **최종 E2E 재검증**은 도메인 더 붙인 뒤(또는 배포 전) 별도로 한다
@@ -34,10 +34,10 @@ Spring Boot 3.4 / MyBatis / MariaDB 10.1 / 패키지 `me._hanho.ultary` / API pr
 - `hashtag`·`pet.name` 생성 후 불변
 - 닉네임: 한글만 2~5자, 영문만 4~10자. 혼합 시 한글 1자=2·영문 1자=1, 가중치 합 4~10 (한글 최대 5자). 스펙 `share/validation/` · 구현 `NicknameRules`
 - 쿨다운: nickname 7일 / mention_id·handle 30일 (`handle_changed_at` NULL이면 handle 최초 설정 자유)
-- 스토리: IMAGE|VIDEO, `expires_at = created_at + 24h`, 조회는 본인 또는 ACCEPTED 이웃. owners = requester ACCEPTED 주민 중 활성 스토리. 링 항목은 `profileFile`만(없으면 null), 스토리 미디어는 단건 조회
+- 스토리: IMAGE|VIDEO, `expires_at = created_at + 24h`, 조회는 본인 또는 ACCEPTED 이웃. owners = requester ACCEPTED 주민 중 활성 스토리. 링 항목은 `profileFile`만(없으면 null), 스토리 미디어는 단건 조회. 울타리 버튼은 `hasStory`+`hasUnviewed`(조회한 나 기준). `POST /stories/{id}/view`는 본인 스토리도 기록
 - 이웃: 주민=`requester` ACCEPTED, 이웃=`receiver` ACCEPTED. `pair_key=min:max` 한 쌍 1행. 유저 API는 `UserController` → `NeighborService`
 - 파일 경로: `images/…`, `videos/…` (uploadDir 기준 상대경로) 또는 CDN 절대 URL
-- 읽기 응답: `fileId` + **FileSummary**(`file`/`profileFile`/`coverFile`/`authorProfileFile`/`images` … `filePath` 포함) — 피드 스크롤용. 메인·단건 피드와 댓글·답글 작성자 프로필은 `authorProfileFile`(없으면 null)
+- 읽기 응답: `fileId` + **FileSummary**(`file`/`profileFile`/`coverFile`/`authorProfileFile`/`images` … `filePath` 포함) — 피드 스크롤용. 유저로 보이는 `profileFile`/`authorProfileFile`은 대표 펫 사진(없으면 null)
 - 쓰기 요청: 기존처럼 `fileId`만
 
 ## HTTP 요청 파일

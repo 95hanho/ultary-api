@@ -16,7 +16,8 @@ Content-Type: application/json
   "name": "한호"
 }
 
-### 1. 마이울타리 정보 조회 (hasStory, petCount, feedCount 등)
+### 1. 마이울타리 정보 조회 (hasStory, hasUnviewed, petCount, feedCount 등)
+# 스토리 버튼: hasStory=false 없음 / hasUnviewed=true 안읽음 / 둘 다 아니면 다 읽음. 기준은 로그인한 나
 GET {{baseUrl}}/api/v1/my-ultary
 Authorization: Bearer {{accessToken}}
 
@@ -36,25 +37,9 @@ Authorization: Bearer {{accessToken}}
 GET {{baseUrl}}/api/v1/my-ultary/tagged-feeds?limit=30
 Authorization: Bearer {{accessToken}}
 
-### 6a. 프로필 사진 변경 (시드 fileId=121 post2.jpg — user 101 소유)
-PATCH {{baseUrl}}/api/v1/my-ultary/profile-image
-Authorization: Bearer {{accessToken}}
-Content-Type: application/json
-
-{
-  "profileFileId": 121
-}
-
-### 6b. 프로필 사진 제거
-PATCH {{baseUrl}}/api/v1/my-ultary/profile-image
-Authorization: Bearer {{accessToken}}
-Content-Type: application/json
-
-{
-  "removeProfileFile": true
-}
-
-### 7a. 소개글 변경
+### 6a. 소개글 변경
+# 프로필 사진은 유저 컬럼이 아님. 사진 있는 펫 중 priority가 가장 높은 펫 사진.
+# 바꾸려면 requests/pet.http 의 profileFileId / priority
 PATCH {{baseUrl}}/api/v1/my-ultary/bio
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
@@ -63,7 +48,7 @@ Content-Type: application/json
   "bio": "강아지랑 산책하는 집사"
 }
 
-### 7b. 소개글 삭제
+### 6b. 소개글 삭제
 PATCH {{baseUrl}}/api/v1/my-ultary/bio
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json

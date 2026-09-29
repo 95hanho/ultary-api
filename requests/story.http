@@ -29,7 +29,8 @@ Content-Type: application/json
   "caption": "24시간 스토리"
 }
 
-### 2. 내 스토리 목록 (createdAt / expiresAt)
+### 2. 내 스토리 목록 (createdAt / expiresAt, viewedByMe)
+# 본인 스토리도 읽음 기록이 있을 때만 viewedByMe=true
 GET {{baseUrl}}/api/v1/my-ultary/stories
 Authorization: Bearer {{accessToken}}
 
@@ -46,7 +47,7 @@ Authorization: Bearer {{accessToken}}
 GET {{baseUrl}}/api/v1/main/stories?userNo=103
 Authorization: Bearer {{accessToken}}
 
-### 5. 스토리 읽음 처리 (해당 storyId만 ultary_story_view)
+### 5. 스토리 읽음 처리 (본인 스토리도 ultary_story_view INSERT IGNORE)
 POST {{baseUrl}}/api/v1/stories/{{storyId}}/view
 Authorization: Bearer {{accessToken}}
 

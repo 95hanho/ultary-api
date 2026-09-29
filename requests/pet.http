@@ -49,6 +49,7 @@ Content-Type: application/json
 }
 
 ### 2. 내 반려동물 목록
+# priority 오름차순 (1이 먼저). 같은 값이면 petId 오름차순
 GET {{baseUrl}}/api/v1/pets
 Authorization: Bearer {{accessToken}}
 
@@ -59,7 +60,8 @@ Content-Type: application/json
 
 {
   "bio": "간식도 좋아함",
-  "isNeutered": false
+  "isNeutered": false,
+  "priority": 1
 }
 
 ### 3b. mention_id 변경 가능 여부
@@ -76,6 +78,7 @@ Content-Type: application/json
 }
 
 ### 4. 프로필 이미지 연결 (시드 fileId=120 post.jpg)
+# 이전 프로필 파일은 다른 펫·피드·스토리·태그에 없으면 is_deleted=1, deleted_at 설정
 PATCH {{baseUrl}}/api/v1/pets/{{petId}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json

@@ -82,4 +82,23 @@
 		  AND is_deleted = 0
 	</update>
 
+	<select id="countLiveReferences" resultType="int">
+		SELECT
+			(SELECT COUNT(1)
+			 FROM ultary_pet
+			 WHERE profile_file_id = #{fileId}
+			   AND is_deleted = 0)
+			+ (SELECT COUNT(1)
+			   FROM ultary_feed_media
+			   WHERE file_id = #{fileId}
+			      OR thumbnail_file_id = #{fileId})
+			+ (SELECT COUNT(1)
+			   FROM ultary_story
+			   WHERE is_deleted = 0
+			     AND (file_id = #{fileId} OR thumbnail_file_id = #{fileId}))
+			+ (SELECT COUNT(1)
+			   FROM ultary_tag_image
+			   WHERE file_id = #{fileId})
+	</select>
+
 </mapper>

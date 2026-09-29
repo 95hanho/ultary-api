@@ -14,7 +14,6 @@
 		is_default_nickname,
 		email,
 		phone,
-		profile_file_id,
 		bio,
 		region_sido,
 		region_sigungu,
@@ -155,22 +154,6 @@
 				</when>
 				<otherwise>
 					bio = NULLIF(#{bio}, ''),
-				</otherwise>
-			</choose>
-			updated_at = NOW()
-		WHERE user_no = #{userNo}
-		  AND withdrawal_status = 'ACTIVE'
-	</update>
-
-	<update id="updateProfileFileId">
-		UPDATE ultary_user
-		SET
-			<choose>
-				<when test="clearProfileFile">
-					profile_file_id = NULL,
-				</when>
-				<otherwise>
-					profile_file_id = #{profileFileId},
 				</otherwise>
 			</choose>
 			updated_at = NOW()

@@ -104,7 +104,15 @@
 		SELECT
 			u.user_no AS userNo,
 			u.nickname AS nickname,
-			u.profile_file_id AS profileFileId,
+			(
+				SELECT rp.profile_file_id
+				FROM ultary_pet rp
+				WHERE rp.user_no = u.user_no
+				  AND rp.is_deleted = 0
+				  AND rp.profile_file_id IS NOT NULL
+				ORDER BY rp.priority ASC, rp.pet_id ASC
+				LIMIT 1
+			) AS profileFileId,
 			COUNT(s.story_id) AS storyCount
 		FROM ultary_neighbor n
 		INNER JOIN ultary_user u ON u.user_no = n.receiver_user_no
@@ -116,7 +124,7 @@
 			-->
 		WHERE n.requester_user_no = #{viewerUserNo}
 		  AND n.status = 'ACCEPTED'
-		GROUP BY u.user_no, u.nickname, u.profile_file_id
+		GROUP BY u.user_no, u.nickname
 		ORDER BY MAX(s.created_at) DESC
 	</select>
 

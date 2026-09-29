@@ -21,7 +21,16 @@ Content-Type: application/json
 }
 
 ### 1. 다른 유저 울타리 (102 나리집사) — relationStatus=ACCEPTED
+# hasStory, hasUnviewed: 102 스토리를 내가 안 읽었으면 안읽음
 GET {{baseUrl}}/api/v1/users/102/ultary
+Authorization: Bearer {{accessToken}}
+
+### 1b. 102 펫 목록 (priority 오름차순. GET /pets 와 같은 항목)
+GET {{baseUrl}}/api/v1/users/102/pets
+Authorization: Bearer {{accessToken}}
+
+### 1c. 102 게시글 그리드 (PUBLIC. NEIGHBORS는 ACCEPTED일 때만)
+GET {{baseUrl}}/api/v1/users/102/feeds?limit=30
 Authorization: Bearer {{accessToken}}
 
 ### 2. 다른 유저 울타리 (104 대기중) — PENDING_RECEIVED

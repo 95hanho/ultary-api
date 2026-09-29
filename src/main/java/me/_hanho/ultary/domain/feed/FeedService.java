@@ -45,6 +45,7 @@ import me._hanho.ultary.domain.file.FileService;
 import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
 import me._hanho.ultary.domain.file.model.FileMeta;
 import me._hanho.ultary.domain.pet.PetMapper;
+import me._hanho.ultary.domain.pet.PetService;
 import me._hanho.ultary.domain.pet.model.Pet;
 import me._hanho.ultary.domain.tag.TagMapper;
 import me._hanho.ultary.domain.tag.model.Tag;
@@ -66,6 +67,7 @@ public class FeedService {
 	private final FeedMapper feedMapper;
 	private final FileService fileService;
 	private final PetMapper petMapper;
+	private final PetService petService;
 	private final TagMapper tagMapper;
 	private final UserMapper userMapper;
 	private final NeighborService neighborService;
@@ -108,7 +110,6 @@ public class FeedService {
 		Map<Long, User> authors = new HashMap<>();
 		for (Feed feed : feeds) {
 			authors.computeIfAbsent(feed.getUserNo(), userMapper::findActiveByUserNo);
-			collectAuthorProfileId(fileIds, authors.get(feed.getUserNo()));
 			List<FeedMedia> mediaList = feedMapper.findMediaByFeedId(feed.getFeedId());
 			mediaByFeed.put(feed.getFeedId(), mediaList);
 			for (FeedMedia media : mediaList) {
@@ -120,6 +121,10 @@ public class FeedService {
 				}
 			}
 		}
+		Map<Long, Integer> authorProfiles = petService.representativeProfileFileIds(authors.keySet());
+		for (Integer profileFileId : authorProfiles.values()) {
+			fileIds.add(profileFileId.longValue());
+		}
 		Map<Long, FileSummaryResponse> files = fileService.findSummaries(fileIds);
 		List<FeedResponse> result = new ArrayList<>();
 		for (Feed feed : feeds) {
@@ -128,7 +133,8 @@ public class FeedService {
 					viewerUserNo,
 					authors.get(feed.getUserNo()),
 					mediaByFeed.get(feed.getFeedId()),
-					files));
+					files,
+					authorProfiles));
 		}
 		return result;
 	}
@@ -630,9 +636,15 @@ public class FeedService {
 
 	private FeedResponse toResponse(Feed feed, Long viewerUserNo) {
 		User author = userMapper.findActiveByUserNo(feed.getUserNo());
+		Map<Long, Integer> authorProfiles = author == null
+				? Map.of()
+				: petService.representativeProfileFileIds(List.of(author.getUserNo()));
 		List<FeedMedia> mediaList = feedMapper.findMediaByFeedId(feed.getFeedId());
 		Set<Long> fileIds = new HashSet<>();
-		collectAuthorProfileId(fileIds, author);
+		Integer authorProfileFileId = author == null ? null : authorProfiles.get(author.getUserNo());
+		if (authorProfileFileId != null) {
+			fileIds.add(authorProfileFileId.longValue());
+		}
 		for (FeedMedia media : mediaList) {
 			if (media.getFileId() != null) {
 				fileIds.add(media.getFileId());
@@ -641,13 +653,8 @@ public class FeedService {
 				fileIds.add(media.getThumbnailFileId());
 			}
 		}
-		return toResponse(feed, viewerUserNo, author, mediaList, fileService.findSummaries(fileIds));
-	}
-
-	private static void collectAuthorProfileId(Set<Long> fileIds, User author) {
-		if (author != null && author.getProfileFileId() != null) {
-			fileIds.add(author.getProfileFileId().longValue());
-		}
+		return toResponse(
+				feed, viewerUserNo, author, mediaList, fileService.findSummaries(fileIds), authorProfiles);
 	}
 
 	private FeedResponse toResponse(
@@ -655,7 +662,8 @@ public class FeedService {
 			Long viewerUserNo,
 			User author,
 			List<FeedMedia> mediaList,
-			Map<Long, FileSummaryResponse> files) {
+			Map<Long, FileSummaryResponse> files,
+			Map<Long, Integer> authorProfiles) {
 		List<FeedResponse.MediaItem> mediaItems = new ArrayList<>();
 		List<FeedMedia> resolvedMedia = mediaList != null ? mediaList : List.of();
 		for (FeedMedia media : resolvedMedia) {
@@ -700,7 +708,9 @@ public class FeedService {
 			storedByMe = store != null && !Boolean.TRUE.equals(store.getIsDeleted());
 		}
 
-		Integer authorProfileFileId = author != null ? author.getProfileFileId() : null;
+		Integer authorProfileFileId = author == null || authorProfiles == null
+				? null
+				: authorProfiles.get(author.getUserNo());
 		return FeedResponse.builder()
 				.feedId(feed.getFeedId())
 				.userNo(feed.getUserNo())
@@ -887,7 +897,7 @@ public class FeedService {
 		if (nickname == null) {
 			User user = userMapper.findActiveByUserNo(userNo);
 			nickname = user != null ? user.getNickname() : null;
-			profileFileId = user != null ? user.getProfileFileId() : null;
+			profileFileId = petService.representativeProfileFileId(userNo);
 		}
 		if (profileFileId == null) {
 			return new AuthorProfile(nickname, null);

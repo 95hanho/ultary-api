@@ -3,17 +3,24 @@ package me._hanho.ultary.domain.main;
 import java.util.List;
 
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.response.ApiResponse;
 import me._hanho.ultary.domain.feed.dto.response.FeedResponse;
+import me._hanho.ultary.domain.main.dto.request.SaveSearchHistoryRequest;
 import me._hanho.ultary.domain.main.dto.response.MainFeedPageResponse;
 import me._hanho.ultary.domain.main.dto.response.MainSearchResponse;
+import me._hanho.ultary.domain.main.dto.response.SearchHistoryItemResponse;
+import me._hanho.ultary.domain.main.dto.response.SearchHistoryPageResponse;
 import me._hanho.ultary.domain.story.dto.response.StoryOwnerResponse;
 import me._hanho.ultary.domain.story.dto.response.StoryResponse;
 import me._hanho.ultary.security.principal.UserPrincipal;
@@ -82,5 +89,46 @@ public class MainController {
 		return ApiResponse.ok(
 				mainService.getSearchRecommendedFeeds(principal, limit),
 				"검색 추천 게시글 조회 성공");
+	}
+
+	/** 검색창을 열면 최근 들어간 울타리 5건 */
+	@GetMapping("/search/recent")
+	public ApiResponse<SearchHistoryPageResponse> recentSearches(
+			@AuthenticationPrincipal UserPrincipal principal) {
+		log.info("[recentSearches] userNo={}", principal.getUserNo());
+		return ApiResponse.ok(mainService.getRecentSearches(principal), "최근 검색 조회 성공");
+	}
+
+	/** 최근 검색 더보기 20건. cursorHistoryId는 직전 응답의 nextCursorHistoryId */
+	@GetMapping("/search/recent/more")
+	public ApiResponse<SearchHistoryPageResponse> moreRecentSearches(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@RequestParam Long cursorHistoryId) {
+		log.info("[moreRecentSearches] userNo={} cursorHistoryId={}",
+				principal.getUserNo(), cursorHistoryId);
+		return ApiResponse.ok(
+				mainService.getMoreRecentSearches(principal, cursorHistoryId),
+				"최근 검색 더보기 성공");
+	}
+
+	/** 검색 후 그 유저 울타리에 들어갈 때 저장 */
+	@PostMapping("/search/recent")
+	public ApiResponse<SearchHistoryItemResponse> saveRecentSearch(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@Valid @RequestBody SaveSearchHistoryRequest request) {
+		log.info("[saveRecentSearch] userNo={} targetUserNo={}",
+				principal.getUserNo(), request.getTargetUserNo());
+		return ApiResponse.ok(
+				mainService.saveRecentSearch(principal, request.getTargetUserNo()),
+				"최근 검색 저장 성공");
+	}
+
+	/** 최근 검색 모두 지우기 */
+	@DeleteMapping("/search/recent")
+	public ApiResponse<Void> clearRecentSearches(
+			@AuthenticationPrincipal UserPrincipal principal) {
+		log.info("[clearRecentSearches] userNo={}", principal.getUserNo());
+		mainService.clearRecentSearches(principal);
+		return ApiResponse.okEmpty("최근 검색 모두 삭제 성공");
 	}
 }

@@ -2,6 +2,7 @@ package me._hanho.ultary.domain.pet.dto.request;
 
 import java.time.LocalDateTime;
 
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
@@ -29,6 +30,10 @@ public class UpdatePetRequest {
 
 	/** true면 profile_file_id를 NULL로 클리어 */
 	private Boolean removeProfileFile;
+
+	/** 작을수록 우선. 1이 가장 높음. null이면 유지 */
+	@Min(value = 1, message = "우선순위는 1 이상이어야 합니다.")
+	private Integer priority;
 
 	@Size(max = 300, message = "소개글은 300자 이하여야 합니다.")
 	private String bio;

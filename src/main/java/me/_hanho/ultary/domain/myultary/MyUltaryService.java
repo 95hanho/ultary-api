@@ -22,11 +22,11 @@ import me._hanho.ultary.domain.feed.model.FeedMedia;
 import me._hanho.ultary.domain.file.FileService;
 import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
 import me._hanho.ultary.domain.myultary.dto.request.UpdateMyBioRequest;
-import me._hanho.ultary.domain.myultary.dto.request.UpdateMyProfileImageRequest;
 import me._hanho.ultary.domain.myultary.dto.response.FeedGridItemResponse;
 import me._hanho.ultary.domain.myultary.dto.response.MyUltaryProfileResponse;
 import me._hanho.ultary.domain.neighbor.NeighborMapper;
 import me._hanho.ultary.domain.pet.PetMapper;
+import me._hanho.ultary.domain.pet.PetService;
 import me._hanho.ultary.domain.story.StoryService;
 import me._hanho.ultary.domain.story.dto.request.CreateStoryRequest;
 import me._hanho.ultary.domain.story.dto.response.StoryResponse;
@@ -45,6 +45,7 @@ public class MyUltaryService {
 	private final UserMapper userMapper;
 	private final NeighborMapper neighborMapper;
 	private final PetMapper petMapper;
+	private final PetService petService;
 	private final FeedMapper feedMapper;
 	private final FeedService feedService;
 	private final FileService fileService;
@@ -53,16 +54,18 @@ public class MyUltaryService {
 	@Transactional(readOnly = true)
 	public MyUltaryProfileResponse getProfile(UserPrincipal principal) {
 		User user = requireUser(principal.getUserNo());
+		Integer profileFileId = petService.representativeProfileFileId(user.getUserNo());
 		return MyUltaryProfileResponse.builder()
 				.userNo(user.getUserNo())
 				.nickname(user.getNickname())
 				.defaultNickname(Boolean.TRUE.equals(user.getIsDefaultNickname()))
-				.profileFileId(user.getProfileFileId())
-				.profileFile(fileService.findSummary(user.getProfileFileId()))
+				.profileFileId(profileFileId)
+				.profileFile(fileService.findSummary(profileFileId))
 				.bio(user.getBio())
 				.regionSido(user.getRegionSido())
 				.regionSigungu(user.getRegionSigungu())
 				.hasStory(storyService.hasActiveStory(user.getUserNo()))
+				.hasUnviewed(storyService.hasUnviewedStory(user.getUserNo(), principal.getUserNo()))
 				.residentCount(neighborMapper.countAcceptedAsRequester(user.getUserNo()))
 				.neighborCount(neighborMapper.countAcceptedAsReceiver(user.getUserNo()))
 				.petCount(petMapper.countActiveByUserNo(user.getUserNo()))
@@ -73,6 +76,16 @@ public class MyUltaryService {
 	@Transactional(readOnly = true)
 	public List<FeedGridItemResponse> getFeeds(UserPrincipal principal, Integer limit) {
 		return toGridItems(feedMapper.findActiveByUserNo(principal.getUserNo(), resolveLimit(limit)));
+	}
+
+	/** 그 유저의 게시글 그리드. 본인이면 내 그리드와 같다 */
+	@Transactional(readOnly = true)
+	public List<FeedGridItemResponse> getFeedsOf(UserPrincipal principal, Long ownerUserNo, Integer limit) {
+		if (principal.getUserNo().equals(ownerUserNo)) {
+			return getFeeds(principal, limit);
+		}
+		return toGridItems(feedMapper.findVisibleByOwner(
+				ownerUserNo, principal.getUserNo(), resolveLimit(limit)));
 	}
 
 	@Transactional(readOnly = true)
@@ -92,27 +105,6 @@ public class MyUltaryService {
 	@Transactional(readOnly = true)
 	public List<FeedGridItemResponse> getTaggedFeeds(UserPrincipal principal, Integer limit) {
 		return toGridItems(feedMapper.findTaggedByUserNo(principal.getUserNo(), resolveLimit(limit)));
-	}
-
-	@Transactional
-	public MyUltaryProfileResponse updateProfileImage(
-			UserPrincipal principal, UpdateMyProfileImageRequest request) {
-		boolean remove = Boolean.TRUE.equals(request.getRemoveProfileFile());
-		if (!remove && request.getProfileFileId() == null) {
-			throw new BusinessException(ErrorCode.INVALID_INPUT, "profileFileId 또는 removeProfileFile이 필요합니다.");
-		}
-		if (!remove) {
-			fileService.requireActive(request.getProfileFileId());
-		}
-		int updated = userMapper.updateProfileFileId(
-				principal.getUserNo(),
-				request.getProfileFileId(),
-				remove);
-		if (updated == 0) {
-			throw new BusinessException(ErrorCode.USER_NOT_FOUND);
-		}
-		log.info("[updateProfileImage] userNo={} remove={}", principal.getUserNo(), remove);
-		return getProfile(principal);
 	}
 
 	@Transactional

@@ -78,6 +78,31 @@
 		LIMIT #{limit}
 	</select>
 
+	<select id="findVisibleByOwner" resultType="me._hanho.ultary.domain.feed.model.Feed">
+		SELECT <include refid="feedColumns"/>
+		FROM ultary_feed
+		WHERE user_no = #{ownerUserNo}
+		  AND is_deleted = 0
+		  AND (
+			#{viewerUserNo} = #{ownerUserNo}
+			OR visibility = 'PUBLIC'
+			OR (
+				visibility = 'NEIGHBORS'
+				AND EXISTS (
+					SELECT 1
+					FROM ultary_neighbor n
+					WHERE n.status = 'ACCEPTED'
+					  AND (
+						(n.requester_user_no = #{viewerUserNo} AND n.receiver_user_no = #{ownerUserNo})
+						OR (n.requester_user_no = #{ownerUserNo} AND n.receiver_user_no = #{viewerUserNo})
+					  )
+				)
+			)
+		  )
+		ORDER BY created_at DESC, feed_id DESC
+		LIMIT #{limit}
+	</select>
+
 	<select id="countActiveByUserNo" resultType="int">
 		SELECT COUNT(1)
 		FROM ultary_feed
@@ -532,7 +557,15 @@
 			c.is_deleted,
 			c.deleted_at,
 			u.nickname AS authorNickname,
-			u.profile_file_id AS authorProfileFileId
+			(
+				SELECT rp.profile_file_id
+				FROM ultary_pet rp
+				WHERE rp.user_no = u.user_no
+				  AND rp.is_deleted = 0
+				  AND rp.profile_file_id IS NOT NULL
+				ORDER BY rp.priority ASC, rp.pet_id ASC
+				LIMIT 1
+			) AS authorProfileFileId
 		FROM ultary_feed_comment c
 		INNER JOIN ultary_user u ON u.user_no = c.user_no
 		WHERE c.feed_id = #{feedId}
@@ -655,7 +688,15 @@
 			r.is_deleted,
 			r.deleted_at,
 			u.nickname AS authorNickname,
-			u.profile_file_id AS authorProfileFileId
+			(
+				SELECT rp.profile_file_id
+				FROM ultary_pet rp
+				WHERE rp.user_no = u.user_no
+				  AND rp.is_deleted = 0
+				  AND rp.profile_file_id IS NOT NULL
+				ORDER BY rp.priority ASC, rp.pet_id ASC
+				LIMIT 1
+			) AS authorProfileFileId
 		FROM ultary_feed_reply r
 		INNER JOIN ultary_user u ON u.user_no = r.user_no
 		WHERE r.feed_comment_id = #{commentId}

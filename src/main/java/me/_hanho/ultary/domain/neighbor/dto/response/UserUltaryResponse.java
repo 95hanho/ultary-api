@@ -17,6 +17,8 @@ public class UserUltaryResponse {
 	private String regionSido;
 	private String regionSigungu;
 	private boolean hasStory;
+	/** 그 울타리 활성 스토리 중 내가 안 읽은 것이 있으면 true. 스토리가 없으면 false */
+	private boolean hasUnviewed;
 	private int residentCount;
 	private int neighborCount;
 	private int petCount;

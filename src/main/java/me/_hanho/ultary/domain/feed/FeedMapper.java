@@ -30,6 +30,12 @@ public interface FeedMapper {
 			@Param("userNo") Long userNo,
 			@Param("limit") int limit);
 
+	/** 작성자 글 중 조회자에게 보이는 것만. 본인이면 공개범위와 무관 */
+	List<Feed> findVisibleByOwner(
+			@Param("ownerUserNo") Long ownerUserNo,
+			@Param("viewerUserNo") Long viewerUserNo,
+			@Param("limit") int limit);
+
 	int countActiveByUserNo(@Param("userNo") Long userNo);
 
 	List<Feed> findSavedByUserNo(

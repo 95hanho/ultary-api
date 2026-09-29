@@ -20,7 +20,6 @@ import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.response.ApiResponse;
 import me._hanho.ultary.domain.feed.dto.response.FeedResponse;
 import me._hanho.ultary.domain.myultary.dto.request.UpdateMyBioRequest;
-import me._hanho.ultary.domain.myultary.dto.request.UpdateMyProfileImageRequest;
 import me._hanho.ultary.domain.myultary.dto.response.FeedGridItemResponse;
 import me._hanho.ultary.domain.myultary.dto.response.MyUltaryProfileResponse;
 import me._hanho.ultary.domain.story.dto.request.CreateStoryRequest;
@@ -78,16 +77,6 @@ public class MyUltaryController {
 			@RequestParam(required = false) Integer limit) {
 		log.info("[taggedFeeds] userNo={} limit={}", principal.getUserNo(), limit);
 		return ApiResponse.ok(myUltaryService.getTaggedFeeds(principal, limit), "태그된 게시글 조회 성공");
-	}
-
-	/** 프로필 사진 변경 (fileId는 files 업로드 후) */
-	@PatchMapping("/profile-image")
-	public ApiResponse<MyUltaryProfileResponse> profileImage(
-			@AuthenticationPrincipal UserPrincipal principal,
-			@Valid @RequestBody UpdateMyProfileImageRequest request) {
-		log.info("[profileImage] profileFileId={} remove={}",
-				request.getProfileFileId(), request.getRemoveProfileFile());
-		return ApiResponse.ok(myUltaryService.updateProfileImage(principal, request), "프로필 사진 변경 성공");
 	}
 
 	/** 소개글 변경 (Auth PATCH /me 의 bio와 동일 컬럼) */
