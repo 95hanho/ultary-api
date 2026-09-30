@@ -31,6 +31,16 @@
 		  AND withdrawal_status = 'ACTIVE'
 	</select>
 
+	<select id="findActiveByUserNos" resultType="me._hanho.ultary.domain.user.model.User">
+		SELECT <include refid="userColumns"/>
+		FROM ultary_user
+		WHERE withdrawal_status = 'ACTIVE'
+		  AND user_no IN
+		<foreach collection="userNos" item="id" open="(" separator="," close=")">
+			#{id}
+		</foreach>
+	</select>
+
 	<select id="findByPhone" resultType="me._hanho.ultary.domain.user.model.User">
 		SELECT <include refid="userColumns"/>
 		FROM ultary_user
@@ -69,6 +79,7 @@
 		SELECT <include refid="userColumns"/>
 		FROM ultary_user u
 		WHERE u.withdrawal_status = 'ACTIVE'
+		  AND u.user_no != #{viewerUserNo}
 		  AND u.nickname LIKE CONCAT('%', #{q}, '%')
 		  AND NOT EXISTS (
 			SELECT 1

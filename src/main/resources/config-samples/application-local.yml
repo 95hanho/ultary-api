@@ -25,4 +25,4 @@ spring:
   # ==============================
   servlet:
     multipart:
-      location: ${UPLOAD_DIR:D:/files/ultary-api}
+      location: ${UPLOAD_DIR:D:/files/ultary}

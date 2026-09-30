@@ -2,6 +2,7 @@ package me._hanho.ultary.domain.main;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -23,6 +24,8 @@ import me._hanho.ultary.domain.feed.model.Feed;
 import me._hanho.ultary.domain.file.FileService;
 import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
 import me._hanho.ultary.domain.main.dto.response.MainFeedPageResponse;
+import me._hanho.ultary.domain.main.dto.response.PetTagHistoryItemResponse;
+import me._hanho.ultary.domain.main.dto.response.PetTagHistoryPageResponse;
 import me._hanho.ultary.domain.main.dto.response.MainSearchPetItem;
 import me._hanho.ultary.domain.main.dto.response.MainSearchResponse;
 import me._hanho.ultary.domain.main.dto.response.MainSearchUserItem;
@@ -38,7 +41,9 @@ import me._hanho.ultary.domain.tag.TagService;
 import me._hanho.ultary.domain.tag.dto.response.TagResponse;
 import me._hanho.ultary.domain.user.UserBlockMapper;
 import me._hanho.ultary.domain.user.UserMapper;
+import me._hanho.ultary.domain.user.UserPetTagHistoryMapper;
 import me._hanho.ultary.domain.user.UserSearchHistoryMapper;
+import me._hanho.ultary.domain.user.model.PetTagHistoryRow;
 import me._hanho.ultary.domain.user.model.SearchHistoryRow;
 import me._hanho.ultary.domain.user.model.User;
 import me._hanho.ultary.domain.user.model.UserSearchHistory;
@@ -56,6 +61,7 @@ public class MainService {
 
 	private static final int RECENT_SEARCH_LIMIT = 5;
 	private static final int RECENT_SEARCH_MORE_LIMIT = 20;
+	private static final int RECENT_PET_TAG_LIMIT = 20;
 
 	private final StoryService storyService;
 	private final FeedMapper feedMapper;
@@ -63,6 +69,7 @@ public class MainService {
 	private final UserMapper userMapper;
 	private final UserBlockMapper userBlockMapper;
 	private final UserSearchHistoryMapper userSearchHistoryMapper;
+	private final UserPetTagHistoryMapper userPetTagHistoryMapper;
 	private final PetMapper petMapper;
 	private final PetService petService;
 	private final TagService tagService;
@@ -163,6 +170,47 @@ public class MainService {
 		return toHistoryItem(row, fileService.findSummary(row.getProfileFileId()));
 	}
 
+	/** 스토리 @·사진 태그 모달의 최근 펫. 검색 최근 울타리와 별도 */
+	@Transactional(readOnly = true)
+	public PetTagHistoryPageResponse getRecentPetTags(UserPrincipal principal) {
+		List<PetTagHistoryRow> rows = userPetTagHistoryMapper.findRecent(
+				principal.getUserNo(), RECENT_PET_TAG_LIMIT);
+		return PetTagHistoryPageResponse.builder()
+				.items(toPetTagItems(rows))
+				.build();
+	}
+
+	/** 멘션으로 펫을 고를 때 저장. 같은 펫은 used_at만 갱신 */
+	@Transactional
+	public PetTagHistoryItemResponse saveRecentPetTag(UserPrincipal principal, Long petId) {
+		if (petId == null) {
+			throw new BusinessException(ErrorCode.INVALID_INPUT, "petId는 필수입니다.");
+		}
+		Pet pet = petMapper.findActiveByPetId(petId);
+		if (pet == null) {
+			throw new BusinessException(ErrorCode.PET_NOT_FOUND);
+		}
+		User owner = userMapper.findActiveByUserNo(pet.getUserNo());
+		if (owner == null) {
+			throw new BusinessException(ErrorCode.PET_NOT_FOUND);
+		}
+		if (!principal.getUserNo().equals(pet.getUserNo())
+				&& userBlockMapper.findActiveEitherWay(principal.getUserNo(), pet.getUserNo()) != null) {
+			throw new BusinessException(ErrorCode.USER_BLOCKED);
+		}
+		userPetTagHistoryMapper.upsert(principal.getUserNo(), petId);
+		PetTagHistoryRow row = userPetTagHistoryMapper.findByPair(principal.getUserNo(), petId);
+		log.info("[saveRecentPetTag] userNo={} petId={}", principal.getUserNo(), petId);
+		return toPetTagItem(row, fileService.findSummary(row.getProfileFileId()));
+	}
+
+	/** 내 최근 펫 태그 전부 삭제. 목록에 안 보이던 행도 포함 */
+	@Transactional
+	public void clearRecentPetTags(UserPrincipal principal) {
+		int deleted = userPetTagHistoryMapper.deleteByUserNo(principal.getUserNo());
+		log.info("[clearRecentPetTags] userNo={} deleted={}", principal.getUserNo(), deleted);
+	}
+
 	/** 모두 지우기. 목록에 안 보이는 탈퇴·차단 대상 행도 함께 삭제 */
 	@Transactional
 	public void clearRecentSearches(UserPrincipal principal) {
@@ -207,6 +255,47 @@ public class MainService {
 		return SearchHistoryPageResponse.builder()
 				.items(items)
 				.nextCursorHistoryId(nextCursor)
+				.build();
+	}
+
+	private Map<Long, String> ownerNicknames(List<Long> userNos) {
+		if (userNos == null || userNos.isEmpty()) {
+			return Map.of();
+		}
+		List<Long> ids = userNos.stream().distinct().toList();
+		Map<Long, String> nicknames = new HashMap<>();
+		for (User user : userMapper.findActiveByUserNos(ids)) {
+			nicknames.put(user.getUserNo(), user.getNickname());
+		}
+		return nicknames;
+	}
+
+	private List<PetTagHistoryItemResponse> toPetTagItems(List<PetTagHistoryRow> rows) {
+		Set<Long> profileIds = new HashSet<>();
+		for (PetTagHistoryRow row : rows) {
+			if (row.getProfileFileId() != null) {
+				profileIds.add(row.getProfileFileId());
+			}
+		}
+		Map<Long, FileSummaryResponse> files = fileService.findSummaries(profileIds);
+		return rows.stream()
+				.map(row -> toPetTagItem(
+						row,
+						row.getProfileFileId() == null ? null : files.get(row.getProfileFileId())))
+				.toList();
+	}
+
+	private PetTagHistoryItemResponse toPetTagItem(PetTagHistoryRow row, FileSummaryResponse profileFile) {
+		Long profileFileId = row.getProfileFileId();
+		return PetTagHistoryItemResponse.builder()
+				.petId(row.getPetId())
+				.mentionId(row.getMentionId())
+				.name(row.getName())
+				.userNo(row.getOwnerUserNo())
+				.ownerNickname(row.getOwnerNickname())
+				.profileFileId(profileFileId)
+				.profileFile(profileFile)
+				.usedAt(row.getUsedAt())
 				.build();
 	}
 
@@ -268,10 +357,12 @@ public class MainService {
 				}
 			}
 			Map<Long, FileSummaryResponse> files = fileService.findSummaries(profileIds);
+			Map<Long, String> ownerNicknames = ownerNicknames(petRows.stream().map(Pet::getUserNo).toList());
 			pets = petRows.stream()
 					.map(p -> MainSearchPetItem.builder()
 							.petId(p.getPetId())
 							.userNo(p.getUserNo())
+							.ownerNickname(ownerNicknames.get(p.getUserNo()))
 							.mentionId(p.getMentionId())
 							.name(p.getName())
 							.species(p.getSpecies())

@@ -17,6 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.exception.BusinessException;
 import me._hanho.ultary.common.exception.ErrorCode;
 import me._hanho.ultary.domain.neighbor.NeighborService;
+import me._hanho.ultary.domain.notification.NotificationService;
 import me._hanho.ultary.domain.feed.dto.request.CommentMentionRequest;
 import me._hanho.ultary.domain.feed.dto.request.CreateCommentRequest;
 import me._hanho.ultary.domain.feed.dto.request.CreateFeedRequest;
@@ -71,6 +72,7 @@ public class FeedService {
 	private final TagMapper tagMapper;
 	private final UserMapper userMapper;
 	private final NeighborService neighborService;
+	private final NotificationService notificationService;
 
 	@Transactional
 	public FeedResponse create(UserPrincipal principal, CreateFeedRequest request) {
@@ -88,6 +90,7 @@ public class FeedService {
 		insertMedia(feed.getFeedId(), principal.getUserNo(), request.getMedia());
 		insertPets(feed.getFeedId(), principal.getUserNo(), request.getPets());
 		insertTags(feed.getFeedId(), request.getTagIds());
+		notificationService.syncFeedTags(feed.getFeedId());
 
 		log.info("[create] feedId={} userNo={} media={}",
 				feed.getFeedId(), principal.getUserNo(), request.getMedia().size());
@@ -172,6 +175,7 @@ public class FeedService {
 		if (deleted == 0) {
 			throw new BusinessException(ErrorCode.FEED_NOT_FOUND);
 		}
+		notificationService.removeByFeed(feedId);
 		log.info("[delete] feedId={} byUserNo={}", feedId, principal.getUserNo());
 	}
 
@@ -179,13 +183,19 @@ public class FeedService {
 	public FeedResponse like(UserPrincipal principal, Long feedId) {
 		requireVisible(feedId, principal.getUserNo());
 		FeedLike existing = feedMapper.findLike(feedId, principal.getUserNo());
+		boolean changed = false;
 		if (existing == null) {
 			feedMapper.insertLike(feedId, principal.getUserNo());
 			feedMapper.adjustLikeCount(feedId, 1);
+			changed = true;
 		} else if (Boolean.TRUE.equals(existing.getIsDeleted())) {
 			if (feedMapper.restoreLike(feedId, principal.getUserNo()) > 0) {
 				feedMapper.adjustLikeCount(feedId, 1);
+				changed = true;
 			}
+		}
+		if (changed) {
+			notificationService.syncFeedLike(feedId, true);
 		}
 		log.info("[like] feedId={} userNo={}", feedId, principal.getUserNo());
 		return toResponse(requireVisible(feedId, principal.getUserNo()), principal.getUserNo());
@@ -196,6 +206,7 @@ public class FeedService {
 		requireVisible(feedId, principal.getUserNo());
 		if (feedMapper.softDeleteLike(feedId, principal.getUserNo()) > 0) {
 			feedMapper.adjustLikeCount(feedId, -1);
+			notificationService.syncFeedLike(feedId, false);
 		}
 		log.info("[unlike] feedId={} userNo={}", feedId, principal.getUserNo());
 		return toResponse(requireVisible(feedId, principal.getUserNo()), principal.getUserNo());
@@ -295,6 +306,8 @@ public class FeedService {
 		feedMapper.insertComment(comment);
 		insertCommentMentions(comment.getFeedCommentId(), null, request.getMentions());
 		feedMapper.adjustCommentCount(feedId, 1);
+		notificationService.syncFeedThread(feedId, true);
+		notificationService.syncCommentMentions(comment.getFeedCommentId());
 		log.info("[createComment] feedId={} commentId={}", feedId, comment.getFeedCommentId());
 		return toCommentResponse(requireComment(feedId, comment.getFeedCommentId()), false, principal.getUserNo(), null);
 	}
@@ -308,6 +321,8 @@ public class FeedService {
 		if (updated == 0) {
 			throw new BusinessException(ErrorCode.FORBIDDEN);
 		}
+		notificationService.refreshCommentSnippet(commentId);
+		notificationService.syncFeedThread(feedId, false);
 		return toCommentResponse(requireComment(feedId, commentId), false, principal.getUserNo(), null);
 	}
 
@@ -327,6 +342,8 @@ public class FeedService {
 			throw new BusinessException(ErrorCode.FEED_COMMENT_NOT_FOUND);
 		}
 		feedMapper.adjustCommentCount(feedId, -1);
+		notificationService.removeCommentTree(commentId);
+		notificationService.syncFeedThread(feedId, false);
 		log.info("[deleteComment] feedId={} commentId={} by={}", feedId, commentId, principal.getUserNo());
 	}
 
@@ -335,13 +352,19 @@ public class FeedService {
 		requireVisible(feedId, principal.getUserNo());
 		requireComment(feedId, commentId);
 		FeedCommentLike existing = feedMapper.findCommentLike(commentId, principal.getUserNo());
+		boolean changed = false;
 		if (existing == null) {
 			feedMapper.insertCommentLike(commentId, principal.getUserNo());
 			feedMapper.adjustCommentLikeCount(commentId, 1);
+			changed = true;
 		} else if (Boolean.TRUE.equals(existing.getIsDeleted())) {
 			if (feedMapper.restoreCommentLike(commentId, principal.getUserNo()) > 0) {
 				feedMapper.adjustCommentLikeCount(commentId, 1);
+				changed = true;
 			}
+		}
+		if (changed) {
+			notificationService.syncCommentLike(commentId, true);
 		}
 		log.info("[likeComment] feedId={} commentId={} userNo={}", feedId, commentId, principal.getUserNo());
 		return toCommentResponse(requireComment(feedId, commentId), false, principal.getUserNo(), null);
@@ -353,6 +376,7 @@ public class FeedService {
 		requireComment(feedId, commentId);
 		if (feedMapper.softDeleteCommentLike(commentId, principal.getUserNo()) > 0) {
 			feedMapper.adjustCommentLikeCount(commentId, -1);
+			notificationService.syncCommentLike(commentId, false);
 		}
 		log.info("[unlikeComment] feedId={} commentId={} userNo={}", feedId, commentId, principal.getUserNo());
 		return toCommentResponse(requireComment(feedId, commentId), false, principal.getUserNo(), null);
@@ -388,6 +412,8 @@ public class FeedService {
 		reply.setContent(request.getContent().trim());
 		feedMapper.insertReply(reply);
 		insertCommentMentions(null, reply.getFeedReplyId(), request.getMentions());
+		notificationService.syncFeedThread(feedId, true);
+		notificationService.syncReplyMentions(reply.getFeedReplyId());
 		log.info("[createReply] commentId={} replyId={}", commentId, reply.getFeedReplyId());
 		return toReplyResponse(requireReply(commentId, reply.getFeedReplyId()), principal.getUserNo(), null);
 	}
@@ -406,6 +432,8 @@ public class FeedService {
 		if (updated == 0) {
 			throw new BusinessException(ErrorCode.FORBIDDEN);
 		}
+		notificationService.refreshReplySnippet(replyId);
+		notificationService.syncFeedThread(feedId, false);
 		return toReplyResponse(requireReply(commentId, replyId), principal.getUserNo(), null);
 	}
 
@@ -416,13 +444,19 @@ public class FeedService {
 		requireComment(feedId, commentId);
 		requireReply(commentId, replyId);
 		FeedReplyLike existing = feedMapper.findReplyLike(replyId, principal.getUserNo());
+		boolean changed = false;
 		if (existing == null) {
 			feedMapper.insertReplyLike(replyId, principal.getUserNo());
 			feedMapper.adjustReplyLikeCount(replyId, 1);
+			changed = true;
 		} else if (Boolean.TRUE.equals(existing.getIsDeleted())) {
 			if (feedMapper.restoreReplyLike(replyId, principal.getUserNo()) > 0) {
 				feedMapper.adjustReplyLikeCount(replyId, 1);
+				changed = true;
 			}
+		}
+		if (changed) {
+			notificationService.syncReplyLike(replyId, true);
 		}
 		log.info("[likeReply] replyId={} userNo={}", replyId, principal.getUserNo());
 		return toReplyResponse(requireReply(commentId, replyId), principal.getUserNo(), null);
@@ -436,6 +470,7 @@ public class FeedService {
 		requireReply(commentId, replyId);
 		if (feedMapper.softDeleteReplyLike(replyId, principal.getUserNo()) > 0) {
 			feedMapper.adjustReplyLikeCount(replyId, -1);
+			notificationService.syncReplyLike(replyId, false);
 		}
 		log.info("[unlikeReply] replyId={} userNo={}", replyId, principal.getUserNo());
 		return toReplyResponse(requireReply(commentId, replyId), principal.getUserNo(), null);
@@ -457,6 +492,8 @@ public class FeedService {
 		if (deleted == 0) {
 			throw new BusinessException(ErrorCode.FEED_REPLY_NOT_FOUND);
 		}
+		notificationService.removeReply(replyId);
+		notificationService.syncFeedThread(feedId, false);
 		log.info("[deleteReply] replyId={} by={}", replyId, principal.getUserNo());
 	}
 

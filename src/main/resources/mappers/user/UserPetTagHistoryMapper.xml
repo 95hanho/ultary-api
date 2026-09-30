@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="me._hanho.ultary.domain.user.UserPetTagHistoryMapper">
+
+	<sql id="recentColumns">
+		h.user_pet_tag_history_id,
+		h.pet_id,
+		h.used_at,
+		p.mention_id,
+		p.name,
+		p.user_no AS ownerUserNo,
+		u.nickname AS ownerNickname,
+		p.profile_file_id
+	</sql>
+
+	<select id="findRecent" resultType="me._hanho.ultary.domain.user.model.PetTagHistoryRow">
+		SELECT <include refid="recentColumns"/>
+		FROM ultary_user_pet_tag_history h
+		INNER JOIN ultary_pet p
+			ON p.pet_id = h.pet_id
+		   AND p.is_deleted = 0
+		INNER JOIN ultary_user u
+			ON u.user_no = p.user_no
+		   AND u.withdrawal_status = 'ACTIVE'
+		WHERE h.user_no = #{viewerUserNo}
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM ultary_user_block b
+			WHERE b.is_deleted = 0
+			  AND (
+				(b.blocker_user_no = #{viewerUserNo} AND b.blocked_user_no = p.user_no)
+				OR (b.blocker_user_no = p.user_no AND b.blocked_user_no = #{viewerUserNo})
+			  )
+		  )
+		ORDER BY h.used_at DESC, h.user_pet_tag_history_id DESC
+		LIMIT #{limit}
+	</select>
+
+	<insert id="upsert">
+		INSERT INTO ultary_user_pet_tag_history (
+			user_no,
+			pet_id,
+			used_at
+		) VALUES (
+			#{userNo},
+			#{petId},
+			NOW()
+		)
+		ON DUPLICATE KEY UPDATE used_at = NOW()
+	</insert>
+
+	<select id="findByPair" resultType="me._hanho.ultary.domain.user.model.PetTagHistoryRow">
+		SELECT <include refid="recentColumns"/>
+		FROM ultary_user_pet_tag_history h
+		INNER JOIN ultary_pet p ON p.pet_id = h.pet_id
+		INNER JOIN ultary_user u ON u.user_no = p.user_no
+		WHERE h.user_no = #{viewerUserNo}
+		  AND h.pet_id = #{petId}
+	</select>
+
+	<delete id="deleteByUserNo">
+		DELETE FROM ultary_user_pet_tag_history
+		WHERE user_no = #{userNo}
+	</delete>
+
+</mapper>

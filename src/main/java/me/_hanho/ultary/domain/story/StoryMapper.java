@@ -6,12 +6,23 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import me._hanho.ultary.domain.story.model.Story;
+import me._hanho.ultary.domain.story.model.StoryLike;
+import me._hanho.ultary.domain.story.model.StoryMentionRow;
 import me._hanho.ultary.domain.story.model.StoryOwnerRow;
+import me._hanho.ultary.domain.story.model.StoryText;
 
 @Mapper
 public interface StoryMapper {
 
 	int insert(Story story);
+
+	int insertText(StoryText text);
+
+	int insertMention(StoryMentionRow mention);
+
+	List<StoryText> findTextsByStoryId(@Param("storyId") Long storyId);
+
+	List<StoryMentionRow> findMentionsByStoryId(@Param("storyId") Long storyId);
 
 	Story findActiveByStoryId(@Param("storyId") Long storyId);
 
@@ -44,4 +55,26 @@ public interface StoryMapper {
 	int countAcceptedNeighborPair(
 			@Param("userNoA") Long userNoA,
 			@Param("userNoB") Long userNoB);
+
+	StoryLike findLike(
+			@Param("storyId") Long storyId,
+			@Param("userNo") Long userNo);
+
+	int insertLike(
+			@Param("storyId") Long storyId,
+			@Param("userNo") Long userNo);
+
+	int restoreLike(
+			@Param("storyId") Long storyId,
+			@Param("userNo") Long userNo);
+
+	int softDeleteLike(
+			@Param("storyId") Long storyId,
+			@Param("userNo") Long userNo);
+
+	int countActiveLikes(@Param("storyId") Long storyId);
+
+	int countActiveLikeByUser(
+			@Param("storyId") Long storyId,
+			@Param("userNo") Long userNo);
 }

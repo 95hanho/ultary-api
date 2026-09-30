@@ -1,5 +1,6 @@
 package me._hanho.ultary.domain.user;
 
+import java.util.Collection;
 import java.util.List;
 
 import org.apache.ibatis.annotations.Mapper;
@@ -11,6 +12,8 @@ import me._hanho.ultary.domain.user.model.User;
 public interface UserMapper {
 
 	User findActiveByUserNo(@Param("userNo") Long userNo);
+
+	List<User> findActiveByUserNos(@Param("userNos") Collection<Long> userNos);
 
 	User findByPhone(@Param("phone") String phone);
 

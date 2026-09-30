@@ -1,0 +1,29 @@
+@baseUrl = http://localhost:9377
+@accessToken = {{socialLogin.response.body.$.data.accessToken}}
+
+# 로그인: user 101 (google-myultary-test-001)
+# 알림은 좋아요·댓글·이웃 신청 등이 성공한 뒤 저장된다. 웹소켓 없음.
+
+### 0. 소셜 로그인 (시드 user 101)
+# @name socialLogin
+POST {{baseUrl}}/api/v1/auth/social/login
+Content-Type: application/json
+
+{
+  "provider": "GOOGLE",
+  "providerUserId": "google-myultary-test-001",
+  "email": "myultary.test@example.com",
+  "name": "한호"
+}
+
+### 1. 알림 목록 (unreadCount, items)
+GET {{baseUrl}}/api/v1/notifications?limit=30
+Authorization: Bearer {{accessToken}}
+
+### 2. 단건 읽음
+PATCH {{baseUrl}}/api/v1/notifications/1/read
+Authorization: Bearer {{accessToken}}
+
+### 3. 전체 읽음
+POST {{baseUrl}}/api/v1/notifications/read-all
+Authorization: Bearer {{accessToken}}

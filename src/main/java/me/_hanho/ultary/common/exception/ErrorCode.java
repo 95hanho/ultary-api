@@ -103,7 +103,7 @@ public enum ErrorCode {
 	// ==============================
 	// 알림 (notification)
 	// ==============================
-	// NOTIFICATION_NOT_FOUND("NOTIFICATION_NOT_FOUND", "알림을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
+	NOTIFICATION_NOT_FOUND("NOTIFICATION_NOT_FOUND", "알림을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
 
 	// ==============================
 	// 신고 (report)

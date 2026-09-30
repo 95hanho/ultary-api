@@ -47,6 +47,85 @@
 		)
 	</insert>
 
+	<insert id="insertText" useGeneratedKeys="true" keyProperty="storyTextId" keyColumn="story_text_id">
+		INSERT INTO ultary_story_text (
+			story_id,
+			content,
+			font_size,
+			is_bold,
+			is_underline,
+			is_strikethrough,
+			color,
+			pos_x,
+			pos_y,
+			sort_order
+		) VALUES (
+			#{storyId},
+			#{content},
+			#{fontSize},
+			#{bold},
+			#{underline},
+			#{strikethrough},
+			#{color},
+			#{posX},
+			#{posY},
+			#{sortOrder}
+		)
+	</insert>
+
+	<insert id="insertMention" useGeneratedKeys="true" keyProperty="storyMentionId" keyColumn="story_mention_id">
+		INSERT INTO ultary_story_mention (
+			story_id,
+			pet_id,
+			pos_x,
+			pos_y,
+			sort_order,
+			added_by_user_no
+		) VALUES (
+			#{storyId},
+			#{petId},
+			#{posX},
+			#{posY},
+			#{sortOrder},
+			#{addedByUserNo}
+		)
+	</insert>
+
+	<select id="findTextsByStoryId" resultType="me._hanho.ultary.domain.story.model.StoryText">
+		SELECT
+			story_text_id,
+			story_id,
+			content,
+			font_size,
+			is_bold AS bold,
+			is_underline AS underline,
+			is_strikethrough AS strikethrough,
+			color,
+			pos_x,
+			pos_y,
+			sort_order
+		FROM ultary_story_text
+		WHERE story_id = #{storyId}
+		ORDER BY sort_order ASC, story_text_id ASC
+	</select>
+
+	<select id="findMentionsByStoryId" resultType="me._hanho.ultary.domain.story.model.StoryMentionRow">
+		SELECT
+			sm.story_mention_id,
+			sm.story_id,
+			sm.pet_id,
+			p.mention_id,
+			p.name AS petName,
+			sm.pos_x,
+			sm.pos_y,
+			sm.sort_order,
+			sm.added_by_user_no
+		FROM ultary_story_mention sm
+		LEFT JOIN ultary_pet p ON p.pet_id = sm.pet_id
+		WHERE sm.story_id = #{storyId}
+		ORDER BY sm.sort_order ASC, sm.story_mention_id ASC
+	</select>
+
 	<select id="findActiveByStoryId" resultType="me._hanho.ultary.domain.story.model.Story">
 		SELECT <include refid="storyColumns"/>
 		FROM ultary_story
@@ -142,6 +221,58 @@
 			WHERE v.story_id = s.story_id
 			  AND v.viewer_user_no = #{viewerUserNo}
 		  )
+	</select>
+
+	<select id="findLike" resultType="me._hanho.ultary.domain.story.model.StoryLike">
+		SELECT
+			story_like_id,
+			story_id,
+			user_no,
+			created_at,
+			is_deleted,
+			deleted_at
+		FROM ultary_story_like
+		WHERE story_id = #{storyId}
+		  AND user_no = #{userNo}
+	</select>
+
+	<insert id="insertLike">
+		INSERT INTO ultary_story_like (story_id, user_no, is_deleted, deleted_at)
+		VALUES (#{storyId}, #{userNo}, 0, NULL)
+	</insert>
+
+	<update id="restoreLike">
+		UPDATE ultary_story_like
+		SET is_deleted = 0,
+			deleted_at = NULL,
+			created_at = NOW()
+		WHERE story_id = #{storyId}
+		  AND user_no = #{userNo}
+		  AND is_deleted = 1
+	</update>
+
+	<update id="softDeleteLike">
+		UPDATE ultary_story_like
+		SET is_deleted = 1,
+			deleted_at = NOW()
+		WHERE story_id = #{storyId}
+		  AND user_no = #{userNo}
+		  AND is_deleted = 0
+	</update>
+
+	<select id="countActiveLikes" resultType="int">
+		SELECT COUNT(1)
+		FROM ultary_story_like
+		WHERE story_id = #{storyId}
+		  AND is_deleted = 0
+	</select>
+
+	<select id="countActiveLikeByUser" resultType="int">
+		SELECT COUNT(1)
+		FROM ultary_story_like
+		WHERE story_id = #{storyId}
+		  AND user_no = #{userNo}
+		  AND is_deleted = 0
 	</select>
 
 	<select id="countAcceptedNeighborPair" resultType="int">

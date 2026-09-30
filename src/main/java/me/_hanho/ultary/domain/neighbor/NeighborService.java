@@ -18,6 +18,7 @@ import me._hanho.ultary.common.exception.ErrorCode;
 import me._hanho.ultary.domain.feed.FeedMapper;
 import me._hanho.ultary.domain.file.FileService;
 import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
+import me._hanho.ultary.domain.notification.NotificationService;
 import me._hanho.ultary.domain.neighbor.dto.response.NeighborListItemResponse;
 import me._hanho.ultary.domain.neighbor.dto.response.NeighborRelationResponse;
 import me._hanho.ultary.domain.neighbor.dto.response.UserUltaryResponse;
@@ -48,6 +49,7 @@ public class NeighborService {
 	private final FeedMapper feedMapper;
 	private final StoryService storyService;
 	private final FileService fileService;
+	private final NotificationService notificationService;
 
 	/** 울타리 조회와 같다. 없는 유저 404, 상대가 나를 차단하면 403 */
 	@Transactional(readOnly = true)
@@ -156,6 +158,7 @@ public class NeighborService {
 			created.setPairKey(key);
 			created.setStatus("PENDING");
 			neighborMapper.insert(created);
+			notificationService.syncNeighborRequest(created.getNeighborId());
 			log.info("[request] me={} target={} neighborId={}", me, targetUserNo, created.getNeighborId());
 			return toRelation(created);
 		}
@@ -177,6 +180,7 @@ public class NeighborService {
 		existing.setReceiverUserNo(targetUserNo);
 		existing.setStatus("PENDING");
 		neighborMapper.updateReRequest(existing);
+		notificationService.syncNeighborRequest(existing.getNeighborId());
 		log.info("[request:re] me={} target={} neighborId={}", me, targetUserNo, existing.getNeighborId());
 		return toRelation(neighborMapper.findByNeighborId(existing.getNeighborId()));
 	}
@@ -230,6 +234,7 @@ public class NeighborService {
 		if (!"PENDING".equals(neighbor.getStatus()) && !"ACCEPTED".equals(neighbor.getStatus())) {
 			throw new BusinessException(ErrorCode.INVALID_INPUT, "취소·해제할 수 있는 상태가 아닙니다.");
 		}
+		notificationService.removeByNeighbor(neighborId);
 		neighborMapper.deleteByNeighborId(neighborId);
 		log.info("[cancelOrRemove] neighborId={} by={}", neighborId, me);
 	}
@@ -257,6 +262,7 @@ public class NeighborService {
 
 		Neighbor neighbor = neighborMapper.findByPairKey(pairKey(me, targetUserNo));
 		if (neighbor != null) {
+			notificationService.removeByNeighbor(neighbor.getNeighborId());
 			neighborMapper.deleteByNeighborId(neighbor.getNeighborId());
 		}
 		log.info("[block] me={} target={}", me, targetUserNo);

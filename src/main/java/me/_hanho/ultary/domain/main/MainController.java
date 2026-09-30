@@ -16,9 +16,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.response.ApiResponse;
 import me._hanho.ultary.domain.feed.dto.response.FeedResponse;
+import me._hanho.ultary.domain.main.dto.request.SavePetTagHistoryRequest;
 import me._hanho.ultary.domain.main.dto.request.SaveSearchHistoryRequest;
 import me._hanho.ultary.domain.main.dto.response.MainFeedPageResponse;
 import me._hanho.ultary.domain.main.dto.response.MainSearchResponse;
+import me._hanho.ultary.domain.main.dto.response.PetTagHistoryItemResponse;
+import me._hanho.ultary.domain.main.dto.response.PetTagHistoryPageResponse;
 import me._hanho.ultary.domain.main.dto.response.SearchHistoryItemResponse;
 import me._hanho.ultary.domain.main.dto.response.SearchHistoryPageResponse;
 import me._hanho.ultary.domain.story.dto.response.StoryOwnerResponse;
@@ -89,6 +92,34 @@ public class MainController {
 		return ApiResponse.ok(
 				mainService.getSearchRecommendedFeeds(principal, limit),
 				"검색 추천 게시글 조회 성공");
+	}
+
+	/** 스토리 @·사진 태그 모달의 최근 펫 20건. 검색 최근 울타리와 별도 */
+	@GetMapping("/pet-tags/recent")
+	public ApiResponse<PetTagHistoryPageResponse> recentPetTags(
+			@AuthenticationPrincipal UserPrincipal principal) {
+		log.info("[recentPetTags] userNo={}", principal.getUserNo());
+		return ApiResponse.ok(mainService.getRecentPetTags(principal), "최근 펫 태그 조회 성공");
+	}
+
+	/** 멘션으로 펫을 고를 때 저장. 같은 펫은 used_at만 갱신 */
+	@PostMapping("/pet-tags/recent")
+	public ApiResponse<PetTagHistoryItemResponse> saveRecentPetTag(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@Valid @RequestBody SavePetTagHistoryRequest request) {
+		log.info("[saveRecentPetTag] userNo={} petId={}", principal.getUserNo(), request.getPetId());
+		return ApiResponse.ok(
+				mainService.saveRecentPetTag(principal, request.getPetId()),
+				"최근 펫 태그 저장 성공");
+	}
+
+	/** 내 최근 펫 태그 전부 삭제 */
+	@DeleteMapping("/pet-tags/recent")
+	public ApiResponse<Void> clearRecentPetTags(
+			@AuthenticationPrincipal UserPrincipal principal) {
+		log.info("[clearRecentPetTags] userNo={}", principal.getUserNo());
+		mainService.clearRecentPetTags(principal);
+		return ApiResponse.okEmpty("최근 펫 태그 모두 삭제 성공");
 	}
 
 	/** 검색창을 열면 최근 들어간 울타리 5건 */

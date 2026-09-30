@@ -1,0 +1,591 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="me._hanho.ultary.domain.notification.NotificationMapper">
+
+	<sql id="notBlocked">
+		NOT EXISTS (
+			SELECT 1
+			FROM ultary_user_block b
+			WHERE b.is_deleted = 0
+			  AND (
+				(b.blocker_user_no = ${ownerExpr} AND b.blocked_user_no = ${actorExpr})
+				OR (b.blocker_user_no = ${actorExpr} AND b.blocked_user_no = ${ownerExpr})
+			  )
+		)
+	</sql>
+
+	<sql id="visibleNotification">
+		n.receiver_user_no = #{userNo}
+		AND EXISTS (
+			SELECT 1
+			FROM ultary_user actor
+			WHERE actor.user_no = n.actor_user_no
+			  AND actor.withdrawal_status = 'ACTIVE'
+		)
+		AND (
+			n.feed_id IS NULL
+			OR EXISTS (
+				SELECT 1 FROM ultary_feed f
+				WHERE f.feed_id = n.feed_id AND f.is_deleted = 0
+			)
+		)
+		AND (
+			n.story_id IS NULL
+			OR EXISTS (
+				SELECT 1 FROM ultary_story s
+				WHERE s.story_id = n.story_id AND s.is_deleted = 0
+			)
+		)
+		AND (n.type &lt;&gt; 'NEIGHBOR_REQUEST' OR n.neighbor_id IS NOT NULL)
+	</sql>
+
+	<insert id="upsert">
+		INSERT INTO ultary_notification (
+			receiver_user_no,
+			actor_user_no,
+			type,
+			feed_id,
+			feed_comment_id,
+			feed_reply_id,
+			story_id,
+			neighbor_id,
+			content,
+			actor_count,
+			has_comment,
+			has_reply,
+			group_key,
+			is_read,
+			created_at,
+			updated_at
+		) VALUES (
+			#{receiverUserNo},
+			#{actorUserNo},
+			#{type},
+			#{feedId},
+			#{feedCommentId},
+			#{feedReplyId},
+			#{storyId},
+			#{neighborId},
+			#{content},
+			#{actorCount},
+			#{hasComment},
+			#{hasReply},
+			#{groupKey},
+			0,
+			NOW(),
+			NOW()
+		)
+		ON DUPLICATE KEY UPDATE
+			actor_user_no = VALUES(actor_user_no),
+			feed_id = VALUES(feed_id),
+			feed_comment_id = VALUES(feed_comment_id),
+			feed_reply_id = VALUES(feed_reply_id),
+			story_id = VALUES(story_id),
+			neighbor_id = VALUES(neighbor_id),
+			content = VALUES(content),
+			actor_count = VALUES(actor_count),
+			has_comment = VALUES(has_comment),
+			has_reply = VALUES(has_reply),
+			is_read = IF(#{markUnread} = 1, 0, is_read),
+			read_at = IF(#{markUnread} = 1, NULL, read_at),
+			updated_at = IF(#{markUnread} = 1, NOW(), updated_at)
+	</insert>
+
+	<delete id="deleteByReceiverGroup">
+		DELETE FROM ultary_notification
+		WHERE receiver_user_no = #{receiverUserNo}
+		  AND group_key = #{groupKey}
+	</delete>
+
+	<delete id="deleteByGroupKey">
+		DELETE FROM ultary_notification
+		WHERE group_key = #{groupKey}
+	</delete>
+
+	<delete id="deleteByFeedId">
+		DELETE FROM ultary_notification
+		WHERE feed_id = #{feedId}
+	</delete>
+
+	<delete id="deleteByStoryId">
+		DELETE FROM ultary_notification
+		WHERE story_id = #{storyId}
+	</delete>
+
+	<delete id="deleteByNeighborId">
+		DELETE FROM ultary_notification
+		WHERE neighbor_id = #{neighborId}
+	</delete>
+
+	<delete id="deleteByCommentTypes">
+		DELETE FROM ultary_notification
+		WHERE feed_comment_id = #{feedCommentId}
+		  AND type IN
+		<foreach collection="types" item="type" open="(" separator="," close=")">
+			#{type}
+		</foreach>
+	</delete>
+
+	<delete id="deleteByReplyTypes">
+		DELETE FROM ultary_notification
+		WHERE feed_reply_id = #{feedReplyId}
+		  AND type IN
+		<foreach collection="types" item="type" open="(" separator="," close=")">
+			#{type}
+		</foreach>
+	</delete>
+
+	<update id="updateSnippetByComment">
+		UPDATE ultary_notification
+		SET content = #{content}
+		WHERE feed_comment_id = #{feedCommentId}
+		  AND type IN
+		<foreach collection="types" item="type" open="(" separator="," close=")">
+			#{type}
+		</foreach>
+	</update>
+
+	<update id="updateSnippetByReply">
+		UPDATE ultary_notification
+		SET content = #{content}
+		WHERE feed_reply_id = #{feedReplyId}
+		  AND type IN
+		<foreach collection="types" item="type" open="(" separator="," close=")">
+			#{type}
+		</foreach>
+	</update>
+
+	<select id="findFeedLike" resultType="me._hanho.ultary.domain.notification.model.NotificationDraft">
+		SELECT
+			f.user_no AS receiver_user_no,
+			(
+				SELECT l.user_no
+				FROM ultary_feed_like l
+				WHERE l.feed_id = f.feed_id
+				  AND l.is_deleted = 0
+				  AND l.user_no &lt;&gt; f.user_no
+				  AND <include refid="notBlocked"><property name="ownerExpr" value="f.user_no"/><property name="actorExpr" value="l.user_no"/></include>
+				ORDER BY l.created_at DESC, l.feed_like_id DESC
+				LIMIT 1
+			) AS actor_user_no,
+			(
+				SELECT COUNT(DISTINCT l.user_no)
+				FROM ultary_feed_like l
+				WHERE l.feed_id = f.feed_id
+				  AND l.is_deleted = 0
+				  AND l.user_no &lt;&gt; f.user_no
+				  AND <include refid="notBlocked"><property name="ownerExpr" value="f.user_no"/><property name="actorExpr" value="l.user_no"/></include>
+			) AS actor_count,
+			f.content AS content,
+			f.feed_id AS feed_id
+		FROM ultary_feed f
+		WHERE f.feed_id = #{feedId}
+		  AND f.is_deleted = 0
+	</select>
+
+	<select id="findCommentLike" resultType="me._hanho.ultary.domain.notification.model.NotificationDraft">
+		SELECT
+			c.user_no AS receiver_user_no,
+			(
+				SELECT l.user_no
+				FROM ultary_feed_comment_like l
+				WHERE l.feed_comment_id = c.feed_comment_id
+				  AND l.is_deleted = 0
+				  AND l.user_no &lt;&gt; c.user_no
+				  AND <include refid="notBlocked"><property name="ownerExpr" value="c.user_no"/><property name="actorExpr" value="l.user_no"/></include>
+				ORDER BY l.created_at DESC, l.feed_comment_like_id DESC
+				LIMIT 1
+			) AS actor_user_no,
+			(
+				SELECT COUNT(DISTINCT l.user_no)
+				FROM ultary_feed_comment_like l
+				WHERE l.feed_comment_id = c.feed_comment_id
+				  AND l.is_deleted = 0
+				  AND l.user_no &lt;&gt; c.user_no
+				  AND <include refid="notBlocked"><property name="ownerExpr" value="c.user_no"/><property name="actorExpr" value="l.user_no"/></include>
+			) AS actor_count,
+			c.content AS content,
+			c.feed_id AS feed_id,
+			c.feed_comment_id AS feed_comment_id
+		FROM ultary_feed_comment c
+		INNER JOIN ultary_feed f ON f.feed_id = c.feed_id AND f.is_deleted = 0
+		WHERE c.feed_comment_id = #{commentId}
+		  AND c.is_deleted = 0
+	</select>
+
+	<select id="findReplyLike" resultType="me._hanho.ultary.domain.notification.model.NotificationDraft">
+		SELECT
+			r.user_no AS receiver_user_no,
+			(
+				SELECT l.user_no
+				FROM ultary_feed_reply_like l
+				WHERE l.feed_reply_id = r.feed_reply_id
+				  AND l.is_deleted = 0
+				  AND l.user_no &lt;&gt; r.user_no
+				  AND <include refid="notBlocked"><property name="ownerExpr" value="r.user_no"/><property name="actorExpr" value="l.user_no"/></include>
+				ORDER BY l.created_at DESC, l.feed_reply_like_id DESC
+				LIMIT 1
+			) AS actor_user_no,
+			(
+				SELECT COUNT(DISTINCT l.user_no)
+				FROM ultary_feed_reply_like l
+				WHERE l.feed_reply_id = r.feed_reply_id
+				  AND l.is_deleted = 0
+				  AND l.user_no &lt;&gt; r.user_no
+				  AND <include refid="notBlocked"><property name="ownerExpr" value="r.user_no"/><property name="actorExpr" value="l.user_no"/></include>
+			) AS actor_count,
+			r.content AS content,
+			c.feed_id AS feed_id,
+			c.feed_comment_id AS feed_comment_id,
+			r.feed_reply_id AS feed_reply_id
+		FROM ultary_feed_reply r
+		INNER JOIN ultary_feed_comment c ON c.feed_comment_id = r.feed_comment_id AND c.is_deleted = 0
+		INNER JOIN ultary_feed f ON f.feed_id = c.feed_id AND f.is_deleted = 0
+		WHERE r.feed_reply_id = #{replyId}
+		  AND r.is_deleted = 0
+	</select>
+
+	<select id="findFeedThread" resultType="me._hanho.ultary.domain.notification.model.NotificationDraft">
+		SELECT
+			f.user_no AS receiver_user_no,
+			latest.user_no AS actor_user_no,
+			(
+				SELECT COUNT(DISTINCT x.user_no)
+				FROM (
+					SELECT c.user_no
+					FROM ultary_feed_comment c
+					WHERE c.feed_id = f.feed_id
+					  AND c.is_deleted = 0
+					  AND c.user_no &lt;&gt; f.user_no
+					  AND <include refid="notBlocked"><property name="ownerExpr" value="f.user_no"/><property name="actorExpr" value="c.user_no"/></include>
+					UNION
+					SELECT r.user_no
+					FROM ultary_feed_reply r
+					INNER JOIN ultary_feed_comment c ON c.feed_comment_id = r.feed_comment_id AND c.is_deleted = 0
+					WHERE c.feed_id = f.feed_id
+					  AND r.is_deleted = 0
+					  AND r.user_no &lt;&gt; f.user_no
+					  AND <include refid="notBlocked"><property name="ownerExpr" value="f.user_no"/><property name="actorExpr" value="r.user_no"/></include>
+				) x
+			) AS actor_count,
+			latest.content AS content,
+			CASE WHEN EXISTS (
+				SELECT 1
+				FROM ultary_feed_comment c
+				WHERE c.feed_id = f.feed_id
+				  AND c.is_deleted = 0
+				  AND c.user_no &lt;&gt; f.user_no
+				  AND <include refid="notBlocked"><property name="ownerExpr" value="f.user_no"/><property name="actorExpr" value="c.user_no"/></include>
+			) THEN 1 ELSE 0 END AS has_comment,
+			CASE WHEN EXISTS (
+				SELECT 1
+				FROM ultary_feed_reply r
+				INNER JOIN ultary_feed_comment c ON c.feed_comment_id = r.feed_comment_id AND c.is_deleted = 0
+				WHERE c.feed_id = f.feed_id
+				  AND r.is_deleted = 0
+				  AND r.user_no &lt;&gt; f.user_no
+				  AND <include refid="notBlocked"><property name="ownerExpr" value="f.user_no"/><property name="actorExpr" value="r.user_no"/></include>
+			) THEN 1 ELSE 0 END AS has_reply,
+			f.feed_id AS feed_id,
+			latest.feed_comment_id AS feed_comment_id,
+			latest.feed_reply_id AS feed_reply_id
+		FROM ultary_feed f
+		LEFT JOIN (
+			SELECT
+				e.feed_id,
+				e.user_no,
+				e.content,
+				e.feed_comment_id,
+				e.feed_reply_id
+			FROM (
+				SELECT
+					c.feed_id,
+					c.user_no,
+					c.content,
+					c.feed_comment_id,
+					NULL AS feed_reply_id,
+					c.created_at,
+					c.feed_comment_id AS sort_id
+				FROM ultary_feed_comment c
+				INNER JOIN ultary_feed owner_feed ON owner_feed.feed_id = c.feed_id
+				WHERE c.feed_id = #{feedId}
+				  AND c.is_deleted = 0
+				  AND c.user_no &lt;&gt; owner_feed.user_no
+				  AND <include refid="notBlocked"><property name="ownerExpr" value="owner_feed.user_no"/><property name="actorExpr" value="c.user_no"/></include>
+				UNION ALL
+				SELECT
+					c.feed_id,
+					r.user_no,
+					r.content,
+					c.feed_comment_id,
+					r.feed_reply_id,
+					r.created_at,
+					r.feed_reply_id AS sort_id
+				FROM ultary_feed_reply r
+				INNER JOIN ultary_feed_comment c ON c.feed_comment_id = r.feed_comment_id AND c.is_deleted = 0
+				INNER JOIN ultary_feed owner_feed ON owner_feed.feed_id = c.feed_id
+				WHERE c.feed_id = #{feedId}
+				  AND r.is_deleted = 0
+				  AND r.user_no &lt;&gt; owner_feed.user_no
+				  AND <include refid="notBlocked"><property name="ownerExpr" value="owner_feed.user_no"/><property name="actorExpr" value="r.user_no"/></include>
+			) e
+			ORDER BY e.created_at DESC, e.sort_id DESC
+			LIMIT 1
+		) latest ON latest.feed_id = f.feed_id
+		WHERE f.feed_id = #{feedId}
+		  AND f.is_deleted = 0
+	</select>
+
+	<select id="findCommentSource" resultType="me._hanho.ultary.domain.notification.model.NotificationDraft">
+		SELECT
+			c.user_no AS actor_user_no,
+			c.content AS content,
+			c.feed_id AS feed_id,
+			c.feed_comment_id AS feed_comment_id
+		FROM ultary_feed_comment c
+		INNER JOIN ultary_feed f ON f.feed_id = c.feed_id AND f.is_deleted = 0
+		WHERE c.feed_comment_id = #{commentId}
+		  AND c.is_deleted = 0
+	</select>
+
+	<select id="findReplySource" resultType="me._hanho.ultary.domain.notification.model.NotificationDraft">
+		SELECT
+			r.user_no AS actor_user_no,
+			r.content AS content,
+			c.feed_id AS feed_id,
+			c.feed_comment_id AS feed_comment_id,
+			r.feed_reply_id AS feed_reply_id
+		FROM ultary_feed_reply r
+		INNER JOIN ultary_feed_comment c ON c.feed_comment_id = r.feed_comment_id AND c.is_deleted = 0
+		INNER JOIN ultary_feed f ON f.feed_id = c.feed_id AND f.is_deleted = 0
+		WHERE r.feed_reply_id = #{replyId}
+		  AND r.is_deleted = 0
+	</select>
+
+	<select id="findFeedSource" resultType="me._hanho.ultary.domain.notification.model.NotificationDraft">
+		SELECT
+			f.user_no AS actor_user_no,
+			f.content AS content,
+			f.feed_id AS feed_id
+		FROM ultary_feed f
+		WHERE f.feed_id = #{feedId}
+		  AND f.is_deleted = 0
+	</select>
+
+	<select id="findStorySource" resultType="me._hanho.ultary.domain.notification.model.NotificationDraft">
+		SELECT
+			s.user_no AS actor_user_no,
+			COALESCE(
+				NULLIF(TRIM(s.caption), ''),
+				(
+					SELECT t.content
+					FROM ultary_story_text t
+					WHERE t.story_id = s.story_id
+					ORDER BY t.sort_order ASC, t.story_text_id ASC
+					LIMIT 1
+				)
+			) AS content,
+			s.story_id AS story_id
+		FROM ultary_story s
+		WHERE s.story_id = #{storyId}
+		  AND s.is_deleted = 0
+	</select>
+
+	<select id="findStoryLike" resultType="me._hanho.ultary.domain.notification.model.NotificationDraft">
+		SELECT
+			s.user_no AS receiver_user_no,
+			(
+				SELECT l.user_no
+				FROM ultary_story_like l
+				WHERE l.story_id = s.story_id
+				  AND l.is_deleted = 0
+				  AND l.user_no &lt;&gt; s.user_no
+				  AND <include refid="notBlocked"><property name="ownerExpr" value="s.user_no"/><property name="actorExpr" value="l.user_no"/></include>
+				ORDER BY l.created_at DESC, l.story_like_id DESC
+				LIMIT 1
+			) AS actor_user_no,
+			(
+				SELECT COUNT(DISTINCT l.user_no)
+				FROM ultary_story_like l
+				WHERE l.story_id = s.story_id
+				  AND l.is_deleted = 0
+				  AND l.user_no &lt;&gt; s.user_no
+				  AND <include refid="notBlocked"><property name="ownerExpr" value="s.user_no"/><property name="actorExpr" value="l.user_no"/></include>
+			) AS actor_count,
+			COALESCE(
+				NULLIF(TRIM(s.caption), ''),
+				(
+					SELECT t.content
+					FROM ultary_story_text t
+					WHERE t.story_id = s.story_id
+					ORDER BY t.sort_order ASC, t.story_text_id ASC
+					LIMIT 1
+				)
+			) AS content,
+			s.story_id AS story_id
+		FROM ultary_story s
+		WHERE s.story_id = #{storyId}
+		  AND s.is_deleted = 0
+	</select>
+
+	<select id="findNeighborRequest" resultType="me._hanho.ultary.domain.notification.model.NotificationDraft">
+		SELECT
+			n.receiver_user_no AS receiver_user_no,
+			n.requester_user_no AS actor_user_no,
+			1 AS actor_count,
+			n.neighbor_id AS neighbor_id
+		FROM ultary_neighbor n
+		INNER JOIN ultary_user u ON u.user_no = n.requester_user_no AND u.withdrawal_status = 'ACTIVE'
+		WHERE n.neighbor_id = #{neighborId}
+		  AND n.status = 'PENDING'
+	</select>
+
+	<select id="findFeedTagReceivers" resultType="long">
+		SELECT DISTINCT p.user_no
+		FROM (
+			SELECT mm.pet_id
+			FROM ultary_feed_media_mention mm
+			INNER JOIN ultary_feed_media m ON m.feed_media_id = mm.feed_media_id
+			WHERE m.feed_id = #{feedId}
+			UNION
+			SELECT fp.pet_id
+			FROM ultary_feed_pet fp
+			WHERE fp.feed_id = #{feedId}
+		) tagged
+		INNER JOIN ultary_pet p ON p.pet_id = tagged.pet_id AND p.is_deleted = 0
+		INNER JOIN ultary_user u ON u.user_no = p.user_no AND u.withdrawal_status = 'ACTIVE'
+		INNER JOIN ultary_feed f ON f.feed_id = #{feedId} AND f.is_deleted = 0
+		WHERE p.user_no &lt;&gt; f.user_no
+		  AND <include refid="notBlocked"><property name="ownerExpr" value="p.user_no"/><property name="actorExpr" value="f.user_no"/></include>
+	</select>
+
+	<select id="findStoryTagReceivers" resultType="long">
+		SELECT DISTINCT p.user_no
+		FROM ultary_story_mention sm
+		INNER JOIN ultary_pet p ON p.pet_id = sm.pet_id AND p.is_deleted = 0
+		INNER JOIN ultary_user u ON u.user_no = p.user_no AND u.withdrawal_status = 'ACTIVE'
+		INNER JOIN ultary_story s ON s.story_id = sm.story_id AND s.is_deleted = 0
+		WHERE sm.story_id = #{storyId}
+		  AND p.user_no &lt;&gt; s.user_no
+		  AND <include refid="notBlocked"><property name="ownerExpr" value="p.user_no"/><property name="actorExpr" value="s.user_no"/></include>
+	</select>
+
+	<select id="findCommentMentionReceivers" resultType="long">
+		SELECT DISTINCT t.receiver_user_no
+		FROM (
+			SELECT m.mentioned_user_no AS receiver_user_no
+			FROM ultary_feed_comment_mention m
+			WHERE m.feed_comment_id = #{commentId}
+			  AND m.mentioned_user_no IS NOT NULL
+			UNION
+			SELECT p.user_no
+			FROM ultary_feed_comment_mention m
+			INNER JOIN ultary_pet p ON p.pet_id = m.mentioned_pet_id AND p.is_deleted = 0
+			WHERE m.feed_comment_id = #{commentId}
+			  AND m.mentioned_pet_id IS NOT NULL
+		) t
+		INNER JOIN ultary_user u ON u.user_no = t.receiver_user_no AND u.withdrawal_status = 'ACTIVE'
+		INNER JOIN ultary_feed_comment c ON c.feed_comment_id = #{commentId} AND c.is_deleted = 0
+		WHERE t.receiver_user_no &lt;&gt; c.user_no
+		  AND <include refid="notBlocked"><property name="ownerExpr" value="t.receiver_user_no"/><property name="actorExpr" value="c.user_no"/></include>
+	</select>
+
+	<select id="findReplyMentionReceivers" resultType="long">
+		SELECT DISTINCT t.receiver_user_no
+		FROM (
+			SELECT m.mentioned_user_no AS receiver_user_no
+			FROM ultary_feed_comment_mention m
+			WHERE m.feed_reply_id = #{replyId}
+			  AND m.mentioned_user_no IS NOT NULL
+			UNION
+			SELECT p.user_no
+			FROM ultary_feed_comment_mention m
+			INNER JOIN ultary_pet p ON p.pet_id = m.mentioned_pet_id AND p.is_deleted = 0
+			WHERE m.feed_reply_id = #{replyId}
+			  AND m.mentioned_pet_id IS NOT NULL
+		) t
+		INNER JOIN ultary_user u ON u.user_no = t.receiver_user_no AND u.withdrawal_status = 'ACTIVE'
+		INNER JOIN ultary_feed_reply r ON r.feed_reply_id = #{replyId} AND r.is_deleted = 0
+		WHERE t.receiver_user_no &lt;&gt; r.user_no
+		  AND <include refid="notBlocked"><property name="ownerExpr" value="t.receiver_user_no"/><property name="actorExpr" value="r.user_no"/></include>
+	</select>
+
+	<select id="findByReceiver" resultType="me._hanho.ultary.domain.notification.model.NotificationListRow">
+		SELECT
+			n.notification_id,
+			n.type,
+			n.actor_user_no,
+			u.nickname AS actor_nickname,
+			n.actor_count,
+			n.has_comment,
+			n.has_reply,
+			n.content,
+			n.feed_id,
+			n.feed_comment_id,
+			n.feed_reply_id,
+			n.story_id,
+			n.neighbor_id,
+			nb.status AS neighbor_status,
+			n.is_read,
+			n.updated_at
+		FROM ultary_notification n
+		INNER JOIN ultary_user u ON u.user_no = n.actor_user_no AND u.withdrawal_status = 'ACTIVE'
+		LEFT JOIN ultary_neighbor nb ON nb.neighbor_id = n.neighbor_id
+		WHERE <include refid="visibleNotification"/>
+		ORDER BY n.updated_at DESC, n.notification_id DESC
+		LIMIT #{limit}
+	</select>
+
+	<select id="countUnread" resultType="int">
+		SELECT COUNT(1)
+		FROM ultary_notification n
+		WHERE <include refid="visibleNotification"/>
+		  AND n.is_read = 0
+	</select>
+
+	<select id="findByIdAndReceiver" resultType="me._hanho.ultary.domain.notification.model.NotificationListRow">
+		SELECT
+			n.notification_id,
+			n.type,
+			n.actor_user_no,
+			u.nickname AS actor_nickname,
+			n.actor_count,
+			n.has_comment,
+			n.has_reply,
+			n.content,
+			n.feed_id,
+			n.feed_comment_id,
+			n.feed_reply_id,
+			n.story_id,
+			n.neighbor_id,
+			nb.status AS neighbor_status,
+			n.is_read,
+			n.updated_at
+		FROM ultary_notification n
+		INNER JOIN ultary_user u ON u.user_no = n.actor_user_no AND u.withdrawal_status = 'ACTIVE'
+		LEFT JOIN ultary_neighbor nb ON nb.neighbor_id = n.neighbor_id
+		WHERE n.notification_id = #{notificationId}
+		  AND <include refid="visibleNotification"/>
+	</select>
+
+	<update id="markRead">
+		UPDATE ultary_notification
+		SET is_read = 1,
+			read_at = NOW()
+		WHERE notification_id = #{notificationId}
+		  AND receiver_user_no = #{userNo}
+		  AND is_read = 0
+	</update>
+
+	<update id="markAllRead">
+		UPDATE ultary_notification
+		SET is_read = 1,
+			read_at = NOW()
+		WHERE receiver_user_no = #{userNo}
+		  AND is_read = 0
+	</update>
+
+</mapper>

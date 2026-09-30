@@ -94,3 +94,20 @@ Content-Type: application/json
 ### 10. 최근 검색 모두 지우기
 DELETE {{baseUrl}}/api/v1/main/search/recent
 Authorization: Bearer {{accessToken}}
+
+### 11. 최근 펫 태그 20건 (스토리 @·사진 태그 모달. 검색 최근과 별도)
+GET {{baseUrl}}/api/v1/main/pet-tags/recent
+Authorization: Bearer {{accessToken}}
+
+### 12. 최근 펫 태그 저장 (멘션으로 펫을 고를 때. 같은 펫은 usedAt만 갱신)
+POST {{baseUrl}}/api/v1/main/pet-tags/recent
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "petId": 103
+}
+
+### 13. 최근 펫 태그 모두 지우기
+DELETE {{baseUrl}}/api/v1/main/pet-tags/recent
+Authorization: Bearer {{accessToken}}

@@ -26,7 +26,26 @@ Content-Type: application/json
 {
   "fileId": 130,
   "mediaType": "IMAGE",
-  "caption": "24시간 스토리"
+  "caption": "24시간 스토리",
+  "texts": [
+    {
+      "content": "안녕",
+      "fontSize": 16,
+      "bold": true,
+      "underline": false,
+      "strikethrough": false,
+      "color": "#FFFFFF",
+      "posX": 40,
+      "posY": 30
+    }
+  ],
+  "mentions": [
+    {
+      "petId": 101,
+      "posX": 55,
+      "posY": 70
+    }
+  ]
 }
 
 ### 2. 내 스토리 목록 (createdAt / expiresAt, viewedByMe)
@@ -53,4 +72,12 @@ Authorization: Bearer {{accessToken}}
 
 ### 6. 스토리 삭제
 DELETE {{baseUrl}}/api/v1/my-ultary/stories/{{storyId}}
+Authorization: Bearer {{accessToken}}
+
+### 7. 스토리 공감 (본인 또는 ACCEPTED 이웃. 본인 스토리면 알림 없음)
+POST {{baseUrl}}/api/v1/stories/{{storyId}}/like
+Authorization: Bearer {{accessToken}}
+
+### 8. 스토리 공감 취소
+DELETE {{baseUrl}}/api/v1/stories/{{storyId}}/like
 Authorization: Bearer {{accessToken}}

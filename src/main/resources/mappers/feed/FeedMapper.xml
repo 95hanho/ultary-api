@@ -148,6 +148,7 @@
 			f.deleted_by_user_no
 		FROM ultary_feed f
 		WHERE f.is_deleted = 0
+		  AND f.user_no &lt;&gt; #{userNo}
 		  AND (
 			EXISTS (
 				SELECT 1

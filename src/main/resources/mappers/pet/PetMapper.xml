@@ -171,9 +171,11 @@
 		INNER JOIN ultary_user u ON u.user_no = p.user_no
 			AND u.withdrawal_status = 'ACTIVE'
 		WHERE p.is_deleted = 0
+		  AND p.user_no != #{viewerUserNo}
 		  AND (
 			p.mention_id LIKE CONCAT('%', #{q}, '%')
 			OR p.name LIKE CONCAT('%', #{q}, '%')
+			OR u.nickname LIKE CONCAT('%', #{q}, '%')
 		  )
 		  AND NOT EXISTS (
 			SELECT 1

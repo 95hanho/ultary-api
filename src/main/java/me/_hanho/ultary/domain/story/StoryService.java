@@ -17,13 +17,22 @@ import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.exception.BusinessException;
 import me._hanho.ultary.common.exception.ErrorCode;
 import me._hanho.ultary.domain.file.FileService;
+import me._hanho.ultary.domain.notification.NotificationService;
+import me._hanho.ultary.domain.pet.PetMapper;
 import me._hanho.ultary.domain.pet.PetService;
+import me._hanho.ultary.domain.pet.model.Pet;
 import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
 import me._hanho.ultary.domain.file.model.FileMeta;
 import me._hanho.ultary.domain.story.dto.request.CreateStoryRequest;
+import me._hanho.ultary.domain.story.dto.response.StoryLikeResponse;
+import me._hanho.ultary.domain.story.dto.response.StoryMentionResponse;
 import me._hanho.ultary.domain.story.dto.response.StoryOwnerResponse;
 import me._hanho.ultary.domain.story.dto.response.StoryResponse;
+import me._hanho.ultary.domain.story.dto.response.StoryTextResponse;
 import me._hanho.ultary.domain.story.model.Story;
+import me._hanho.ultary.domain.story.model.StoryLike;
+import me._hanho.ultary.domain.story.model.StoryMentionRow;
+import me._hanho.ultary.domain.story.model.StoryText;
 import me._hanho.ultary.domain.story.model.StoryOwnerRow;
 import me._hanho.ultary.domain.user.UserMapper;
 import me._hanho.ultary.domain.user.model.User;
@@ -35,11 +44,14 @@ import me._hanho.ultary.security.principal.UserPrincipal;
 public class StoryService {
 
 	private static final Set<String> VIDEO_EXTENSIONS = Set.of("mp4", "webm", "mov");
+	private static final Set<Integer> FONT_SIZES = Set.of(12, 16, 20, 24);
 
 	private final StoryMapper storyMapper;
 	private final FileService fileService;
 	private final UserMapper userMapper;
 	private final PetService petService;
+	private final PetMapper petMapper;
+	private final NotificationService notificationService;
 
 	@Transactional
 	public StoryResponse create(UserPrincipal principal, CreateStoryRequest request) {
@@ -67,6 +79,8 @@ public class StoryService {
 		story.setDurationSec(durationSec);
 		story.setCaption(blankToNull(request.getCaption()));
 		storyMapper.insert(story);
+		insertOverlays(story.getStoryId(), principal.getUserNo(), request);
+		notificationService.syncStoryTags(story.getStoryId());
 		log.info("[create] storyId={} userNo={} mediaType={}",
 				story.getStoryId(), principal.getUserNo(), mediaType);
 		return toResponse(requireActive(story.getStoryId()), principal.getUserNo());
@@ -78,6 +92,7 @@ public class StoryService {
 		if (deleted == 0) {
 			throw new BusinessException(ErrorCode.STORY_NOT_FOUND);
 		}
+		notificationService.removeByStory(storyId);
 		log.info("[delete] storyId={} userNo={}", storyId, principal.getUserNo());
 	}
 
@@ -147,6 +162,44 @@ public class StoryService {
 		return toResponse(story, principal.getUserNo());
 	}
 
+	@Transactional
+	public StoryLikeResponse like(UserPrincipal principal, Long storyId) {
+		Story story = requireActive(storyId);
+		assertCanViewOwnerStories(principal.getUserNo(), story.getUserNo());
+		StoryLike existing = storyMapper.findLike(storyId, principal.getUserNo());
+		boolean changed = false;
+		if (existing == null) {
+			storyMapper.insertLike(storyId, principal.getUserNo());
+			changed = true;
+		} else if (Boolean.TRUE.equals(existing.getIsDeleted())) {
+			changed = storyMapper.restoreLike(storyId, principal.getUserNo()) > 0;
+		}
+		if (changed) {
+			notificationService.syncStoryLike(storyId, true);
+		}
+		log.info("[like] storyId={} userNo={}", storyId, principal.getUserNo());
+		return toLikeResponse(storyId, principal.getUserNo());
+	}
+
+	@Transactional
+	public StoryLikeResponse unlike(UserPrincipal principal, Long storyId) {
+		Story story = requireActive(storyId);
+		assertCanViewOwnerStories(principal.getUserNo(), story.getUserNo());
+		if (storyMapper.softDeleteLike(storyId, principal.getUserNo()) > 0) {
+			notificationService.syncStoryLike(storyId, false);
+		}
+		log.info("[unlike] storyId={} userNo={}", storyId, principal.getUserNo());
+		return toLikeResponse(storyId, principal.getUserNo());
+	}
+
+	private StoryLikeResponse toLikeResponse(Long storyId, Long userNo) {
+		return StoryLikeResponse.builder()
+				.storyId(storyId)
+				.likeCount(storyMapper.countActiveLikes(storyId))
+				.likedByMe(storyMapper.countActiveLikeByUser(storyId, userNo) > 0)
+				.build();
+	}
+
 	private void assertCanViewOwnerStories(Long viewerUserNo, Long ownerUserNo) {
 		if (viewerUserNo.equals(ownerUserNo)) {
 			return;
@@ -197,6 +250,8 @@ public class StoryService {
 						: files.get(story.getThumbnailFileId()))
 				.durationSec(story.getDurationSec())
 				.caption(story.getCaption())
+				.texts(toTextResponses(storyMapper.findTextsByStoryId(story.getStoryId())))
+				.mentions(toMentionResponses(storyMapper.findMentionsByStoryId(story.getStoryId())))
 				.createdAt(story.getCreatedAt())
 				.expiresAt(story.getExpiresAt())
 				.viewedByMe(viewedByMe)
@@ -213,6 +268,85 @@ public class StoryService {
 			return "VIDEO";
 		}
 		return "IMAGE";
+	}
+
+	private void insertOverlays(Long storyId, Long userNo, CreateStoryRequest request) {
+		List<CreateStoryRequest.TextItem> texts = request.getTexts() == null ? List.of() : request.getTexts();
+		int textOrder = 0;
+		for (CreateStoryRequest.TextItem item : texts) {
+			int fontSize = item.getFontSize() == null ? 16 : item.getFontSize();
+			if (!FONT_SIZES.contains(fontSize)) {
+				throw new BusinessException(ErrorCode.INVALID_INPUT, "글자 크기는 12, 16, 20, 24만 가능합니다.");
+			}
+			StoryText row = new StoryText();
+			row.setStoryId(storyId);
+			row.setContent(item.getContent().trim());
+			row.setFontSize(fontSize);
+			row.setBold(Boolean.TRUE.equals(item.getBold()));
+			row.setUnderline(Boolean.TRUE.equals(item.getUnderline()));
+			row.setStrikethrough(Boolean.TRUE.equals(item.getStrikethrough()));
+			row.setColor(item.getColor().toUpperCase(Locale.ROOT));
+			row.setPosX(item.getPosX());
+			row.setPosY(item.getPosY());
+			row.setSortOrder(textOrder++);
+			storyMapper.insertText(row);
+		}
+
+		List<CreateStoryRequest.MentionItem> mentions = request.getMentions() == null ? List.of() : request.getMentions();
+		int mentionOrder = 0;
+		for (CreateStoryRequest.MentionItem item : mentions) {
+			Pet pet = petMapper.findActiveByPetId(item.getPetId());
+			if (pet == null) {
+				throw new BusinessException(ErrorCode.PET_NOT_FOUND);
+			}
+			StoryMentionRow row = new StoryMentionRow();
+			row.setStoryId(storyId);
+			row.setPetId(item.getPetId());
+			row.setPosX(item.getPosX());
+			row.setPosY(item.getPosY());
+			row.setSortOrder(mentionOrder++);
+			row.setAddedByUserNo(userNo);
+			storyMapper.insertMention(row);
+		}
+	}
+
+	private List<StoryTextResponse> toTextResponses(List<StoryText> rows) {
+		if (rows == null || rows.isEmpty()) {
+			return List.of();
+		}
+		List<StoryTextResponse> result = new ArrayList<>();
+		for (StoryText row : rows) {
+			result.add(StoryTextResponse.builder()
+					.storyTextId(row.getStoryTextId())
+					.content(row.getContent())
+					.fontSize(row.getFontSize())
+					.bold(Boolean.TRUE.equals(row.getBold()))
+					.underline(Boolean.TRUE.equals(row.getUnderline()))
+					.strikethrough(Boolean.TRUE.equals(row.getStrikethrough()))
+					.color(row.getColor())
+					.posX(row.getPosX())
+					.posY(row.getPosY())
+					.build());
+		}
+		return result;
+	}
+
+	private List<StoryMentionResponse> toMentionResponses(List<StoryMentionRow> rows) {
+		if (rows == null || rows.isEmpty()) {
+			return List.of();
+		}
+		List<StoryMentionResponse> result = new ArrayList<>();
+		for (StoryMentionRow row : rows) {
+			result.add(StoryMentionResponse.builder()
+					.storyMentionId(row.getStoryMentionId())
+					.petId(row.getPetId())
+					.mentionId(row.getMentionId())
+					.petName(row.getPetName())
+					.posX(row.getPosX())
+					.posY(row.getPosY())
+					.build());
+		}
+		return result;
 	}
 
 	private static String blankToNull(String value) {

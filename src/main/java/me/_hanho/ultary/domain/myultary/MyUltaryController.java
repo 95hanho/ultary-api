@@ -70,7 +70,7 @@ public class MyUltaryController {
 		return ApiResponse.ok(myUltaryService.getSavedFeeds(principal, limit), "저장한 게시글 조회 성공");
 	}
 
-	/** 내 펫이 COLLABORATOR이거나 사진 @멘션된 게시글 */
+	/** 다른 사람이 내 펫을 COLLABORATOR로 넣거나 사진에 @멘션한 글. 내 글은 제외 */
 	@GetMapping("/tagged-feeds")
 	public ApiResponse<List<FeedGridItemResponse>> taggedFeeds(
 			@AuthenticationPrincipal UserPrincipal principal,

@@ -1,6 +1,7 @@
 package me._hanho.ultary.domain.story.dto.response;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import lombok.Builder;
 import lombok.Getter;
@@ -22,6 +23,8 @@ public class StoryResponse {
 	private FileSummaryResponse thumbnailFile;
 	private Integer durationSec;
 	private String caption;
+	private List<StoryTextResponse> texts;
+	private List<StoryMentionResponse> mentions;
 	private LocalDateTime createdAt;
 	private LocalDateTime expiresAt;
 	/**
