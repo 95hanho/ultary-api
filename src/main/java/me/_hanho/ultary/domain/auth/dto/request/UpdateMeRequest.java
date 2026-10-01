@@ -22,4 +22,10 @@ public class UpdateMeRequest {
 
 	@Size(max = 30, message = "시/군/구는 30자 이하여야 합니다.")
 	private String regionSigungu;
+
+	/** 번호가 바뀔 때만. 인증 완료 토큰의 번호와 같아야 한다. */
+	private String phone;
+
+	/** phone 이 기존 번호와 다를 때 필수 */
+	private String phoneAuthCompleteToken;
 }
