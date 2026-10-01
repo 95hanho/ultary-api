@@ -37,3 +37,8 @@ Content-Type: application/json
 # FE: development에서만 호출. 응답 deletedCount = 지운 ultary_story_view 행 수
 DELETE {{baseUrl}}/api/v1/test/story-views
 Authorization: Bearer {{accessToken}}
+
+### 3. 닉네임 변경 쿨다운 초기화 (local + Bearer)
+# nickname_changed_at = 올해 1월 1일 00:00. 7일이 지난 것으로 봐서 PATCH /auth/me/nickname 가능
+POST {{baseUrl}}/api/v1/test/nickname-cooldown
+Authorization: Bearer {{accessToken}}

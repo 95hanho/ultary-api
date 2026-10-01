@@ -1,5 +1,6 @@
 package me._hanho.ultary.domain.user;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 
@@ -39,6 +40,11 @@ public interface UserMapper {
 	int updateNickname(
 			@Param("userNo") Long userNo,
 			@Param("nickname") String nickname);
+
+	/** local 테스트: 닉네임 쿨다운 기준 시각만 바꾼다 */
+	int updateNicknameChangedAt(
+			@Param("userNo") Long userNo,
+			@Param("nicknameChangedAt") LocalDateTime nicknameChangedAt);
 
 	int updatePassword(
 			@Param("userNo") Long userNo,

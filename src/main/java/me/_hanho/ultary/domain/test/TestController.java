@@ -1,5 +1,7 @@
 package me._hanho.ultary.domain.test;
 
+import java.time.LocalDateTime;
+
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -18,8 +20,10 @@ import me._hanho.ultary.common.exception.ErrorCode;
 import me._hanho.ultary.common.response.ApiResponse;
 import me._hanho.ultary.domain.story.StoryMapper;
 import me._hanho.ultary.domain.test.dto.request.PasswordEncodeRequest;
+import me._hanho.ultary.domain.test.dto.response.NicknameCooldownResetResponse;
 import me._hanho.ultary.domain.test.dto.response.PasswordEncodeResponse;
 import me._hanho.ultary.domain.test.dto.response.StoryViewResetResponse;
+import me._hanho.ultary.domain.user.UserMapper;
 import me._hanho.ultary.security.principal.UserPrincipal;
 
 /**
@@ -36,6 +40,7 @@ public class TestController {
 
 	private final PasswordEncoder passwordEncoder;
 	private final StoryMapper storyMapper;
+	private final UserMapper userMapper;
 
 	@PostMapping("/password/encode")
 	public ApiResponse<PasswordEncodeResponse> encodePassword(
@@ -63,5 +68,26 @@ public class TestController {
 				.viewerUserNo(principal.getUserNo())
 				.deletedCount(deleted)
 				.build(), "스토리 읽음 초기화 성공");
+	}
+
+	/**
+	 * 로그인 유저의 {@code nickname_changed_at}을 올해 1월 1일로 되돌려 7일 쿨다운을 푼다.
+	 */
+	@PostMapping("/nickname-cooldown")
+	public ApiResponse<NicknameCooldownResetResponse> resetNicknameCooldown(
+			@AuthenticationPrincipal UserPrincipal principal) {
+		if (principal == null) {
+			throw new BusinessException(ErrorCode.UNAUTHORIZED);
+		}
+		LocalDateTime changedAt = LocalDateTime.of(LocalDateTime.now().getYear(), 1, 1, 0, 0);
+		int updated = userMapper.updateNicknameChangedAt(principal.getUserNo(), changedAt);
+		if (updated == 0) {
+			throw new BusinessException(ErrorCode.UNAUTHORIZED);
+		}
+		log.info("[resetNicknameCooldown] userNo={} nicknameChangedAt={}", principal.getUserNo(), changedAt);
+		return ApiResponse.ok(NicknameCooldownResetResponse.builder()
+				.userNo(principal.getUserNo())
+				.nicknameChangedAt(changedAt)
+				.build(), "닉네임 변경 기간 초기화 성공");
 	}
 }

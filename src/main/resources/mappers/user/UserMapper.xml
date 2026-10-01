@@ -135,6 +135,13 @@
 		  AND withdrawal_status = 'ACTIVE'
 	</update>
 
+	<update id="updateNicknameChangedAt">
+		UPDATE ultary_user
+		SET nickname_changed_at = #{nicknameChangedAt}
+		WHERE user_no = #{userNo}
+		  AND withdrawal_status = 'ACTIVE'
+	</update>
+
 	<update id="updatePassword">
 		UPDATE ultary_user
 		SET password = #{password}
