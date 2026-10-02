@@ -24,6 +24,7 @@ public enum ErrorCode {
 	// 인증 (auth)
 	// ==============================
 	LOGIN_FAILED("LOGIN_FAILED", "이메일/휴대폰 또는 비밀번호가 올바르지 않습니다.", HttpStatus.UNAUTHORIZED),
+	ACCOUNT_WITHDRAWN("ACCOUNT_WITHDRAWN", "탈퇴된 계정입니다.", HttpStatus.FORBIDDEN),
 	USER_INACTIVE("USER_INACTIVE", "이용할 수 없는 계정입니다.", HttpStatus.FORBIDDEN),
 	TOKEN_EXPIRED("TOKEN_EXPIRED", "토큰이 만료되었습니다.", HttpStatus.UNAUTHORIZED),
 	INVALID_TOKEN("INVALID_TOKEN", "유효하지 않은 토큰입니다.", HttpStatus.UNAUTHORIZED),
@@ -88,6 +89,10 @@ public enum ErrorCode {
 	NEIGHBOR_PENDING_RECEIVED("NEIGHBOR_PENDING_RECEIVED", "상대가 이미 주민 요청을 보냈습니다. 수락해 주세요.", HttpStatus.CONFLICT),
 	NEIGHBOR_SELF("NEIGHBOR_SELF", "자기 자신에게는 요청할 수 없습니다.", HttpStatus.BAD_REQUEST),
 	NEIGHBOR_BLOCKED("NEIGHBOR_BLOCKED", "차단된 사용자와는 주민 요청을 할 수 없습니다.", HttpStatus.FORBIDDEN),
+	NEIGHBOR_REQUEST_CLOSED("NEIGHBOR_REQUEST_CLOSED", "이웃 신청을 받지 않는 계정입니다.", HttpStatus.FORBIDDEN),
+	COMMENT_NOT_ALLOWED("COMMENT_NOT_ALLOWED", "댓글을 허용하지 않는 게시글입니다.", HttpStatus.FORBIDDEN),
+	MENTION_NOT_ALLOWED("MENTION_NOT_ALLOWED", "멘션을 허용하지 않는 계정입니다.", HttpStatus.FORBIDDEN),
+	TAG_NOT_ALLOWED("TAG_NOT_ALLOWED", "태그를 허용하지 않는 계정입니다.", HttpStatus.FORBIDDEN),
 	USER_BLOCKED("USER_BLOCKED", "차단된 사용자입니다.", HttpStatus.FORBIDDEN),
 	USER_ALREADY_BLOCKED("USER_ALREADY_BLOCKED", "이미 차단한 사용자입니다.", HttpStatus.CONFLICT),
 	USER_NOT_BLOCKED("USER_NOT_BLOCKED", "차단하지 않은 사용자입니다.", HttpStatus.NOT_FOUND),
@@ -104,6 +109,13 @@ public enum ErrorCode {
 	// 알림 (notification)
 	// ==============================
 	NOTIFICATION_NOT_FOUND("NOTIFICATION_NOT_FOUND", "알림을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
+
+	// ==============================
+	// 메시지 (dm)
+	// ==============================
+	DM_ROOM_NOT_FOUND("DM_ROOM_NOT_FOUND", "대화방을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
+	DM_NOT_NEIGHBOR("DM_NOT_NEIGHBOR", "주민 또는 이웃에게만 메시지를 보낼 수 있습니다.", HttpStatus.FORBIDDEN),
+	DM_SELF("DM_SELF", "자기 자신에게는 메시지를 보낼 수 없습니다.", HttpStatus.BAD_REQUEST),
 
 	// ==============================
 	// 신고 (report)

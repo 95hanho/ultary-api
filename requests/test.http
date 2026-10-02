@@ -42,3 +42,9 @@ Authorization: Bearer {{accessToken}}
 # nickname_changed_at = 올해 1월 1일 00:00. 7일이 지난 것으로 봐서 PATCH /auth/me/nickname 가능
 POST {{baseUrl}}/api/v1/test/nickname-cooldown
 Authorization: Bearer {{accessToken}}
+
+### 4. 펫 멘션 ID 변경 쿨다운 초기화 (local + Bearer)
+# mention_id_changed_at = 올해 1월 1일 00:00. 30일이 지난 것으로 봐서 PATCH /pets/{petId}/mention-id 가능
+# 시드 user 101 펫: 101. 화면의 펫 id로 바꿔 호출
+POST {{baseUrl}}/api/v1/test/pets/101/mention-id-cooldown
+Authorization: Bearer {{accessToken}}

@@ -32,4 +32,6 @@ public class StoryResponse {
 	 * 본인 스토리도 읽음 기록이 있을 때만 true. FE는 목록에서 첫 false부터 재생, 없으면 처음부터.
 	 */
 	private Boolean viewedByMe;
+	/** 현재 조회자가 이 스토리에 공감했는지 ({@code ultary_story_like}, 취소 제외) */
+	private Boolean likedByMe;
 }

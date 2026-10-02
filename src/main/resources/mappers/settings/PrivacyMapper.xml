@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="me._hanho.ultary.domain.settings.PrivacyMapper">
+
+	<select id="findByUserNo" resultType="me._hanho.ultary.domain.settings.model.UserPrivacy">
+		SELECT
+			user_no,
+			private_account,
+			feed_visibility,
+			story_visibility,
+			neighbor_request,
+			allow_comment,
+			allow_mention,
+			allow_tag
+		FROM ultary_user_privacy
+		WHERE user_no = #{userNo}
+	</select>
+
+	<insert id="upsert">
+		INSERT INTO ultary_user_privacy (
+			user_no,
+			private_account,
+			feed_visibility,
+			story_visibility,
+			neighbor_request,
+			allow_comment,
+			allow_mention,
+			allow_tag
+		) VALUES (
+			#{userNo},
+			#{privateAccount},
+			#{feedVisibility},
+			#{storyVisibility},
+			#{neighborRequest},
+			#{allowComment},
+			#{allowMention},
+			#{allowTag}
+		)
+		ON DUPLICATE KEY UPDATE
+			private_account = VALUES(private_account),
+			feed_visibility = VALUES(feed_visibility),
+			story_visibility = VALUES(story_visibility),
+			neighbor_request = VALUES(neighbor_request),
+			allow_comment = VALUES(allow_comment),
+			allow_mention = VALUES(allow_mention),
+			allow_tag = VALUES(allow_tag)
+	</insert>
+
+</mapper>

@@ -16,7 +16,11 @@ Content-Type: application/json
   "name": "한호"
 }
 
-### 1. 알림 목록 (unreadCount, items)
+### 1. 안 읽은 알림 수 (하단 배지. 읽음 처리 없음)
+GET {{baseUrl}}/api/v1/notifications/unread-count
+Authorization: Bearer {{accessToken}}
+
+### 1b. 알림 목록 (페이지 진입. 조회 후 그때까지 안 읽은 알림을 읽음 처리)
 GET {{baseUrl}}/api/v1/notifications?limit=30
 Authorization: Bearer {{accessToken}}
 
@@ -27,3 +31,16 @@ Authorization: Bearer {{accessToken}}
 ### 3. 전체 읽음
 POST {{baseUrl}}/api/v1/notifications/read-all
 Authorization: Bearer {{accessToken}}
+
+### 4. 알림 설정 조회 (없으면 전부 true)
+GET {{baseUrl}}/api/v1/settings/notifications
+Authorization: Bearer {{accessToken}}
+
+### 5. 알림 설정 변경 (넣은 필드만)
+PATCH {{baseUrl}}/api/v1/settings/notifications
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "likePost": false
+}

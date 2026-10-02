@@ -92,8 +92,14 @@ public class AuthService {
 		User user;
 
 		if (linked != null) {
-			user = userMapper.findActiveByUserNo(linked.getUserNo());
+			user = userMapper.findByUserNo(linked.getUserNo());
 			if (user == null) {
+				throw new BusinessException(ErrorCode.USER_INACTIVE);
+			}
+			if ("WITHDRAWN".equals(user.getWithdrawalStatus())) {
+				throw new BusinessException(ErrorCode.ACCOUNT_WITHDRAWN);
+			}
+			if (!"ACTIVE".equals(user.getWithdrawalStatus())) {
 				throw new BusinessException(ErrorCode.USER_INACTIVE);
 			}
 		} else {
@@ -169,6 +175,9 @@ public class AuthService {
 	public TokenResponse login(LoginRequest request, HttpServletRequest httpRequest) {
 		User user = resolveLoginUser(request);
 
+		if (user != null && "WITHDRAWN".equals(user.getWithdrawalStatus())) {
+			throw new BusinessException(ErrorCode.ACCOUNT_WITHDRAWN);
+		}
 		if (user == null
 				|| !StringUtils.hasText(user.getPassword())
 				|| !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
@@ -246,9 +255,38 @@ public class AuthService {
 		if (request.getRegionSigungu() != null) {
 			user.setRegionSigungu(request.getRegionSigungu());
 		}
+		applyPhoneChange(user, request);
 
 		userMapper.updateProfile(user);
 		return toMeResponse(userMapper.findActiveByUserNo(user.getUserNo()));
+	}
+
+	/** 번호가 기존과 다를 때만 인증 완료 토큰의 번호와 맞는지 보고 저장한다. */
+	private void applyPhoneChange(User user, UpdateMeRequest request) {
+		if (request.getPhone() == null) {
+			return;
+		}
+		String nextPhone = PhoneRules.normalize(request.getPhone());
+		String currentPhone = PhoneRules.normalize(user.getPhone());
+		if (nextPhone.equals(currentPhone == null ? "" : currentPhone)) {
+			return;
+		}
+		if (!PhoneRules.isValid(nextPhone)) {
+			throw new BusinessException(ErrorCode.INVALID_INPUT, PhoneRules.MESSAGE);
+		}
+		if (!StringUtils.hasText(request.getPhoneAuthCompleteToken())) {
+			throw new BusinessException(ErrorCode.PHONE_AUTH_FAILED);
+		}
+		Claims claims = jwtTokenProvider.parsePhoneAuthCompleteToken(request.getPhoneAuthCompleteToken());
+		String tokenPhone = PhoneRules.normalize(jwtTokenProvider.getPhone(claims));
+		if (tokenPhone == null || !nextPhone.equals(tokenPhone)) {
+			throw new BusinessException(ErrorCode.PHONE_AUTH_FAILED);
+		}
+		User owner = userMapper.findByPhone(nextPhone);
+		if (owner != null && !owner.getUserNo().equals(user.getUserNo())) {
+			throw new BusinessException(ErrorCode.PHONE_ALREADY_USED);
+		}
+		user.setPhone(nextPhone);
 	}
 
 	@Transactional(readOnly = true)
@@ -331,8 +369,9 @@ public class AuthService {
 		return AvailabilityCheckResponse.builder().available(available).build();
 	}
 
-	public PhoneAuthResponse requestPhoneAuth(PhoneAuthRequest request) {
+	public PhoneAuthResponse requestPhoneAuth(UserPrincipal principal, PhoneAuthRequest request) {
 		String phone = PhoneRules.normalize(request.getPhone());
+		assertPhoneAvailableForSend(phone, request.getPurpose(), principal);
 		String code = String.format("%06d", secureRandom.nextInt(1_000_000));
 		long ttlSeconds = jwtProperties.getExpiration().getPhoneauth();
 
@@ -342,6 +381,33 @@ public class AuthService {
 
 		String phoneAuthToken = jwtTokenProvider.createPhoneAuthToken(phone);
 		return PhoneAuthResponse.builder().phoneAuthToken(phoneAuthToken).build();
+	}
+
+	/**
+	 * 인증번호 발송 전에 번호를 검사한다.
+	 * 회원가입은 이미 쓰면 거절. 회원정보 변경은 다른 사람 번호만 거절. 비밀번호 재설정은 통과.
+	 */
+	private void assertPhoneAvailableForSend(String phone, String purpose, UserPrincipal principal) {
+		if ("PASSWORD".equals(purpose)) {
+			return;
+		}
+		if (purpose != null && !purpose.isEmpty()
+				&& !"SIGNUP".equals(purpose) && !"PROFILE".equals(purpose)) {
+			throw new BusinessException(ErrorCode.INVALID_INPUT, "휴대폰 인증 용도가 올바르지 않습니다.");
+		}
+		User owner = userMapper.findByPhone(phone);
+		if (owner == null) {
+			return;
+		}
+		if ("PROFILE".equals(purpose)) {
+			if (principal == null) {
+				throw new BusinessException(ErrorCode.UNAUTHORIZED);
+			}
+			if (owner.getUserNo().equals(principal.getUserNo())) {
+				return;
+			}
+		}
+		throw new BusinessException(ErrorCode.PHONE_ALREADY_USED);
 	}
 
 	public PhoneVerifyResponse verifyPhoneAuth(PhoneVerifyRequest request) {
@@ -482,7 +548,7 @@ public class AuthService {
 
 	private User resolveLoginUser(LoginRequest request) {
 		if (StringUtils.hasText(request.getEmail())) {
-			return userMapper.findByEmail(request.getEmail().trim());
+			return userMapper.findByEmailForLogin(request.getEmail().trim());
 		}
 		if (StringUtils.hasText(request.getPhone())) {
 			String raw = request.getPhone();
@@ -493,7 +559,7 @@ public class AuthService {
 			if (!PhoneRules.isValid(phone)) {
 				return null;
 			}
-			return userMapper.findByPhone(phone);
+			return userMapper.findByPhoneForLogin(phone);
 		}
 		return null;
 	}

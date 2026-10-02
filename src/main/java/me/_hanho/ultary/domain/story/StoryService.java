@@ -19,6 +19,7 @@ import me._hanho.ultary.common.exception.ErrorCode;
 import me._hanho.ultary.domain.file.FileService;
 import me._hanho.ultary.domain.notification.NotificationService;
 import me._hanho.ultary.domain.pet.PetMapper;
+import me._hanho.ultary.domain.settings.PrivacyService;
 import me._hanho.ultary.domain.pet.PetService;
 import me._hanho.ultary.domain.pet.model.Pet;
 import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
@@ -52,6 +53,7 @@ public class StoryService {
 	private final PetService petService;
 	private final PetMapper petMapper;
 	private final NotificationService notificationService;
+	private final PrivacyService privacyService;
 
 	@Transactional
 	public StoryResponse create(UserPrincipal principal, CreateStoryRequest request) {
@@ -106,6 +108,25 @@ public class StoryService {
 	@Transactional(readOnly = true)
 	public boolean hasActiveStory(Long userNo) {
 		return storyMapper.countActiveByUserNo(userNo) > 0;
+	}
+
+	/** 조회자가 그 사람 스토리를 볼 수 있을 때만 true */
+	@Transactional(readOnly = true)
+	public boolean hasVisibleStory(Long viewerUserNo, Long ownerUserNo) {
+		if (ownerUserNo == null || !hasActiveStory(ownerUserNo)) {
+			return false;
+		}
+		if (viewerUserNo != null && viewerUserNo.equals(ownerUserNo)) {
+			return true;
+		}
+		String audience = privacyService.storyAudience(ownerUserNo);
+		if ("PRIVATE".equals(audience)) {
+			return false;
+		}
+		if ("PUBLIC".equals(audience)) {
+			return true;
+		}
+		return viewerUserNo != null && storyMapper.countAcceptedNeighborPair(viewerUserNo, ownerUserNo) > 0;
 	}
 
 	/** 조회자 기준. 활성 스토리 중 안 읽은 것이 1개라도 있으면 true. 스토리가 없으면 false */
@@ -200,11 +221,22 @@ public class StoryService {
 				.build();
 	}
 
+	/** DM으로 스토리를 공유할 때 보낸 사람이 그 스토리를 볼 수 있는지 */
+	public void assertViewable(Long storyId, Long viewerUserNo) {
+		Story story = requireActive(storyId);
+		assertCanViewOwnerStories(viewerUserNo, story.getUserNo());
+	}
+
 	private void assertCanViewOwnerStories(Long viewerUserNo, Long ownerUserNo) {
 		if (viewerUserNo.equals(ownerUserNo)) {
 			return;
 		}
-		if (storyMapper.countAcceptedNeighborPair(viewerUserNo, ownerUserNo) == 0) {
+		String audience = privacyService.storyAudience(ownerUserNo);
+		if ("PUBLIC".equals(audience)) {
+			return;
+		}
+		if ("PRIVATE".equals(audience)
+				|| storyMapper.countAcceptedNeighborPair(viewerUserNo, ownerUserNo) == 0) {
 			throw new BusinessException(ErrorCode.STORY_FORBIDDEN);
 		}
 	}
@@ -221,6 +253,7 @@ public class StoryService {
 	private StoryResponse toResponse(Story story, Long viewerUserNo) {
 		User author = userMapper.findActiveByUserNo(story.getUserNo());
 		boolean viewedByMe = storyMapper.countView(story.getStoryId(), viewerUserNo) > 0;
+		boolean likedByMe = storyMapper.countActiveLikeByUser(story.getStoryId(), viewerUserNo) > 0;
 		Set<Long> fileIds = new HashSet<>();
 		fileIds.add(story.getFileId());
 		if (story.getThumbnailFileId() != null) {
@@ -255,6 +288,7 @@ public class StoryService {
 				.createdAt(story.getCreatedAt())
 				.expiresAt(story.getExpiresAt())
 				.viewedByMe(viewedByMe)
+				.likedByMe(likedByMe)
 				.build();
 	}
 
@@ -299,6 +333,7 @@ public class StoryService {
 			if (pet == null) {
 				throw new BusinessException(ErrorCode.PET_NOT_FOUND);
 			}
+			privacyService.assertTagAllowed(userNo, pet.getUserNo());
 			StoryMentionRow row = new StoryMentionRow();
 			row.setStoryId(storyId);
 			row.setPetId(item.getPetId());

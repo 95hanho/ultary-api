@@ -14,11 +14,19 @@ public interface UserMapper {
 
 	User findActiveByUserNo(@Param("userNo") Long userNo);
 
+	/** 탈퇴 포함. 로그인에서 탈퇴 계정을 구분할 때 */
+	User findByUserNo(@Param("userNo") Long userNo);
+
 	List<User> findActiveByUserNos(@Param("userNos") Collection<Long> userNos);
 
 	User findByPhone(@Param("phone") String phone);
 
 	User findByEmail(@Param("email") String email);
+
+	/** 탈퇴 계정 포함. 비밀번호 로그인 식별용 */
+	User findByPhoneForLogin(@Param("phone") String phone);
+
+	User findByEmailForLogin(@Param("email") String email);
 
 	int countByNickname(
 			@Param("nickname") String nickname,

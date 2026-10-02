@@ -14,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.response.ApiResponse;
 import me._hanho.ultary.domain.notification.dto.response.NotificationItemResponse;
 import me._hanho.ultary.domain.notification.dto.response.NotificationListResponse;
+import me._hanho.ultary.domain.notification.dto.response.NotificationUnreadCountResponse;
 import me._hanho.ultary.security.principal.UserPrincipal;
 
 /** 경로 원본: springEndpoints.notifications / api-memo.md §10 */
@@ -24,6 +25,14 @@ import me._hanho.ultary.security.principal.UserPrincipal;
 public class NotificationController {
 
 	private final NotificationService notificationService;
+
+	/** 하단 공통 배지. /auth/me 에 넣지 않는다. 나중에 웹소켓이 이 숫자를 밀어 준다 */
+	@GetMapping("/unread-count")
+	public ApiResponse<NotificationUnreadCountResponse> unreadCount(
+			@AuthenticationPrincipal UserPrincipal principal) {
+		log.info("[unreadCount] userNo={}", principal.getUserNo());
+		return ApiResponse.ok(notificationService.unreadCount(principal), "안 읽은 알림 수 조회 성공");
+	}
 
 	@GetMapping
 	public ApiResponse<NotificationListResponse> list(

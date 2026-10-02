@@ -64,6 +64,30 @@
 		WHERE user_block_id = #{userBlockId}
 	</update>
 
+	<select id="findBlockedUsers" resultType="me._hanho.ultary.domain.neighbor.model.BlockedUserRow">
+		SELECT
+			u.user_no AS userNo,
+			u.nickname AS nickname,
+			(
+				SELECT rp.profile_file_id
+				FROM ultary_pet rp
+				WHERE rp.user_no = u.user_no
+				  AND rp.is_deleted = 0
+				  AND rp.profile_file_id IS NOT NULL
+				ORDER BY rp.priority ASC, rp.pet_id ASC
+				LIMIT 1
+			) AS profileFileId,
+			b.created_at AS blockedAt
+		FROM ultary_user_block b
+		INNER JOIN ultary_user u
+			ON u.user_no = b.blocked_user_no
+		   AND u.withdrawal_status = 'ACTIVE'
+		WHERE b.blocker_user_no = #{blockerUserNo}
+		  AND b.is_deleted = 0
+		ORDER BY b.created_at DESC, b.user_block_id DESC
+		LIMIT #{limit}
+	</select>
+
 	<update id="softDelete">
 		UPDATE ultary_user_block
 		SET is_deleted = 1,

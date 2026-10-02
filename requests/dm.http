@@ -1,0 +1,71 @@
+@baseUrl = http://localhost:9377
+@accessToken = {{socialLogin.response.body.$.data.accessToken}}
+@dmRoomId = {{createRoom.response.body.$.data.dmRoomId}}
+
+# 로그인: user 101 (google-myultary-test-001)
+# 시드: 101의 주민 102·103, 이웃 105. 게시글 102의 두 번째 사진 feed_media 104. 스토리 102는 102의 사진.
+# 채팅 상대 목록은 requests/neighbor.http 3a(주민) · 3b(이웃)
+
+### 0. 소셜 로그인 (시드 user 101)
+# @name socialLogin
+POST {{baseUrl}}/api/v1/auth/social/login
+Content-Type: application/json
+
+{
+  "provider": "GOOGLE",
+  "providerUserId": "google-myultary-test-001",
+  "email": "myultary.test@example.com",
+  "name": "한호"
+}
+
+### 1. 대화방 목록
+GET {{baseUrl}}/api/v1/dm/rooms?limit=30
+Authorization: Bearer {{accessToken}}
+
+### 2. 대화방 생성 (주민 102. 이미 있으면 그 방)
+# @name createRoom
+POST {{baseUrl}}/api/v1/dm/rooms
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "targetUserNo": 102
+}
+
+### 3. 글 메시지
+POST {{baseUrl}}/api/v1/dm/rooms/{{dmRoomId}}/messages
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "body": "다음에 산책 같이 가요!"
+}
+
+### 4. 게시글 사진 공유 (feed 102의 두 번째 사진 + 글)
+POST {{baseUrl}}/api/v1/dm/rooms/{{dmRoomId}}/messages
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "body": "이 사진 봐",
+  "feedId": 102,
+  "feedMediaId": 104
+}
+
+### 5. 스토리 사진 공유 (story 102. 프로필 없이 사진만)
+POST {{baseUrl}}/api/v1/dm/rooms/{{dmRoomId}}/messages
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "body": "스토리도 같이",
+  "storyId": 102
+}
+
+### 6. 메시지 조회 (오래된 순. 조회하면 읽음)
+GET {{baseUrl}}/api/v1/dm/rooms/{{dmRoomId}}/messages?limit=30
+Authorization: Bearer {{accessToken}}
+
+### 7. 읽음
+POST {{baseUrl}}/api/v1/dm/rooms/{{dmRoomId}}/read
+Authorization: Bearer {{accessToken}}

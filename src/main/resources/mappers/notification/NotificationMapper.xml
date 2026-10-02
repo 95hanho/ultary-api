@@ -40,6 +40,30 @@
 			)
 		)
 		AND (n.type &lt;&gt; 'NEIGHBOR_REQUEST' OR n.neighbor_id IS NOT NULL)
+		AND (
+			NOT EXISTS (
+				SELECT 1 FROM ultary_notification_setting s
+				WHERE s.user_no = n.receiver_user_no
+			)
+			OR EXISTS (
+				SELECT 1 FROM ultary_notification_setting s
+				WHERE s.user_no = n.receiver_user_no
+				  AND (
+					(n.type = 'NEIGHBOR_REQUEST' AND s.neighbor = 1)
+					OR (n.type = 'FEED_LIKE' AND s.like_post = 1)
+					OR (n.type = 'COMMENT_LIKE' AND s.like_comment = 1)
+					OR (n.type = 'REPLY_LIKE' AND s.like_reply = 1)
+					OR (n.type = 'FEED_COMMENT' AND (
+						(n.has_comment = 1 AND s.comment_on_post = 1)
+						OR (n.has_reply = 1 AND s.reply_on_comment = 1)
+					))
+					OR (n.type IN ('COMMENT_MENTION', 'REPLY_MENTION') AND s.mention = 1)
+					OR (n.type = 'FEED_TAG' AND s.tag_post = 1)
+					OR (n.type = 'STORY_TAG' AND s.tag_story = 1)
+					OR (n.type = 'STORY_LIKE' AND s.story_react = 1)
+				  )
+			)
+		)
 	</sql>
 
 	<insert id="upsert">
@@ -520,8 +544,14 @@
 			n.actor_user_no,
 			u.nickname AS actor_nickname,
 			n.actor_count,
-			n.has_comment,
-			n.has_reply,
+			CASE
+				WHEN n.type = 'FEED_COMMENT' AND IFNULL(s.comment_on_post, 1) = 0 THEN 0
+				ELSE n.has_comment
+			END AS has_comment,
+			CASE
+				WHEN n.type = 'FEED_COMMENT' AND IFNULL(s.reply_on_comment, 1) = 0 THEN 0
+				ELSE n.has_reply
+			END AS has_reply,
 			n.content,
 			n.feed_id,
 			n.feed_comment_id,
@@ -534,6 +564,7 @@
 		FROM ultary_notification n
 		INNER JOIN ultary_user u ON u.user_no = n.actor_user_no AND u.withdrawal_status = 'ACTIVE'
 		LEFT JOIN ultary_neighbor nb ON nb.neighbor_id = n.neighbor_id
+		LEFT JOIN ultary_notification_setting s ON s.user_no = n.receiver_user_no
 		WHERE <include refid="visibleNotification"/>
 		ORDER BY n.updated_at DESC, n.notification_id DESC
 		LIMIT #{limit}
@@ -553,8 +584,14 @@
 			n.actor_user_no,
 			u.nickname AS actor_nickname,
 			n.actor_count,
-			n.has_comment,
-			n.has_reply,
+			CASE
+				WHEN n.type = 'FEED_COMMENT' AND IFNULL(s.comment_on_post, 1) = 0 THEN 0
+				ELSE n.has_comment
+			END AS has_comment,
+			CASE
+				WHEN n.type = 'FEED_COMMENT' AND IFNULL(s.reply_on_comment, 1) = 0 THEN 0
+				ELSE n.has_reply
+			END AS has_reply,
 			n.content,
 			n.feed_id,
 			n.feed_comment_id,
@@ -567,6 +604,7 @@
 		FROM ultary_notification n
 		INNER JOIN ultary_user u ON u.user_no = n.actor_user_no AND u.withdrawal_status = 'ACTIVE'
 		LEFT JOIN ultary_neighbor nb ON nb.neighbor_id = n.neighbor_id
+		LEFT JOIN ultary_notification_setting s ON s.user_no = n.receiver_user_no
 		WHERE n.notification_id = #{notificationId}
 		  AND <include refid="visibleNotification"/>
 	</select>

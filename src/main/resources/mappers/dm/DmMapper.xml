@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="me._hanho.ultary.domain.dm.DmMapper">
+
+	<select id="findByPairKey" resultType="me._hanho.ultary.domain.dm.model.DmRoom">
+		SELECT
+			dm_room_id AS dmRoomId,
+			pair_key AS pairKey,
+			user_low AS userLow,
+			user_high AS userHigh,
+			low_last_read_message_id AS lowLastReadMessageId,
+			high_last_read_message_id AS highLastReadMessageId,
+			low_left_at AS lowLeftAt,
+			high_left_at AS highLeftAt,
+			created_at AS createdAt
+		FROM ultary_dm_room
+		WHERE pair_key = #{pairKey}
+	</select>
+
+	<select id="findById" resultType="me._hanho.ultary.domain.dm.model.DmRoom">
+		SELECT
+			dm_room_id AS dmRoomId,
+			pair_key AS pairKey,
+			user_low AS userLow,
+			user_high AS userHigh,
+			low_last_read_message_id AS lowLastReadMessageId,
+			high_last_read_message_id AS highLastReadMessageId,
+			low_left_at AS lowLeftAt,
+			high_left_at AS highLeftAt,
+			created_at AS createdAt
+		FROM ultary_dm_room
+		WHERE dm_room_id = #{dmRoomId}
+	</select>
+
+	<insert id="insertRoom" useGeneratedKeys="true" keyProperty="dmRoomId" keyColumn="dm_room_id">
+		INSERT INTO ultary_dm_room (pair_key, user_low, user_high)
+		VALUES (#{pairKey}, #{userLow}, #{userHigh})
+	</insert>
+
+	<update id="reopen">
+		UPDATE ultary_dm_room
+		SET low_left_at = IF(user_low = #{userNo}, NULL, low_left_at),
+			high_left_at = IF(user_high = #{userNo}, NULL, high_left_at)
+		WHERE dm_room_id = #{dmRoomId}
+		  AND (user_low = #{userNo} OR user_high = #{userNo})
+	</update>
+
+	<update id="leave">
+		UPDATE ultary_dm_room
+		SET low_left_at = IF(user_low = #{userNo}, NOW(), low_left_at),
+			high_left_at = IF(user_high = #{userNo}, NOW(), high_left_at)
+		WHERE dm_room_id = #{dmRoomId}
+		  AND (user_low = #{userNo} OR user_high = #{userNo})
+	</update>
+
+	<update id="markRead">
+		UPDATE ultary_dm_room
+		SET low_last_read_message_id = IF(user_low = #{userNo},
+				GREATEST(IFNULL(low_last_read_message_id, 0), #{messageId}),
+				low_last_read_message_id),
+			high_last_read_message_id = IF(user_high = #{userNo},
+				GREATEST(IFNULL(high_last_read_message_id, 0), #{messageId}),
+				high_last_read_message_id)
+		WHERE dm_room_id = #{dmRoomId}
+		  AND (user_low = #{userNo} OR user_high = #{userNo})
+	</update>
+
+	<update id="clearPeerLeft">
+		UPDATE ultary_dm_room
+		SET low_left_at = IF(user_low = #{senderUserNo}, low_left_at, NULL),
+			high_left_at = IF(user_high = #{senderUserNo}, high_left_at, NULL)
+		WHERE dm_room_id = #{dmRoomId}
+	</update>
+
+	<insert id="insertMessage" useGeneratedKeys="true" keyProperty="dmMessageId" keyColumn="dm_message_id">
+		INSERT INTO ultary_dm_message (
+			dm_room_id, sender_user_no, body, share_type, feed_id, feed_media_id, story_id
+		) VALUES (
+			#{dmRoomId}, #{senderUserNo}, #{body}, #{shareType}, #{feedId}, #{feedMediaId}, #{storyId}
+		)
+	</insert>
+
+	<select id="findLatestMessageId" resultType="java.lang.Long">
+		SELECT MAX(dm_message_id)
+		FROM ultary_dm_message
+		WHERE dm_room_id = #{dmRoomId}
+	</select>
+
+	<sql id="roomColumns">
+		r.dm_room_id AS dmRoomId,
+		IF(r.user_low = #{userNo}, r.user_high, r.user_low) AS peerUserNo,
+		u.nickname AS peerNickname,
+		(
+			SELECT rp.profile_file_id
+			FROM ultary_pet rp
+			WHERE rp.user_no = u.user_no
+			  AND rp.is_deleted = 0
+			  AND rp.profile_file_id IS NOT NULL
+			ORDER BY rp.priority ASC, rp.pet_id ASC
+			LIMIT 1
+		) AS profileFileId,
+		m.body AS lastBody,
+		m.share_type AS lastShareType,
+		IFNULL(m.created_at, r.created_at) AS lastMessageAt,
+		(
+			SELECT COUNT(*)
+			FROM ultary_dm_message um
+			WHERE um.dm_room_id = r.dm_room_id
+			  AND um.sender_user_no &lt;&gt; #{userNo}
+			  AND um.dm_message_id &gt; IFNULL(
+					IF(r.user_low = #{userNo}, r.low_last_read_message_id, r.high_last_read_message_id),
+					0)
+		) AS unreadCount
+	</sql>
+
+	<sql id="roomFrom">
+		FROM ultary_dm_room r
+		INNER JOIN ultary_user u
+			ON u.user_no = IF(r.user_low = #{userNo}, r.user_high, r.user_low)
+			AND u.withdrawal_status = 'ACTIVE'
+		LEFT JOIN ultary_dm_message m ON m.dm_message_id = (
+			SELECT MAX(x.dm_message_id)
+			FROM ultary_dm_message x
+			WHERE x.dm_room_id = r.dm_room_id
+		)
+		WHERE (r.user_low = #{userNo} OR r.user_high = #{userNo})
+		  AND IF(r.user_low = #{userNo}, r.low_left_at, r.high_left_at) IS NULL
+		  AND NOT EXISTS (
+				SELECT 1
+				FROM ultary_user_block b
+				WHERE b.is_deleted = 0
+				  AND (
+						(b.blocker_user_no = #{userNo} AND b.blocked_user_no = u.user_no)
+						OR (b.blocked_user_no = #{userNo} AND b.blocker_user_no = u.user_no)
+				  )
+		  )
+	</sql>
+
+	<select id="findRooms" resultType="me._hanho.ultary.domain.dm.model.DmRoomRow">
+		SELECT
+		<include refid="roomColumns"/>
+		<include refid="roomFrom"/>
+		ORDER BY lastMessageAt DESC, r.dm_room_id DESC
+		LIMIT #{limit}
+	</select>
+
+	<select id="findRoomRow" resultType="me._hanho.ultary.domain.dm.model.DmRoomRow">
+		SELECT
+		<include refid="roomColumns"/>
+		<include refid="roomFrom"/>
+		  AND r.dm_room_id = #{dmRoomId}
+	</select>
+
+	<sql id="messageColumns">
+		msg.dm_message_id AS dmMessageId,
+		msg.sender_user_no AS senderUserNo,
+		msg.body AS body,
+		msg.share_type AS shareType,
+		msg.feed_id AS feedId,
+		msg.feed_media_id AS feedMediaId,
+		msg.story_id AS storyId,
+		msg.created_at AS createdAt,
+		f.content AS feedContent,
+		f.is_deleted AS feedDeleted,
+		f.user_no AS authorUserNo,
+		au.nickname AS authorNickname,
+		(
+			SELECT rp.profile_file_id
+			FROM ultary_pet rp
+			WHERE rp.user_no = f.user_no
+			  AND rp.is_deleted = 0
+			  AND rp.profile_file_id IS NOT NULL
+			ORDER BY rp.priority ASC, rp.pet_id ASC
+			LIMIT 1
+		) AS authorProfileFileId,
+		fm.sort_order AS mediaIndex,
+		fm.file_id AS mediaFileId,
+		fm.thumbnail_file_id AS mediaThumbnailFileId,
+		fm.media_type AS mediaType,
+		s.is_deleted AS storyDeleted,
+		s.file_id AS storyFileId,
+		s.thumbnail_file_id AS storyThumbnailFileId,
+		s.media_type AS storyMediaType
+	</sql>
+
+	<sql id="messageFrom">
+		FROM ultary_dm_message msg
+		LEFT JOIN ultary_feed f ON f.feed_id = msg.feed_id
+		LEFT JOIN ultary_user au ON au.user_no = f.user_no
+		LEFT JOIN ultary_feed_media fm ON fm.feed_media_id = msg.feed_media_id
+		LEFT JOIN ultary_story s ON s.story_id = msg.story_id
+	</sql>
+
+	<select id="findMessages" resultType="me._hanho.ultary.domain.dm.model.DmMessageRow">
+		SELECT
+		<include refid="messageColumns"/>
+		<include refid="messageFrom"/>
+		WHERE msg.dm_room_id = #{dmRoomId}
+		<if test="beforeMessageId != null">
+			AND msg.dm_message_id &lt; #{beforeMessageId}
+		</if>
+		ORDER BY msg.dm_message_id DESC
+		LIMIT #{limit}
+	</select>
+
+	<select id="findMessage" resultType="me._hanho.ultary.domain.dm.model.DmMessageRow">
+		SELECT
+		<include refid="messageColumns"/>
+		<include refid="messageFrom"/>
+		WHERE msg.dm_message_id = #{dmMessageId}
+	</select>
+
+</mapper>

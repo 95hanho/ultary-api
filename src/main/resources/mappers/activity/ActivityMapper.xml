@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="me._hanho.ultary.domain.activity.ActivityMapper">
+
+    <select id="findByUser" resultType="me._hanho.ultary.domain.activity.model.ActivityRow">
+        SELECT
+            activity_type,
+            occurred_at,
+            target_user_no,
+            target_nickname,
+            snippet,
+            feed_id,
+            feed_comment_id,
+            feed_reply_id,
+            story_id,
+            neighbor_id,
+            neighbor_status
+        FROM (
+            SELECT
+                'FEED_LIKE' AS activity_type,
+                l.created_at AS occurred_at,
+                f.user_no AS target_user_no,
+                tu.nickname AS target_nickname,
+                f.content AS snippet,
+                f.feed_id AS feed_id,
+                CAST(NULL AS SIGNED) AS feed_comment_id,
+                CAST(NULL AS SIGNED) AS feed_reply_id,
+                CAST(NULL AS SIGNED) AS story_id,
+                CAST(NULL AS SIGNED) AS neighbor_id,
+                CAST(NULL AS CHAR(20)) AS neighbor_status
+            FROM ultary_feed_like l
+            INNER JOIN ultary_feed f
+                ON f.feed_id = l.feed_id
+               AND f.is_deleted = 0
+            INNER JOIN ultary_user tu
+                ON tu.user_no = f.user_no
+               AND tu.withdrawal_status = 'ACTIVE'
+            WHERE l.user_no = #{userNo}
+              AND l.is_deleted = 0
+
+            UNION ALL
+
+            SELECT
+                'COMMENT_LIKE',
+                l.created_at,
+                c.user_no,
+                tu.nickname,
+                c.content,
+                f.feed_id,
+                c.feed_comment_id,
+                NULL,
+                NULL,
+                NULL,
+                NULL
+            FROM ultary_feed_comment_like l
+            INNER JOIN ultary_feed_comment c
+                ON c.feed_comment_id = l.feed_comment_id
+               AND c.is_deleted = 0
+            INNER JOIN ultary_feed f
+                ON f.feed_id = c.feed_id
+               AND f.is_deleted = 0
+            INNER JOIN ultary_user tu
+                ON tu.user_no = c.user_no
+               AND tu.withdrawal_status = 'ACTIVE'
+            WHERE l.user_no = #{userNo}
+              AND l.is_deleted = 0
+
+            UNION ALL
+
+            SELECT
+                'REPLY_LIKE',
+                l.created_at,
+                r.user_no,
+                tu.nickname,
+                r.content,
+                f.feed_id,
+                c.feed_comment_id,
+                r.feed_reply_id,
+                NULL,
+                NULL,
+                NULL
+            FROM ultary_feed_reply_like l
+            INNER JOIN ultary_feed_reply r
+                ON r.feed_reply_id = l.feed_reply_id
+               AND r.is_deleted = 0
+            INNER JOIN ultary_feed_comment c
+                ON c.feed_comment_id = r.feed_comment_id
+               AND c.is_deleted = 0
+            INNER JOIN ultary_feed f
+                ON f.feed_id = c.feed_id
+               AND f.is_deleted = 0
+            INNER JOIN ultary_user tu
+                ON tu.user_no = r.user_no
+               AND tu.withdrawal_status = 'ACTIVE'
+            WHERE l.user_no = #{userNo}
+              AND l.is_deleted = 0
+
+            UNION ALL
+
+            SELECT
+                'FEED_COMMENT',
+                c.created_at,
+                f.user_no,
+                tu.nickname,
+                c.content,
+                f.feed_id,
+                c.feed_comment_id,
+                NULL,
+                NULL,
+                NULL,
+                NULL
+            FROM ultary_feed_comment c
+            INNER JOIN ultary_feed f
+                ON f.feed_id = c.feed_id
+               AND f.is_deleted = 0
+            INNER JOIN ultary_user tu
+                ON tu.user_no = f.user_no
+               AND tu.withdrawal_status = 'ACTIVE'
+            WHERE c.user_no = #{userNo}
+              AND c.is_deleted = 0
+
+            UNION ALL
+
+            SELECT
+                'FEED_REPLY',
+                r.created_at,
+                c.user_no,
+                tu.nickname,
+                r.content,
+                f.feed_id,
+                c.feed_comment_id,
+                r.feed_reply_id,
+                NULL,
+                NULL,
+                NULL
+            FROM ultary_feed_reply r
+            INNER JOIN ultary_feed_comment c
+                ON c.feed_comment_id = r.feed_comment_id
+               AND c.is_deleted = 0
+            INNER JOIN ultary_feed f
+                ON f.feed_id = c.feed_id
+               AND f.is_deleted = 0
+            INNER JOIN ultary_user tu
+                ON tu.user_no = c.user_no
+               AND tu.withdrawal_status = 'ACTIVE'
+            WHERE r.user_no = #{userNo}
+              AND r.is_deleted = 0
+
+            UNION ALL
+
+            SELECT
+                'NEIGHBOR_REQUEST',
+                n.requested_at,
+                n.receiver_user_no,
+                tu.nickname,
+                NULL,
+                NULL,
+                NULL,
+                NULL,
+                NULL,
+                n.neighbor_id,
+                n.status
+            FROM ultary_neighbor n
+            INNER JOIN ultary_user tu
+                ON tu.user_no = n.receiver_user_no
+               AND tu.withdrawal_status = 'ACTIVE'
+            WHERE n.requester_user_no = #{userNo}
+              AND n.status IN ('PENDING', 'ACCEPTED', 'REJECTED')
+
+            UNION ALL
+
+            SELECT
+                'FEED',
+                f.created_at,
+                f.user_no,
+                tu.nickname,
+                f.content,
+                f.feed_id,
+                NULL,
+                NULL,
+                NULL,
+                NULL,
+                NULL
+            FROM ultary_feed f
+            INNER JOIN ultary_user tu
+                ON tu.user_no = f.user_no
+               AND tu.withdrawal_status = 'ACTIVE'
+            WHERE f.user_no = #{userNo}
+              AND f.is_deleted = 0
+
+            UNION ALL
+
+            SELECT
+                'STORY',
+                s.created_at,
+                s.user_no,
+                tu.nickname,
+                s.caption,
+                NULL,
+                NULL,
+                NULL,
+                s.story_id,
+                NULL,
+                NULL
+            FROM ultary_story s
+            INNER JOIN ultary_user tu
+                ON tu.user_no = s.user_no
+               AND tu.withdrawal_status = 'ACTIVE'
+            WHERE s.user_no = #{userNo}
+              AND s.is_deleted = 0
+        ) activity
+        ORDER BY occurred_at DESC, activity_type ASC
+        LIMIT #{limit}
+    </select>
+
+</mapper>

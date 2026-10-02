@@ -1,5 +1,6 @@
 package me._hanho.ultary.domain.pet;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 
@@ -28,6 +29,12 @@ public interface PetMapper {
 			@Param("petId") Long petId,
 			@Param("userNo") Long userNo,
 			@Param("mentionId") String mentionId);
+
+	/** local 테스트: 멘션 ID 쿨다운 기준 시각만 바꾼다 */
+	int updateMentionIdChangedAt(
+			@Param("petId") Long petId,
+			@Param("userNo") Long userNo,
+			@Param("mentionIdChangedAt") LocalDateTime mentionIdChangedAt);
 
 	int softDelete(
 			@Param("petId") Long petId,

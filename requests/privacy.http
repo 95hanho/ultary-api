@@ -1,0 +1,31 @@
+@baseUrl = http://localhost:9377
+@accessToken = {{socialLogin.response.body.$.data.accessToken}}
+
+# 로그인: user 101 (google-myultary-test-001)
+# 행이 없으면 privateAccount=false, feedVisibility=PUBLIC, storyVisibility=NEIGHBORS, 나머지 true
+
+### 0. 소셜 로그인 (시드 user 101)
+# @name socialLogin
+POST {{baseUrl}}/api/v1/auth/social/login
+Content-Type: application/json
+
+{
+  "provider": "GOOGLE",
+  "providerUserId": "google-myultary-test-001",
+  "email": "myultary.test@example.com",
+  "name": "한호"
+}
+
+### 1. 공개 범위 조회
+GET {{baseUrl}}/api/v1/settings/privacy
+Authorization: Bearer {{accessToken}}
+
+### 2. 공개 범위 변경 (넣은 필드만)
+PATCH {{baseUrl}}/api/v1/settings/privacy
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "privateAccount": true,
+  "storyVisibility": "NEIGHBORS"
+}

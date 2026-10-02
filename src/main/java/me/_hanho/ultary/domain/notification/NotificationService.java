@@ -15,6 +15,7 @@ import me._hanho.ultary.domain.file.FileService;
 import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
 import me._hanho.ultary.domain.notification.dto.response.NotificationItemResponse;
 import me._hanho.ultary.domain.notification.dto.response.NotificationListResponse;
+import me._hanho.ultary.domain.notification.dto.response.NotificationUnreadCountResponse;
 import me._hanho.ultary.domain.notification.model.NotificationDraft;
 import me._hanho.ultary.domain.notification.model.NotificationListRow;
 import me._hanho.ultary.domain.notification.model.NotificationUpsert;
@@ -46,15 +47,27 @@ public class NotificationService {
 			COMMENT_LIKE, COMMENT_MENTION, REPLY_LIKE, REPLY_MENTION);
 
 	private final NotificationMapper notificationMapper;
+	private final NotificationSettingService notificationSettingService;
 	private final PetService petService;
 	private final FileService fileService;
 
+	/** 하단 배지. 읽음 처리하지 않는다 */
 	@Transactional(readOnly = true)
+	public NotificationUnreadCountResponse unreadCount(UserPrincipal principal) {
+		return NotificationUnreadCountResponse.builder()
+				.unreadCount(notificationMapper.countUnread(principal.getUserNo()))
+				.build();
+	}
+
+	/** 알림 페이지 진입. 응답을 만든 뒤 그때까지 쌓인 안 읽음을 읽음으로 바꾼다 */
+	@Transactional
 	public NotificationListResponse list(UserPrincipal principal, Integer limit) {
 		Long userNo = principal.getUserNo();
 		List<NotificationListRow> rows = notificationMapper.findByReceiver(userNo, resolveLimit(limit));
+		int unreadCount = notificationMapper.countUnread(userNo);
+		notificationMapper.markAllRead(userNo);
 		return NotificationListResponse.builder()
-				.unreadCount(notificationMapper.countUnread(userNo))
+				.unreadCount(unreadCount)
 				.items(toItems(rows))
 				.build();
 	}
@@ -228,6 +241,11 @@ public class NotificationService {
 		if (receiverUserNo == null || receiverUserNo.equals(draft.getActorUserNo())) {
 			return;
 		}
+		int hasComment = draft.getHasComment() != null && draft.getHasComment() > 0 ? 1 : 0;
+		int hasReply = draft.getHasReply() != null && draft.getHasReply() > 0 ? 1 : 0;
+		if (!notificationSettingService.allows(receiverUserNo, type, hasComment, hasReply)) {
+			return;
+		}
 		notificationMapper.upsert(NotificationUpsert.builder()
 				.receiverUserNo(receiverUserNo)
 				.actorUserNo(draft.getActorUserNo())
@@ -239,8 +257,8 @@ public class NotificationService {
 				.neighborId(draft.getNeighborId())
 				.content(snippet(draft.getContent()))
 				.actorCount(draft.getActorCount() == null ? 1 : draft.getActorCount())
-				.hasComment(draft.getHasComment() != null && draft.getHasComment() > 0 ? 1 : 0)
-				.hasReply(draft.getHasReply() != null && draft.getHasReply() > 0 ? 1 : 0)
+				.hasComment(hasComment)
+				.hasReply(hasReply)
 				.groupKey(groupKey)
 				.markUnread(markUnread ? 1 : 0)
 				.build());

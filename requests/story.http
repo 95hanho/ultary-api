@@ -48,8 +48,8 @@ Content-Type: application/json
   ]
 }
 
-### 2. 내 스토리 목록 (createdAt / expiresAt, viewedByMe)
-# 본인 스토리도 읽음 기록이 있을 때만 viewedByMe=true
+### 2. 내 스토리 목록 (createdAt / expiresAt, viewedByMe, likedByMe)
+# 본인 스토리도 읽음 기록이 있을 때만 viewedByMe=true. likedByMe는 내 공감(취소 제외)
 GET {{baseUrl}}/api/v1/my-ultary/stories
 Authorization: Bearer {{accessToken}}
 
@@ -58,7 +58,7 @@ GET {{baseUrl}}/api/v1/main/stories/owners
 Authorization: Bearer {{accessToken}}
 
 ### 4. 특정 유저 스토리 조회 (본인 101 또는 ACCEPTED 이웃)
-# data[] 각 항목 viewedByMe — FE: 첫 false부터 재생, 전부 true면 index 0
+# data[] 각 항목 viewedByMe, likedByMe — FE: 첫 viewedByMe false부터 재생, 전부 true면 index 0
 GET {{baseUrl}}/api/v1/main/stories?userNo=101
 Authorization: Bearer {{accessToken}}
 

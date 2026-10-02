@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="me._hanho.ultary.domain.notification.NotificationSettingMapper">
+
+	<select id="findByUserNo" resultType="me._hanho.ultary.domain.notification.model.NotificationSetting">
+		SELECT
+			user_no,
+			neighbor,
+			like_post,
+			like_comment,
+			like_reply,
+			comment_on_post,
+			reply_on_comment,
+			mention,
+			tag_post,
+			tag_story,
+			story_react
+		FROM ultary_notification_setting
+		WHERE user_no = #{userNo}
+	</select>
+
+	<insert id="upsert">
+		INSERT INTO ultary_notification_setting (
+			user_no,
+			neighbor,
+			like_post,
+			like_comment,
+			like_reply,
+			comment_on_post,
+			reply_on_comment,
+			mention,
+			tag_post,
+			tag_story,
+			story_react
+		) VALUES (
+			#{userNo},
+			#{neighbor},
+			#{likePost},
+			#{likeComment},
+			#{likeReply},
+			#{commentOnPost},
+			#{replyOnComment},
+			#{mention},
+			#{tagPost},
+			#{tagStory},
+			#{storyReact}
+		)
+		ON DUPLICATE KEY UPDATE
+			neighbor = VALUES(neighbor),
+			like_post = VALUES(like_post),
+			like_comment = VALUES(like_comment),
+			like_reply = VALUES(like_reply),
+			comment_on_post = VALUES(comment_on_post),
+			reply_on_comment = VALUES(reply_on_comment),
+			mention = VALUES(mention),
+			tag_post = VALUES(tag_post),
+			tag_story = VALUES(tag_story),
+			story_react = VALUES(story_react)
+	</insert>
+
+</mapper>

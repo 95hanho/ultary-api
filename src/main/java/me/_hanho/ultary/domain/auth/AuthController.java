@@ -158,9 +158,11 @@ public class AuthController {
 	}
 
 	@PostMapping("/phone")
-	public ApiResponse<PhoneAuthResponse> phone(@Valid @RequestBody PhoneAuthRequest request) {
-		log.info("[phone] phone={}", request.getPhone());
-		return ApiResponse.ok(authService.requestPhoneAuth(request), "휴대폰 인증 요청 성공");
+	public ApiResponse<PhoneAuthResponse> phone(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@Valid @RequestBody PhoneAuthRequest request) {
+		log.info("[phone] phone={} purpose={}", request.getPhone(), request.getPurpose());
+		return ApiResponse.ok(authService.requestPhoneAuth(principal, request), "휴대폰 인증 요청 성공");
 	}
 
 	@PostMapping("/phone/verify")

@@ -20,9 +20,15 @@
 		created_at,
 		updated_at,
 		withdrawal_status,
-		withdrawal_requested_at,
 		withdrawal_completed_at
 	</sql>
+
+	<select id="findByUserNo" resultType="me._hanho.ultary.domain.user.model.User">
+		SELECT <include refid="userColumns"/>
+		FROM ultary_user
+		WHERE user_no = #{userNo}
+		LIMIT 1
+	</select>
 
 	<select id="findActiveByUserNo" resultType="me._hanho.ultary.domain.user.model.User">
 		SELECT <include refid="userColumns"/>
@@ -54,6 +60,20 @@
 		FROM ultary_user
 		WHERE email = #{email}
 		  AND withdrawal_status = 'ACTIVE'
+		LIMIT 1
+	</select>
+
+	<select id="findByPhoneForLogin" resultType="me._hanho.ultary.domain.user.model.User">
+		SELECT <include refid="userColumns"/>
+		FROM ultary_user
+		WHERE phone = #{phone}
+		LIMIT 1
+	</select>
+
+	<select id="findByEmailForLogin" resultType="me._hanho.ultary.domain.user.model.User">
+		SELECT <include refid="userColumns"/>
+		FROM ultary_user
+		WHERE email = #{email}
 		LIMIT 1
 	</select>
 
@@ -120,6 +140,7 @@
 			name = #{name},
 			email = #{email},
 			bio = #{bio},
+			phone = #{phone},
 			region_sido = #{regionSido},
 			region_sigungu = #{regionSigungu}
 		WHERE user_no = #{userNo}
@@ -152,10 +173,6 @@
 	<update id="updateWithdrawalStatus">
 		UPDATE ultary_user
 		SET withdrawal_status = #{withdrawalStatus},
-			withdrawal_requested_at = CASE
-				WHEN #{withdrawalStatus} = 'REQUESTED' THEN NOW()
-				ELSE withdrawal_requested_at
-			END,
 			withdrawal_completed_at = CASE
 				WHEN #{withdrawalStatus} = 'WITHDRAWN' THEN NOW()
 				ELSE withdrawal_completed_at

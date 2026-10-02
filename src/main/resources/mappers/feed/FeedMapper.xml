@@ -25,9 +25,28 @@
 		AND u.withdrawal_status = 'ACTIVE'
 		AND (
 			f.user_no = #{viewerUserNo}
-			OR f.visibility = 'PUBLIC'
 			OR (
-				f.visibility = 'NEIGHBORS'
+				f.visibility = 'PUBLIC'
+				AND NOT EXISTS (
+					SELECT 1
+					FROM ultary_user_privacy p
+					WHERE p.user_no = f.user_no
+					  AND p.private_account = 1
+				)
+			)
+			OR (
+				(
+					f.visibility = 'NEIGHBORS'
+					OR (
+						f.visibility = 'PUBLIC'
+						AND EXISTS (
+							SELECT 1
+							FROM ultary_user_privacy p
+							WHERE p.user_no = f.user_no
+							  AND p.private_account = 1
+						)
+					)
+				)
 				AND EXISTS (
 					SELECT 1
 					FROM ultary_neighbor n
@@ -85,9 +104,28 @@
 		  AND is_deleted = 0
 		  AND (
 			#{viewerUserNo} = #{ownerUserNo}
-			OR visibility = 'PUBLIC'
 			OR (
-				visibility = 'NEIGHBORS'
+				visibility = 'PUBLIC'
+				AND NOT EXISTS (
+					SELECT 1
+					FROM ultary_user_privacy p
+					WHERE p.user_no = #{ownerUserNo}
+					  AND p.private_account = 1
+				)
+			)
+			OR (
+				(
+					visibility = 'NEIGHBORS'
+					OR (
+						visibility = 'PUBLIC'
+						AND EXISTS (
+							SELECT 1
+							FROM ultary_user_privacy p
+							WHERE p.user_no = #{ownerUserNo}
+							  AND p.private_account = 1
+						)
+					)
+				)
 				AND EXISTS (
 					SELECT 1
 					FROM ultary_neighbor n

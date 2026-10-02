@@ -203,6 +203,12 @@
 			-->
 		WHERE n.requester_user_no = #{viewerUserNo}
 		  AND n.status = 'ACCEPTED'
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM ultary_user_privacy p
+			WHERE p.user_no = u.user_no
+			  AND p.story_visibility = 'PRIVATE'
+		  )
 		GROUP BY u.user_no, u.nickname
 		ORDER BY MAX(s.created_at) DESC
 	</select>

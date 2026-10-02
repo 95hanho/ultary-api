@@ -19,12 +19,15 @@ import me._hanho.ultary.domain.feed.FeedMapper;
 import me._hanho.ultary.domain.file.FileService;
 import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
 import me._hanho.ultary.domain.notification.NotificationService;
+import me._hanho.ultary.domain.neighbor.dto.response.BlockedUserItemResponse;
 import me._hanho.ultary.domain.neighbor.dto.response.NeighborListItemResponse;
 import me._hanho.ultary.domain.neighbor.dto.response.NeighborRelationResponse;
 import me._hanho.ultary.domain.neighbor.dto.response.UserUltaryResponse;
+import me._hanho.ultary.domain.neighbor.model.BlockedUserRow;
 import me._hanho.ultary.domain.neighbor.model.Neighbor;
 import me._hanho.ultary.domain.neighbor.model.NeighborListRow;
 import me._hanho.ultary.domain.pet.PetMapper;
+import me._hanho.ultary.domain.settings.PrivacyService;
 import me._hanho.ultary.domain.pet.PetService;
 import me._hanho.ultary.domain.story.StoryService;
 import me._hanho.ultary.domain.user.UserBlockMapper;
@@ -43,6 +46,7 @@ public class NeighborService {
 
 	private final NeighborMapper neighborMapper;
 	private final UserBlockMapper userBlockMapper;
+	private final PrivacyService privacyService;
 	private final UserMapper userMapper;
 	private final PetMapper petMapper;
 	private final PetService petService;
@@ -79,6 +83,7 @@ public class NeighborService {
 		Long neighborId = neighbor == null ? null : neighbor.getNeighborId();
 
 		Integer profileFileId = petService.representativeProfileFileId(target.getUserNo());
+		boolean hasStory = storyService.hasVisibleStory(principal.getUserNo(), targetUserNo);
 		return UserUltaryResponse.builder()
 				.userNo(target.getUserNo())
 				.nickname(target.getNickname())
@@ -88,8 +93,8 @@ public class NeighborService {
 				.bio(target.getBio())
 				.regionSido(target.getRegionSido())
 				.regionSigungu(target.getRegionSigungu())
-				.hasStory(storyService.hasActiveStory(targetUserNo))
-				.hasUnviewed(storyService.hasUnviewedStory(targetUserNo, me))
+				.hasStory(hasStory)
+				.hasUnviewed(hasStory && storyService.hasUnviewedStory(targetUserNo, me))
 				.residentCount(neighborMapper.countAcceptedAsRequester(targetUserNo))
 				.neighborCount(neighborMapper.countAcceptedAsReceiver(targetUserNo))
 				.petCount(petMapper.countActiveByUserNo(targetUserNo))
@@ -134,7 +139,7 @@ public class NeighborService {
 					.profileFile(profileId == null ? null : files.get(profileId))
 					.status(row.getStatus())
 					.listType(row.getListType())
-					.hasStory(storyService.hasActiveStory(row.getUserNo()))
+					.hasStory(storyService.hasVisibleStory(principal.getUserNo(), row.getUserNo()))
 					.build());
 		}
 		return result;
@@ -147,6 +152,7 @@ public class NeighborService {
 			throw new BusinessException(ErrorCode.NEIGHBOR_SELF);
 		}
 		requireActiveUser(targetUserNo);
+		privacyService.assertNeighborRequestOpen(targetUserNo);
 		assertNotBlockedEitherWay(me, targetUserNo);
 
 		String key = pairKey(me, targetUserNo);
@@ -237,6 +243,30 @@ public class NeighborService {
 		notificationService.removeByNeighbor(neighborId);
 		neighborMapper.deleteByNeighborId(neighborId);
 		log.info("[cancelOrRemove] neighborId={} by={}", neighborId, me);
+	}
+
+	@Transactional(readOnly = true)
+	public List<BlockedUserItemResponse> listBlocked(UserPrincipal principal, Integer limit) {
+		List<BlockedUserRow> rows = userBlockMapper.findBlockedUsers(principal.getUserNo(), resolveLimit(limit));
+		Set<Long> profileIds = new HashSet<>();
+		for (BlockedUserRow row : rows) {
+			if (row.getProfileFileId() != null) {
+				profileIds.add(row.getProfileFileId().longValue());
+			}
+		}
+		Map<Long, FileSummaryResponse> files = fileService.findSummaries(profileIds);
+		List<BlockedUserItemResponse> result = new ArrayList<>();
+		for (BlockedUserRow row : rows) {
+			Long profileId = row.getProfileFileId() == null ? null : row.getProfileFileId().longValue();
+			result.add(BlockedUserItemResponse.builder()
+					.userNo(row.getUserNo())
+					.nickname(row.getNickname())
+					.profileFileId(row.getProfileFileId())
+					.profileFile(profileId == null ? null : files.get(profileId))
+					.blockedAt(row.getBlockedAt())
+					.build());
+		}
+		return result;
 	}
 
 	@Transactional

@@ -112,6 +112,14 @@
 		  AND is_deleted = 0
 	</update>
 
+	<update id="updateMentionIdChangedAt">
+		UPDATE ultary_pet
+		SET mention_id_changed_at = #{mentionIdChangedAt}
+		WHERE pet_id = #{petId}
+		  AND user_no = #{userNo}
+		  AND is_deleted = 0
+	</update>
+
 	<update id="updateMentionId">
 		UPDATE ultary_pet
 		SET mention_id = #{mentionId},

@@ -1,6 +1,6 @@
 @baseUrl = http://localhost:9377
-@accessToken = {{login.response.body.$.data.accessToken}}
-@refreshToken = {{login.response.body.$.data.refreshToken}}
+@accessToken = {{socialLoginSeed.response.body.$.data.accessToken}}
+@refreshToken = {{socialLoginSeed.response.body.$.data.refreshToken}}
 @phoneAuthToken = {{phone.response.body.$.data.phoneAuthToken}}
 @phoneAuthCompleteToken = {{phoneVerify.response.body.$.data.phoneAuthCompleteToken}}
 @passwordChangeToken = {{passwordToken.response.body.$.data.passwordChangeToken}}
@@ -8,7 +8,7 @@
 ### 시드: share/database/seed/mariadb_10_1/001_dev_sample_data.sql
 ### user 101 myultary.test@example.com / 01011112222 / Test1234!
 ### social GOOGLE google-myultary-test-001
-### 아래 11a 로그인 또는 1c 시드 소셜 로그인 후 accessToken 사용
+### 2번부터의 accessToken 은 1c(@name socialLoginSeed) 응답이다. 1a·11a를 실행해도 토큰은 안 바뀐다.
 
 ### 1a. 소셜 로그인 (Google · 신규 가입 포함) — FE/BFF가 OAuth 후 providerUserId 전달
 # (= 1b와 동일 API) POST /api/v1/auth/social/login
@@ -98,7 +98,8 @@ Content-Type: application/json
 DELETE {{baseUrl}}/api/v1/auth/social/unlink?provider=KAKAO
 Authorization: Bearer {{accessToken}}
 
-### 7. 휴대폰 인증 요청
+### 7. 휴대폰 인증 요청 (회원가입. 이미 가입된 번호면 409 PHONE_ALREADY_USED)
+# purpose 생략 = SIGNUP. 회원정보 변경은 purpose=PROFILE + Bearer. 비밀번호 재설정은 purpose=PASSWORD
 # @name phone
 POST {{baseUrl}}/api/v1/auth/phone
 Content-Type: application/json

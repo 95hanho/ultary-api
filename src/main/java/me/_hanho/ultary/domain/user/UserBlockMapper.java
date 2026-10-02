@@ -1,8 +1,11 @@
 package me._hanho.ultary.domain.user;
 
+import java.util.List;
+
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import me._hanho.ultary.domain.neighbor.model.BlockedUserRow;
 import me._hanho.ultary.domain.user.model.UserBlock;
 
 @Mapper
@@ -28,4 +31,7 @@ public interface UserBlockMapper {
 	int softDelete(
 			@Param("blockerUserNo") Long blockerUserNo,
 			@Param("blockedUserNo") Long blockedUserNo);
+
+	/** 내가 차단한 활성 유저. 최신 차단순 */
+	List<BlockedUserRow> findBlockedUsers(@Param("blockerUserNo") Long blockerUserNo, @Param("limit") int limit);
 }

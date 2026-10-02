@@ -17,6 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.exception.BusinessException;
 import me._hanho.ultary.common.exception.ErrorCode;
 import me._hanho.ultary.domain.neighbor.NeighborService;
+import me._hanho.ultary.domain.settings.PrivacyService;
 import me._hanho.ultary.domain.notification.NotificationService;
 import me._hanho.ultary.domain.feed.dto.request.CommentMentionRequest;
 import me._hanho.ultary.domain.feed.dto.request.CreateCommentRequest;
@@ -73,6 +74,7 @@ public class FeedService {
 	private final UserMapper userMapper;
 	private final NeighborService neighborService;
 	private final NotificationService notificationService;
+	private final PrivacyService privacyService;
 
 	@Transactional
 	public FeedResponse create(UserPrincipal principal, CreateFeedRequest request) {
@@ -80,7 +82,7 @@ public class FeedService {
 			throw new BusinessException(ErrorCode.FEED_MEDIA_REQUIRED);
 		}
 
-		String visibility = normalizeVisibility(request.getVisibility());
+		String visibility = privacyService.resolveFeedVisibility(principal.getUserNo(), request.getVisibility());
 		Feed feed = new Feed();
 		feed.setUserNo(principal.getUserNo());
 		feed.setContent(blankToNull(request.getContent()));
@@ -298,13 +300,14 @@ public class FeedService {
 	@Transactional
 	public FeedCommentResponse createComment(
 			UserPrincipal principal, Long feedId, CreateCommentRequest request) {
-		requireVisible(feedId, principal.getUserNo());
+		Feed feed = requireVisible(feedId, principal.getUserNo());
+		privacyService.assertCommentAllowed(principal.getUserNo(), feed.getUserNo());
 		FeedComment comment = new FeedComment();
 		comment.setFeedId(feedId);
 		comment.setUserNo(principal.getUserNo());
 		comment.setContent(request.getContent().trim());
 		feedMapper.insertComment(comment);
-		insertCommentMentions(comment.getFeedCommentId(), null, request.getMentions());
+		insertCommentMentions(principal.getUserNo(), comment.getFeedCommentId(), null, request.getMentions());
 		feedMapper.adjustCommentCount(feedId, 1);
 		notificationService.syncFeedThread(feedId, true);
 		notificationService.syncCommentMentions(comment.getFeedCommentId());
@@ -404,14 +407,15 @@ public class FeedService {
 	@Transactional
 	public FeedReplyResponse createReply(
 			UserPrincipal principal, Long feedId, Long commentId, CreateReplyRequest request) {
-		requireVisible(feedId, principal.getUserNo());
+		Feed feed = requireVisible(feedId, principal.getUserNo());
+		privacyService.assertCommentAllowed(principal.getUserNo(), feed.getUserNo());
 		requireComment(feedId, commentId);
 		FeedReply reply = new FeedReply();
 		reply.setFeedCommentId(commentId);
 		reply.setUserNo(principal.getUserNo());
 		reply.setContent(request.getContent().trim());
 		feedMapper.insertReply(reply);
-		insertCommentMentions(null, reply.getFeedReplyId(), request.getMentions());
+		insertCommentMentions(principal.getUserNo(), null, reply.getFeedReplyId(), request.getMentions());
 		notificationService.syncFeedThread(feedId, true);
 		notificationService.syncReplyMentions(reply.getFeedReplyId());
 		log.info("[createReply] commentId={} replyId={}", commentId, reply.getFeedReplyId());
@@ -525,7 +529,8 @@ public class FeedService {
 					if (mentionItem.getPetId() == null || !seenPets.add(mentionItem.getPetId())) {
 						continue;
 					}
-					requirePet(mentionItem.getPetId());
+					Pet tagged = requirePet(mentionItem.getPetId());
+					privacyService.assertTagAllowed(userNo, tagged.getUserNo());
 					FeedMediaMention mention = new FeedMediaMention();
 					mention.setFeedMediaId(media.getFeedMediaId());
 					mention.setPetId(mentionItem.getPetId());
@@ -548,7 +553,8 @@ public class FeedService {
 			if (item.getPetId() == null || !seen.add(item.getPetId())) {
 				continue;
 			}
-			requirePet(item.getPetId());
+			Pet pet = requirePet(item.getPetId());
+			privacyService.assertTagAllowed(userNo, pet.getUserNo());
 			String role = StringUtils.hasText(item.getRole()) ? item.getRole() : "TAGGED";
 			boolean isMain = Boolean.TRUE.equals(item.getIsMain()) && !mainAssigned;
 			if (isMain) {
@@ -620,18 +626,24 @@ public class FeedService {
 		return feed;
 	}
 
+	/** DM으로 게시글을 공유할 때 보낸 사람이 그 글을 볼 수 있는지 */
+	public void assertVisible(Long feedId, Long viewerUserNo) {
+		requireVisible(feedId, viewerUserNo);
+	}
+
 	private Feed requireVisible(Long feedId, Long viewerUserNo) {
 		Feed feed = requireActive(feedId);
+		String audience = privacyService.feedAudience(feed.getUserNo(), feed.getVisibility());
 		if (viewerUserNo == null) {
-			if (!"PUBLIC".equals(feed.getVisibility())) {
+			if (!"PUBLIC".equals(audience)) {
 				throw new BusinessException(ErrorCode.FEED_NOT_FOUND);
 			}
 			return feed;
 		}
-		if ("PRIVATE".equals(feed.getVisibility()) && !feed.getUserNo().equals(viewerUserNo)) {
+		if ("PRIVATE".equals(audience) && !feed.getUserNo().equals(viewerUserNo)) {
 			throw new BusinessException(ErrorCode.FEED_NOT_FOUND);
 		}
-		if ("NEIGHBORS".equals(feed.getVisibility())
+		if ("NEIGHBORS".equals(audience)
 				&& !feed.getUserNo().equals(viewerUserNo)
 				&& !neighborService.isAcceptedPair(viewerUserNo, feed.getUserNo())) {
 			throw new BusinessException(ErrorCode.FEED_NOT_FOUND);
@@ -771,6 +783,7 @@ public class FeedService {
 	}
 
 	private void insertCommentMentions(
+			Long actorUserNo,
 			Long commentId,
 			Long replyId,
 			List<CommentMentionRequest> mentions) {
@@ -794,13 +807,15 @@ public class FeedService {
 				if (user == null) {
 					throw new BusinessException(ErrorCode.USER_NOT_FOUND);
 				}
+				privacyService.assertMentionAllowed(actorUserNo, item.getUserNo());
 				mention.setMentionedUserNo(item.getUserNo());
 			} else if (item.getPetId() != null) {
 				String key = "P:" + item.getPetId();
 				if (!seen.add(key)) {
 					continue;
 				}
-				requirePet(item.getPetId());
+				Pet mentioned = requirePet(item.getPetId());
+				privacyService.assertMentionAllowed(actorUserNo, mentioned.getUserNo());
 				mention.setMentionedPetId(item.getPetId());
 			} else {
 				throw new BusinessException(ErrorCode.INVALID_INPUT, "멘션은 userNo 또는 petId가 필요합니다.");

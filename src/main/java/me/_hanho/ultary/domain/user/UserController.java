@@ -17,6 +17,7 @@ import me._hanho.ultary.common.response.ApiResponse;
 import me._hanho.ultary.domain.myultary.MyUltaryService;
 import me._hanho.ultary.domain.myultary.dto.response.FeedGridItemResponse;
 import me._hanho.ultary.domain.neighbor.NeighborService;
+import me._hanho.ultary.domain.neighbor.dto.response.BlockedUserItemResponse;
 import me._hanho.ultary.domain.neighbor.dto.response.NeighborListItemResponse;
 import me._hanho.ultary.domain.neighbor.dto.response.NeighborRelationResponse;
 import me._hanho.ultary.domain.neighbor.dto.response.UserUltaryResponse;
@@ -86,6 +87,15 @@ public class UserController {
 			@PathVariable Long userNo) {
 		log.info("[neighborRequest] me={} userNo={}", principal.getUserNo(), userNo);
 		return ApiResponse.ok(neighborService.request(principal, userNo), "주민 요청 성공");
+	}
+
+	/** 내가 차단한 사용자. 해제는 DELETE /users/{userNo}/block */
+	@GetMapping("/blocks")
+	public ApiResponse<List<BlockedUserItemResponse>> blocks(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@RequestParam(required = false) Integer limit) {
+		log.info("[blocks] me={} limit={}", principal.getUserNo(), limit);
+		return ApiResponse.ok(neighborService.listBlocked(principal, limit), "차단한 사용자 조회 성공");
 	}
 
 	@PostMapping("/{userNo}/block")
