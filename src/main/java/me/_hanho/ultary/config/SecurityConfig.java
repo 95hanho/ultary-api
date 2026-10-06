@@ -56,6 +56,8 @@ public class SecurityConfig {
 						.permitAll()
 						// 공유 게시글 단건: PUBLIC은 비로그인 허용 (spring-auth-api.md)
 						.requestMatchers(HttpMethod.GET, "/api/v1/feeds/*").permitAll()
+						// 소켓 핸드셰이크는 티켓 전. 인증은 연결 후 첫 메시지
+						.requestMatchers("/api/v1/ws").permitAll()
 						.requestMatchers("/api/v1/**").authenticated()
 						.anyRequest().permitAll())
 				.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

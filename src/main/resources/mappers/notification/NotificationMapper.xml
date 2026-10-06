@@ -118,6 +118,33 @@
 			updated_at = IF(#{markUnread} = 1, NOW(), updated_at)
 	</insert>
 
+	<select id="findReceivers" resultType="java.lang.Long">
+		SELECT DISTINCT receiver_user_no
+		FROM ultary_notification
+		WHERE
+		<choose>
+			<when test="groupKey != null">group_key = #{groupKey}</when>
+			<when test="feedId != null">feed_id = #{feedId}</when>
+			<when test="storyId != null">story_id = #{storyId}</when>
+			<when test="neighborId != null">neighbor_id = #{neighborId}</when>
+			<when test="feedCommentId != null">
+				feed_comment_id = #{feedCommentId}
+				AND type IN
+				<foreach collection="types" item="type" open="(" separator="," close=")">
+					#{type}
+				</foreach>
+			</when>
+			<when test="feedReplyId != null">
+				feed_reply_id = #{feedReplyId}
+				AND type IN
+				<foreach collection="types" item="type" open="(" separator="," close=")">
+					#{type}
+				</foreach>
+			</when>
+			<otherwise>1 = 0</otherwise>
+		</choose>
+	</select>
+
 	<delete id="deleteByReceiverGroup">
 		DELETE FROM ultary_notification
 		WHERE receiver_user_no = #{receiverUserNo}

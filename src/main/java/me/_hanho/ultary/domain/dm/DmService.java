@@ -34,6 +34,7 @@ import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
 import me._hanho.ultary.domain.neighbor.NeighborService;
 import me._hanho.ultary.domain.story.StoryService;
 import me._hanho.ultary.domain.user.UserBlockMapper;
+import me._hanho.ultary.domain.ws.RealtimePush;
 import me._hanho.ultary.domain.user.UserMapper;
 import me._hanho.ultary.domain.user.model.User;
 import me._hanho.ultary.security.principal.UserPrincipal;
@@ -55,6 +56,7 @@ public class DmService {
 	private final FeedMapper feedMapper;
 	private final StoryService storyService;
 	private final FileService fileService;
+	private final RealtimePush realtimePush;
 
 	@Transactional(readOnly = true)
 	public DmRoomListResponse listRooms(UserPrincipal principal, Integer limit) {
@@ -178,7 +180,17 @@ public class DmService {
 		markReadLatest(me, roomId);
 		log.info("[send] userNo={} roomId={} messageId={} share={}", me, roomId, message.getDmMessageId(), shareType);
 		DmMessageRow row = dmMapper.findMessage(message.getDmMessageId());
+		realtimePush.pushDm(me, roomItemOrNull(me, roomId), toMessage(row, me));
+		realtimePush.pushDm(peer, roomItemOrNull(peer, roomId), toMessage(row, peer));
 		return toMessage(row, me);
+	}
+
+	private DmRoomItemResponse roomItemOrNull(Long userNo, Long roomId) {
+		DmRoomRow row = dmMapper.findRoomRow(userNo, roomId);
+		if (row == null) {
+			return null;
+		}
+		return toRoomItems(List.of(row)).get(0);
 	}
 
 	private Long resolveFeedMedia(Long feedId, Long feedMediaId, Long viewerUserNo) {

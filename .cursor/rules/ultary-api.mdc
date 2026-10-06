@@ -20,11 +20,11 @@ Spring Boot 3.4 / MyBatis / MariaDB 10.1 / 패키지 `me._hanho.ultary` / API pr
 ## 진행 상태 (커밋 메시지와 함께 갱신)
 
 - 스키마: **v18** (`ultary_dm_room`·`ultary_dm_message`. 1:1, 게시글 사진·스토리 사진 공유. v17은 공개 범위)
-- 완료(스모크): auth, file, pet, tag, feed, myultary, story, neighbor(block 포함), **main**(feeds/search/recommended/최근검색), **notification**(목록·읽음, 발생 시 저장. 웹소켓 없음), **dm**(방·메시지·게시글/스토리 공유. 웹소켓 없음)
+- 완료(스모크): auth, file, pet, tag, feed, myultary, story, neighbor(block 포함), **main**(feeds/search/recommended/최근검색), **notification**(목록·읽음, 배지는 소켓 `NOTIFICATION_UNREAD`), **dm**(방·메시지·게시글/스토리 공유. 새 메시지는 소켓 `DM_MESSAGE`)
 - 로컬 시드(선택): `share/database/seed/mariadb_10_1/001_dev_sample_data.sql` — 재실행 가능, 운영에서는 제외. user **101~105**, pet 유저당 1~2. HTTP는 user 101 / `google-myultary-test-001`
-- HTTP: `requests/my-ultary.http`, `requests/story.http`, `requests/neighbor.http`, `requests/main.http`, `requests/notification.http`, `requests/dm.http` 등
+- HTTP: `requests/my-ultary.http`, `requests/story.http`, `requests/neighbor.http`, `requests/main.http`, `requests/notification.http`, `requests/dm.http`, `requests/ws.http` 등
 - **최종 E2E 재검증**은 도메인 더 붙인 뒤(또는 배포 전) 별도로 한다
-- 다음 후보: 알림 웹소켓 …
+- 다음 후보: 웹소켓 화면 연결(웹) …
 
 ## 도메인 패턴
 

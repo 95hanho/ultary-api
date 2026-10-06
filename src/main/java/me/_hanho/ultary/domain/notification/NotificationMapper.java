@@ -34,6 +34,16 @@ public interface NotificationMapper {
 			@Param("feedReplyId") Long feedReplyId,
 			@Param("types") List<String> types);
 
+	/** 지우기 전에 배지를 갱신할 수신자. 조건은 하나만 쓴다 */
+	List<Long> findReceivers(
+			@Param("groupKey") String groupKey,
+			@Param("feedId") Long feedId,
+			@Param("storyId") Long storyId,
+			@Param("neighborId") Long neighborId,
+			@Param("feedCommentId") Long feedCommentId,
+			@Param("feedReplyId") Long feedReplyId,
+			@Param("types") List<String> types);
+
 	int updateSnippetByComment(
 			@Param("feedCommentId") Long feedCommentId,
 			@Param("content") String content,

@@ -1,5 +1,6 @@
 package me._hanho.ultary.domain.notification;
 
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -20,6 +21,7 @@ import me._hanho.ultary.domain.notification.model.NotificationDraft;
 import me._hanho.ultary.domain.notification.model.NotificationListRow;
 import me._hanho.ultary.domain.notification.model.NotificationUpsert;
 import me._hanho.ultary.domain.pet.PetService;
+import me._hanho.ultary.domain.ws.RealtimePush;
 import me._hanho.ultary.security.principal.UserPrincipal;
 
 @Service
@@ -50,6 +52,7 @@ public class NotificationService {
 	private final NotificationSettingService notificationSettingService;
 	private final PetService petService;
 	private final FileService fileService;
+	private final RealtimePush realtimePush;
 
 	/** 하단 배지. 읽음 처리하지 않는다 */
 	@Transactional(readOnly = true)
@@ -66,6 +69,7 @@ public class NotificationService {
 		List<NotificationListRow> rows = notificationMapper.findByReceiver(userNo, resolveLimit(limit));
 		int unreadCount = notificationMapper.countUnread(userNo);
 		notificationMapper.markAllRead(userNo);
+		pushUnread(userNo);
 		return NotificationListResponse.builder()
 				.unreadCount(unreadCount)
 				.items(toItems(rows))
@@ -81,12 +85,14 @@ public class NotificationService {
 		}
 		notificationMapper.markRead(notificationId, userNo);
 		row.setIsRead(true);
+		pushUnread(userNo);
 		return toItems(List.of(row)).get(0);
 	}
 
 	@Transactional
 	public void readAll(UserPrincipal principal) {
 		notificationMapper.markAllRead(principal.getUserNo());
+		pushUnread(principal.getUserNo());
 	}
 
 	public void syncFeedLike(Long feedId, boolean markUnread) {
@@ -180,23 +186,30 @@ public class NotificationService {
 	}
 
 	public void removeByFeed(Long feedId) {
-		notificationMapper.deleteByFeedId(feedId);
+		deleteThenPush(notificationMapper.findReceivers(null, feedId, null, null, null, null, null),
+				() -> notificationMapper.deleteByFeedId(feedId));
 	}
 
 	public void removeByStory(Long storyId) {
-		notificationMapper.deleteByStoryId(storyId);
+		deleteThenPush(notificationMapper.findReceivers(null, null, storyId, null, null, null, null),
+				() -> notificationMapper.deleteByStoryId(storyId));
 	}
 
 	public void removeByNeighbor(Long neighborId) {
-		notificationMapper.deleteByNeighborId(neighborId);
+		deleteThenPush(notificationMapper.findReceivers(null, null, null, neighborId, null, null, null),
+				() -> notificationMapper.deleteByNeighborId(neighborId));
 	}
 
 	public void removeCommentTree(Long commentId) {
-		notificationMapper.deleteByCommentTypes(commentId, COMMENT_TREE_TYPES);
+		deleteThenPush(
+				notificationMapper.findReceivers(null, null, null, null, commentId, null, COMMENT_TREE_TYPES),
+				() -> notificationMapper.deleteByCommentTypes(commentId, COMMENT_TREE_TYPES));
 	}
 
 	public void removeReply(Long replyId) {
-		notificationMapper.deleteByReplyTypes(replyId, REPLY_DIRECT_TYPES);
+		deleteThenPush(
+				notificationMapper.findReceivers(null, null, null, null, null, replyId, REPLY_DIRECT_TYPES),
+				() -> notificationMapper.deleteByReplyTypes(replyId, REPLY_DIRECT_TYPES));
 	}
 
 	private void replaceMentions(
@@ -207,10 +220,16 @@ public class NotificationService {
 			Long commentId,
 			Long replyId) {
 		if (commentId != null) {
-			notificationMapper.deleteByCommentTypes(commentId, List.of(type));
+			List<String> types = List.of(type);
+			deleteThenPush(
+					notificationMapper.findReceivers(null, null, null, null, commentId, null, types),
+					() -> notificationMapper.deleteByCommentTypes(commentId, types));
 		}
 		if (replyId != null) {
-			notificationMapper.deleteByReplyTypes(replyId, List.of(type));
+			List<String> types = List.of(type);
+			deleteThenPush(
+					notificationMapper.findReceivers(null, null, null, null, null, replyId, types),
+					() -> notificationMapper.deleteByReplyTypes(replyId, types));
 		}
 		if (source == null || source.getActorUserNo() == null || receivers == null) {
 			return;
@@ -222,11 +241,13 @@ public class NotificationService {
 
 	private void applySingle(String type, String groupKey, NotificationDraft draft, boolean markUnread) {
 		if (draft == null || draft.getReceiverUserNo() == null) {
-			notificationMapper.deleteByGroupKey(groupKey);
+			deleteThenPush(notificationMapper.findReceivers(groupKey, null, null, null, null, null, null),
+					() -> notificationMapper.deleteByGroupKey(groupKey));
 			return;
 		}
 		if (draft.getActorUserNo() == null || draft.getActorCount() == null || draft.getActorCount() < 1) {
 			notificationMapper.deleteByReceiverGroup(draft.getReceiverUserNo(), groupKey);
+			pushUnread(draft.getReceiverUserNo());
 			return;
 		}
 		save(draft.getReceiverUserNo(), draft, type, groupKey, markUnread);
@@ -262,6 +283,25 @@ public class NotificationService {
 				.groupKey(groupKey)
 				.markUnread(markUnread ? 1 : 0)
 				.build());
+		pushUnread(receiverUserNo);
+	}
+
+	private void deleteThenPush(List<Long> receivers, Runnable delete) {
+		delete.run();
+		pushUnread(receivers);
+	}
+
+	private void pushUnread(Long userNo) {
+		realtimePush.pushNotificationUnread(userNo);
+	}
+
+	private void pushUnread(Collection<Long> userNos) {
+		if (userNos == null) {
+			return;
+		}
+		for (Long userNo : userNos) {
+			pushUnread(userNo);
+		}
 	}
 
 	private List<NotificationItemResponse> toItems(List<NotificationListRow> rows) {

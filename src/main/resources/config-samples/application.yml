@@ -100,3 +100,11 @@ jwt:
     # phoneauth: 30              # 30초
     # phoneauth-complete: 60     # 1분
     # pwdchange: 60              # 1분
+
+# 웹소켓. 브라우저는 Spring 주소로 바로 붙는다. 기본 Origin 은 localhost:3000
+ultary:
+  ws:
+    allowed-origins:
+      - http://localhost:3000
+      - http://127.0.0.1:3000
+    ticket-ttl-seconds: 30
