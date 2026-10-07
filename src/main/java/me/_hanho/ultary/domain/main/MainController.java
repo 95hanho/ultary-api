@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.response.ApiResponse;
 import me._hanho.ultary.domain.feed.dto.response.FeedResponse;
+import me._hanho.ultary.domain.myultary.dto.response.FeedGridItemResponse;
 import me._hanho.ultary.domain.main.dto.request.SavePetTagHistoryRequest;
 import me._hanho.ultary.domain.main.dto.request.SaveSearchHistoryRequest;
 import me._hanho.ultary.domain.main.dto.response.MainFeedPageResponse;
@@ -81,6 +83,18 @@ public class MainController {
 			@RequestParam(required = false) Integer limit) {
 		log.info("[search] userNo={} q={} type={}", principal.getUserNo(), q, type);
 		return ApiResponse.ok(mainService.search(principal, q, type, limit), "검색 성공");
+	}
+
+	/** 태그명 검색 결과에서 고른 태그의 게시글 그리드 */
+	@GetMapping("/search/tags/{tagId}/feeds")
+	public ApiResponse<List<FeedGridItemResponse>> searchTagFeeds(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@PathVariable Long tagId,
+			@RequestParam(required = false) Integer limit) {
+		log.info("[searchTagFeeds] userNo={} tagId={} limit={}", principal.getUserNo(), tagId, limit);
+		return ApiResponse.ok(
+				mainService.listFeedsByTag(principal, tagId, limit),
+				"태그 게시글 조회 성공");
 	}
 
 	/** 나중에 추천 알고리즘 추가해야함. 지금은 조회 가능한 전체 피드를 limit건 */

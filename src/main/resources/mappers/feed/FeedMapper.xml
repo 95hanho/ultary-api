@@ -12,7 +12,7 @@
 		visibility,
 		like_count,
 		comment_count,
-		store_count,
+		pin_count,
 		created_at,
 		updated_at,
 		is_deleted,
@@ -148,7 +148,7 @@
 		  AND is_deleted = 0
 	</select>
 
-	<select id="findSavedByUserNo" resultType="me._hanho.ultary.domain.feed.model.Feed">
+	<select id="findPinnedByUserNo" resultType="me._hanho.ultary.domain.feed.model.Feed">
 		SELECT
 			f.feed_id,
 			f.user_no,
@@ -156,17 +156,17 @@
 			f.visibility,
 			f.like_count,
 			f.comment_count,
-			f.store_count,
+			f.pin_count,
 			f.created_at,
 			f.updated_at,
 			f.is_deleted,
 			f.deleted_at,
 			f.deleted_by_user_no
-		FROM ultary_feed_store s
+		FROM ultary_feed_pin s
 		INNER JOIN ultary_feed f ON f.feed_id = s.feed_id AND f.is_deleted = 0
 		WHERE s.user_no = #{userNo}
 		  AND s.is_deleted = 0
-		ORDER BY s.created_at DESC, s.feed_store_id DESC
+		ORDER BY s.created_at DESC, s.feed_pin_id DESC
 		LIMIT #{limit}
 	</select>
 
@@ -178,7 +178,7 @@
 			f.visibility,
 			f.like_count,
 			f.comment_count,
-			f.store_count,
+			f.pin_count,
 			f.created_at,
 			f.updated_at,
 			f.is_deleted,
@@ -211,6 +211,72 @@
 		LIMIT #{limit}
 	</select>
 
+	<select id="findPinnedVisibleByOwner" resultType="me._hanho.ultary.domain.feed.model.Feed">
+		SELECT
+			f.feed_id,
+			f.user_no,
+			f.content,
+			f.visibility,
+			f.like_count,
+			f.comment_count,
+			f.pin_count,
+			f.created_at,
+			f.updated_at,
+			f.is_deleted,
+			f.deleted_at,
+			f.deleted_by_user_no
+		FROM ultary_feed_pin s
+		INNER JOIN ultary_feed f ON f.feed_id = s.feed_id
+		INNER JOIN ultary_user u ON u.user_no = f.user_no
+		WHERE s.user_no = #{ownerUserNo}
+		  AND s.is_deleted = 0
+		  AND <include refid="visibleToViewerAndNotBlocked"/>
+		ORDER BY s.created_at DESC, s.feed_pin_id DESC
+		LIMIT #{limit}
+	</select>
+
+	<select id="findTaggedVisibleByOwner" resultType="me._hanho.ultary.domain.feed.model.Feed">
+		SELECT DISTINCT
+			f.feed_id,
+			f.user_no,
+			f.content,
+			f.visibility,
+			f.like_count,
+			f.comment_count,
+			f.pin_count,
+			f.created_at,
+			f.updated_at,
+			f.is_deleted,
+			f.deleted_at,
+			f.deleted_by_user_no
+		FROM ultary_feed f
+		INNER JOIN ultary_user u ON u.user_no = f.user_no
+		WHERE <include refid="visibleToViewerAndNotBlocked"/>
+		  AND f.user_no &lt;&gt; #{ownerUserNo}
+		  AND (
+			EXISTS (
+				SELECT 1
+				FROM ultary_feed_pet fp
+				INNER JOIN ultary_pet p ON p.pet_id = fp.pet_id
+					AND p.user_no = #{ownerUserNo}
+					AND p.is_deleted = 0
+				WHERE fp.feed_id = f.feed_id
+				  AND fp.role = 'COLLABORATOR'
+			)
+			OR EXISTS (
+				SELECT 1
+				FROM ultary_feed_media m
+				INNER JOIN ultary_feed_media_mention mm ON mm.feed_media_id = m.feed_media_id
+				INNER JOIN ultary_pet p ON p.pet_id = mm.pet_id
+					AND p.user_no = #{ownerUserNo}
+					AND p.is_deleted = 0
+				WHERE m.feed_id = f.feed_id
+			)
+		  )
+		ORDER BY f.created_at DESC, f.feed_id DESC
+		LIMIT #{limit}
+	</select>
+
 	<select id="findMainTimeline" resultType="me._hanho.ultary.domain.feed.model.Feed">
 		SELECT
 			f.feed_id,
@@ -219,7 +285,7 @@
 			f.visibility,
 			f.like_count,
 			f.comment_count,
-			f.store_count,
+			f.pin_count,
 			f.created_at,
 			f.updated_at,
 			f.is_deleted,
@@ -257,7 +323,7 @@
 			f.visibility,
 			f.like_count,
 			f.comment_count,
-			f.store_count,
+			f.pin_count,
 			f.created_at,
 			f.updated_at,
 			f.is_deleted,
@@ -278,7 +344,7 @@
 			f.visibility,
 			f.like_count,
 			f.comment_count,
-			f.store_count,
+			f.pin_count,
 			f.created_at,
 			f.updated_at,
 			f.is_deleted,
@@ -288,6 +354,31 @@
 		INNER JOIN ultary_user u ON u.user_no = f.user_no
 		WHERE <include refid="visibleToViewerAndNotBlocked"/>
 		  AND IFNULL(f.content, '') LIKE CONCAT('%', #{q}, '%')
+		ORDER BY f.created_at DESC, f.feed_id DESC
+		LIMIT #{limit}
+	</select>
+
+	<select id="findVisibleByTag" resultType="me._hanho.ultary.domain.feed.model.Feed">
+		SELECT
+			f.feed_id,
+			f.user_no,
+			f.content,
+			f.visibility,
+			f.like_count,
+			f.comment_count,
+			f.pin_count,
+			f.created_at,
+			f.updated_at,
+			f.is_deleted,
+			f.deleted_at,
+			f.deleted_by_user_no
+		FROM ultary_feed f
+		INNER JOIN ultary_user u ON u.user_no = f.user_no
+		INNER JOIN ultary_feed_tag ft
+			ON ft.feed_id = f.feed_id
+		   AND ft.tag_id = #{tagId}
+		   AND ft.is_deleted = 0
+		WHERE <include refid="visibleToViewerAndNotBlocked"/>
 		ORDER BY f.created_at DESC, f.feed_id DESC
 		LIMIT #{limit}
 	</select>
@@ -361,6 +452,25 @@
 		FROM ultary_feed_media
 		WHERE feed_id = #{feedId}
 		ORDER BY sort_order ASC, feed_media_id ASC
+	</select>
+
+	<select id="findMediaByFeedIds" resultType="me._hanho.ultary.domain.feed.model.FeedMedia">
+		SELECT
+			feed_media_id,
+			feed_id,
+			file_id,
+			media_type,
+			thumbnail_file_id,
+			duration_sec,
+			sort_order,
+			created_at,
+			updated_at
+		FROM ultary_feed_media
+		WHERE feed_id IN
+		<foreach collection="feedIds" item="feedId" open="(" separator="," close=")">
+			#{feedId}
+		</foreach>
+		ORDER BY feed_id ASC, sort_order ASC, feed_media_id ASC
 	</select>
 
 	<insert id="insertMediaMention" useGeneratedKeys="true" keyProperty="feedMediaMentionId" keyColumn="feed_media_mention_id">
@@ -507,26 +617,26 @@
 		LIMIT #{limit}
 	</select>
 
-	<select id="findStore" resultType="me._hanho.ultary.domain.feed.model.FeedStore">
+	<select id="findPin" resultType="me._hanho.ultary.domain.feed.model.FeedPin">
 		SELECT
-			feed_store_id,
+			feed_pin_id,
 			feed_id,
 			user_no,
 			created_at,
 			is_deleted,
 			deleted_at
-		FROM ultary_feed_store
+		FROM ultary_feed_pin
 		WHERE feed_id = #{feedId}
 		  AND user_no = #{userNo}
 	</select>
 
-	<insert id="insertStore">
-		INSERT INTO ultary_feed_store (feed_id, user_no, is_deleted, deleted_at)
+	<insert id="insertPin">
+		INSERT INTO ultary_feed_pin (feed_id, user_no, is_deleted, deleted_at)
 		VALUES (#{feedId}, #{userNo}, 0, NULL)
 	</insert>
 
-	<update id="restoreStore">
-		UPDATE ultary_feed_store
+	<update id="restorePin">
+		UPDATE ultary_feed_pin
 		SET is_deleted = 0,
 			deleted_at = NULL,
 			created_at = NOW()
@@ -535,8 +645,8 @@
 		  AND is_deleted = 1
 	</update>
 
-	<update id="softDeleteStore">
-		UPDATE ultary_feed_store
+	<update id="softDeletePin">
+		UPDATE ultary_feed_pin
 		SET is_deleted = 1,
 			deleted_at = NOW()
 		WHERE feed_id = #{feedId}
@@ -544,14 +654,75 @@
 		  AND is_deleted = 0
 	</update>
 
-	<update id="adjustStoreCount">
+	<update id="adjustPinCount">
 		UPDATE ultary_feed
-		SET store_count = CASE
-				WHEN #{delta} &lt; 0 AND store_count &lt;= 0 THEN 0
-				ELSE store_count + #{delta}
+		SET pin_count = CASE
+				WHEN #{delta} &lt; 0 AND pin_count &lt;= 0 THEN 0
+				ELSE pin_count + #{delta}
 			END,
 			updated_at = NOW()
 		WHERE feed_id = #{feedId}
+		  AND is_deleted = 0
+	</update>
+
+	<select id="findSavedByUserNo" resultType="me._hanho.ultary.domain.feed.model.Feed">
+		SELECT
+			f.feed_id,
+			f.user_no,
+			f.content,
+			f.visibility,
+			f.like_count,
+			f.comment_count,
+			f.pin_count,
+			f.created_at,
+			f.updated_at,
+			f.is_deleted,
+			f.deleted_at,
+			f.deleted_by_user_no
+		FROM ultary_feed_save s
+		INNER JOIN ultary_feed f ON f.feed_id = s.feed_id
+		INNER JOIN ultary_user u ON u.user_no = f.user_no
+		WHERE s.user_no = #{userNo}
+		  AND s.is_deleted = 0
+		  AND <include refid="visibleToViewerAndNotBlocked"/>
+		ORDER BY s.created_at DESC, s.feed_save_id DESC
+		LIMIT #{limit}
+	</select>
+
+	<select id="findSave" resultType="me._hanho.ultary.domain.feed.model.FeedSave">
+		SELECT
+			feed_save_id,
+			feed_id,
+			user_no,
+			created_at,
+			is_deleted,
+			deleted_at
+		FROM ultary_feed_save
+		WHERE feed_id = #{feedId}
+		  AND user_no = #{userNo}
+	</select>
+
+	<insert id="insertSave">
+		INSERT INTO ultary_feed_save (feed_id, user_no, is_deleted, deleted_at)
+		VALUES (#{feedId}, #{userNo}, 0, NULL)
+	</insert>
+
+	<update id="restoreSave">
+		UPDATE ultary_feed_save
+		SET is_deleted = 0,
+			deleted_at = NULL,
+			created_at = NOW()
+		WHERE feed_id = #{feedId}
+		  AND user_no = #{userNo}
+		  AND is_deleted = 1
+	</update>
+
+	<update id="softDeleteSave">
+		UPDATE ultary_feed_save
+		SET is_deleted = 1,
+			deleted_at = NOW()
+		WHERE feed_id = #{feedId}
+		  AND user_no = #{userNo}
 		  AND is_deleted = 0
 	</update>
 

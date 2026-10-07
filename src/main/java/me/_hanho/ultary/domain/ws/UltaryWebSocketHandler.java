@@ -20,6 +20,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import me._hanho.ultary.domain.dm.DmPresence;
 
 @Slf4j
 @Component
@@ -32,6 +33,7 @@ public class UltaryWebSocketHandler extends TextWebSocketHandler {
 	private final WsTicketService ticketService;
 	private final WsSessionRegistry registry;
 	private final RealtimePush realtimePush;
+	private final DmPresence presence;
 	private final ObjectMapper objectMapper;
 	private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(task -> {
 		Thread thread = new Thread(task, "ws-auth-timeout");
@@ -86,7 +88,11 @@ public class UltaryWebSocketHandler extends TextWebSocketHandler {
 	@Override
 	public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
 		cancelTimeout(session);
+		Object userNo = session.getAttributes().get(WsSessionRegistry.USER_NO);
 		registry.remove(session);
+		if (userNo instanceof Long id && !registry.hasSession(id)) {
+			presence.onDisconnect(id);
+		}
 	}
 
 	private void cancelTimeout(WebSocketSession session) {

@@ -239,4 +239,17 @@
 		  )
 	</select>
 
+	<select id="findActiveMentions" resultType="me._hanho.ultary.domain.pet.model.PetMention">
+		SELECT
+			user_no AS userNo,
+			mention_id AS mentionId
+		FROM ultary_pet
+		WHERE is_deleted = 0
+		  AND user_no IN
+		<foreach collection="userNos" item="userNo" open="(" separator="," close=")">
+			#{userNo}
+		</foreach>
+		ORDER BY user_no ASC, priority ASC, pet_id ASC
+	</select>
+
 </mapper>

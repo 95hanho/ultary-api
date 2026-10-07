@@ -33,6 +33,14 @@ Authorization: Bearer {{accessToken}}
 GET {{baseUrl}}/api/v1/users/102/feeds?limit=30
 Authorization: Bearer {{accessToken}}
 
+### 1d. 102가 울타리에 고정한 글 (101이 볼 수 있는 글만)
+GET {{baseUrl}}/api/v1/users/102/pinned-feeds?limit=30
+Authorization: Bearer {{accessToken}}
+
+### 1e. 102가 태그된 글 (102가 쓴 글 제외. 101이 볼 수 있는 글만)
+GET {{baseUrl}}/api/v1/users/102/tagged-feeds?limit=30
+Authorization: Bearer {{accessToken}}
+
 ### 2. 다른 유저 울타리 (104 대기중) — PENDING_RECEIVED
 GET {{baseUrl}}/api/v1/users/104/ultary
 Authorization: Bearer {{accessToken}}

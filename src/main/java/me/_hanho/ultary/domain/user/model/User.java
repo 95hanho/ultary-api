@@ -26,4 +26,5 @@ public class User {
 	private LocalDateTime updatedAt;
 	private String withdrawalStatus;
 	private LocalDateTime withdrawalCompletedAt;
+	private LocalDateTime suspendedAt;
 }

@@ -19,6 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.exception.BusinessException;
 import me._hanho.ultary.common.exception.ErrorCode;
 import me._hanho.ultary.common.response.ApiResponse;
+import me._hanho.ultary.domain.auth.TokenMapper;
 import me._hanho.ultary.domain.pet.PetMapper;
 import me._hanho.ultary.domain.story.StoryMapper;
 import me._hanho.ultary.domain.test.dto.request.PasswordEncodeRequest;
@@ -26,6 +27,7 @@ import me._hanho.ultary.domain.test.dto.response.MentionIdCooldownResetResponse;
 import me._hanho.ultary.domain.test.dto.response.NicknameCooldownResetResponse;
 import me._hanho.ultary.domain.test.dto.response.PasswordEncodeResponse;
 import me._hanho.ultary.domain.test.dto.response.StoryViewResetResponse;
+import me._hanho.ultary.domain.test.dto.response.TokenResetResponse;
 import me._hanho.ultary.domain.user.UserMapper;
 import me._hanho.ultary.security.principal.UserPrincipal;
 
@@ -45,6 +47,7 @@ public class TestController {
 	private final StoryMapper storyMapper;
 	private final UserMapper userMapper;
 	private final PetMapper petMapper;
+	private final TokenMapper tokenMapper;
 
 	@PostMapping("/password/encode")
 	public ApiResponse<PasswordEncodeResponse> encodePassword(
@@ -115,5 +118,23 @@ public class TestController {
 				.petId(petId)
 				.mentionIdChangedAt(changedAt)
 				.build(), "멘션 ID 변경 기간 초기화 성공");
+	}
+
+	/**
+	 * 로그인 유저의 리프레시 토큰을 모두 폐기한다.
+	 * 액세스 토큰은 DB에 없으므로 쿠키 삭제는 호출 쪽(FE)이 한다.
+	 */
+	@DeleteMapping("/tokens")
+	public ApiResponse<TokenResetResponse> resetTokens(
+			@AuthenticationPrincipal UserPrincipal principal) {
+		if (principal == null) {
+			throw new BusinessException(ErrorCode.UNAUTHORIZED);
+		}
+		int revoked = tokenMapper.revokeAllByUserNo(principal.getUserNo());
+		log.info("[resetTokens] userNo={} revoked={}", principal.getUserNo(), revoked);
+		return ApiResponse.ok(TokenResetResponse.builder()
+				.userNo(principal.getUserNo())
+				.revokedCount(revoked)
+				.build(), "액세스·리프레시 토큰 초기화 성공");
 	}
 }

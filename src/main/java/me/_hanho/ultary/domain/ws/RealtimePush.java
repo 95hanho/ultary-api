@@ -38,6 +38,29 @@ public class RealtimePush {
 				"message", message)));
 	}
 
+	/** 읽은 사람이 아닌 상대에게. lastReadMessageId는 그 사람이 읽은 마지막 메시지 */
+	public void pushDmRead(Long userNo, Long dmRoomId, Long lastReadMessageId) {
+		if (userNo == null || dmRoomId == null || lastReadMessageId == null) {
+			return;
+		}
+		afterCommit(() -> registry.send(userNo, Map.of(
+				"type", "DM_READ",
+				"dmRoomId", dmRoomId,
+				"lastReadMessageId", lastReadMessageId)));
+	}
+
+	/** 입력 중인 사람이 아닌 상대에게 */
+	public void pushDmTyping(Long userNo, Long dmRoomId, Long typingUserNo, boolean typing) {
+		if (userNo == null || dmRoomId == null || typingUserNo == null) {
+			return;
+		}
+		afterCommit(() -> registry.send(userNo, Map.of(
+				"type", "DM_TYPING",
+				"dmRoomId", dmRoomId,
+				"userNo", typingUserNo,
+				"typing", typing)));
+	}
+
 	/** 열린 트랜잭션이 커밋된 뒤에 보낸다. 없으면 바로 보낸다 */
 	public void afterCommit(Runnable task) {
 		if (TransactionSynchronizationManager.isSynchronizationActive()) {

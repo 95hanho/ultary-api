@@ -17,7 +17,8 @@ import me._hanho.ultary.domain.feed.model.FeedMediaMention;
 import me._hanho.ultary.domain.feed.model.FeedPet;
 import me._hanho.ultary.domain.feed.model.FeedReply;
 import me._hanho.ultary.domain.feed.model.FeedReplyLike;
-import me._hanho.ultary.domain.feed.model.FeedStore;
+import me._hanho.ultary.domain.feed.model.FeedPin;
+import me._hanho.ultary.domain.feed.model.FeedSave;
 
 @Mapper
 public interface FeedMapper {
@@ -38,12 +39,30 @@ public interface FeedMapper {
 
 	int countActiveByUserNo(@Param("userNo") Long userNo);
 
+	List<Feed> findPinnedByUserNo(
+			@Param("userNo") Long userNo,
+			@Param("limit") int limit);
+
+	/** 나만 보는 저장. viewerUserNo는 공개 범위 검사용이며 목록 주인과 같다 */
 	List<Feed> findSavedByUserNo(
 			@Param("userNo") Long userNo,
+			@Param("viewerUserNo") Long viewerUserNo,
 			@Param("limit") int limit);
 
 	List<Feed> findTaggedByUserNo(
 			@Param("userNo") Long userNo,
+			@Param("limit") int limit);
+
+	/** 그 유저가 울타리에 고정한 글 중 조회자에게 보이는 것만 */
+	List<Feed> findPinnedVisibleByOwner(
+			@Param("ownerUserNo") Long ownerUserNo,
+			@Param("viewerUserNo") Long viewerUserNo,
+			@Param("limit") int limit);
+
+	/** 그 유저가 태그된 글 중 조회자에게 보이는 것만. 그 유저가 쓴 글은 제외 */
+	List<Feed> findTaggedVisibleByOwner(
+			@Param("ownerUserNo") Long ownerUserNo,
+			@Param("viewerUserNo") Long viewerUserNo,
 			@Param("limit") int limit);
 
 	/** 본인 + 주민(requester ACCEPTED) 타임라인. cursor 이후(더 오래된) limit건 */
@@ -66,6 +85,12 @@ public interface FeedMapper {
 			@Param("q") String q,
 			@Param("limit") int limit);
 
+	/** 그 태그가 달린 글 중 조회자에게 보이는 것만. 최신순 */
+	List<Feed> findVisibleByTag(
+			@Param("viewerUserNo") Long viewerUserNo,
+			@Param("tagId") Long tagId,
+			@Param("limit") int limit);
+
 	int updateFeed(Feed feed);
 
 	int softDeleteFeed(
@@ -79,6 +104,8 @@ public interface FeedMapper {
 	int insertMedia(FeedMedia media);
 
 	List<FeedMedia> findMediaByFeedId(@Param("feedId") Long feedId);
+
+	List<FeedMedia> findMediaByFeedIds(@Param("feedIds") Collection<Long> feedIds);
 
 	int insertMediaMention(FeedMediaMention mention);
 
@@ -118,25 +145,41 @@ public interface FeedMapper {
 			@Param("feedId") Long feedId,
 			@Param("limit") int limit);
 
-	FeedStore findStore(
+	FeedPin findPin(
 			@Param("feedId") Long feedId,
 			@Param("userNo") Long userNo);
 
-	int insertStore(
+	int insertPin(
 			@Param("feedId") Long feedId,
 			@Param("userNo") Long userNo);
 
-	int restoreStore(
+	int restorePin(
 			@Param("feedId") Long feedId,
 			@Param("userNo") Long userNo);
 
-	int softDeleteStore(
+	int softDeletePin(
 			@Param("feedId") Long feedId,
 			@Param("userNo") Long userNo);
 
-	int adjustStoreCount(
+	int adjustPinCount(
 			@Param("feedId") Long feedId,
 			@Param("delta") int delta);
+
+	FeedSave findSave(
+			@Param("feedId") Long feedId,
+			@Param("userNo") Long userNo);
+
+	int insertSave(
+			@Param("feedId") Long feedId,
+			@Param("userNo") Long userNo);
+
+	int restoreSave(
+			@Param("feedId") Long feedId,
+			@Param("userNo") Long userNo);
+
+	int softDeleteSave(
+			@Param("feedId") Long feedId,
+			@Param("userNo") Long userNo);
 
 	int insertComment(FeedComment comment);
 

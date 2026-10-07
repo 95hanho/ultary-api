@@ -96,9 +96,7 @@ public class AuthService {
 			if (user == null) {
 				throw new BusinessException(ErrorCode.USER_INACTIVE);
 			}
-			if ("WITHDRAWN".equals(user.getWithdrawalStatus())) {
-				throw new BusinessException(ErrorCode.ACCOUNT_WITHDRAWN);
-			}
+			rejectClosedAccount(user);
 			if (!"ACTIVE".equals(user.getWithdrawalStatus())) {
 				throw new BusinessException(ErrorCode.USER_INACTIVE);
 			}
@@ -175,9 +173,7 @@ public class AuthService {
 	public TokenResponse login(LoginRequest request, HttpServletRequest httpRequest) {
 		User user = resolveLoginUser(request);
 
-		if (user != null && "WITHDRAWN".equals(user.getWithdrawalStatus())) {
-			throw new BusinessException(ErrorCode.ACCOUNT_WITHDRAWN);
-		}
+		rejectClosedAccount(user);
 		if (user == null
 				|| !StringUtils.hasText(user.getPassword())
 				|| !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
@@ -204,8 +200,9 @@ public class AuthService {
 			throw new BusinessException(ErrorCode.INVALID_TOKEN);
 		}
 
-		User user = userMapper.findActiveByUserNo(userNo);
-		if (user == null) {
+		User user = userMapper.findByUserNo(userNo);
+		rejectClosedAccount(user);
+		if (user == null || !"ACTIVE".equals(user.getWithdrawalStatus())) {
 			throw new BusinessException(ErrorCode.USER_INACTIVE);
 		}
 
@@ -562,6 +559,18 @@ public class AuthService {
 			return userMapper.findByPhoneForLogin(phone);
 		}
 		return null;
+	}
+
+	private void rejectClosedAccount(User user) {
+		if (user == null) {
+			return;
+		}
+		if ("WITHDRAWN".equals(user.getWithdrawalStatus())) {
+			throw new BusinessException(ErrorCode.ACCOUNT_WITHDRAWN);
+		}
+		if ("SUSPENDED".equals(user.getWithdrawalStatus())) {
+			throw new BusinessException(ErrorCode.ACCOUNT_SUSPENDED);
+		}
 	}
 
 	private MeResponse toMeResponse(User user) {

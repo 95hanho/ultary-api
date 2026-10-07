@@ -48,3 +48,9 @@ Authorization: Bearer {{accessToken}}
 # 시드 user 101 펫: 101. 화면의 펫 id로 바꿔 호출
 POST {{baseUrl}}/api/v1/test/pets/101/mention-id-cooldown
 Authorization: Bearer {{accessToken}}
+
+### 5. 액세스·리프레시 토큰 초기화 (local + Bearer)
+# ultary_token 의 내 리프레시 행을 모두 폐기. 응답 revokedCount
+# 액세스 JWT는 DB에 없다. 호출 후 브라우저의 access/refresh 쿠키를 지워야 로그아웃된다
+DELETE {{baseUrl}}/api/v1/test/tokens
+Authorization: Bearer {{accessToken}}

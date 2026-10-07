@@ -16,6 +16,8 @@ import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.exception.BusinessException;
 import me._hanho.ultary.common.exception.ErrorCode;
 import me._hanho.ultary.domain.dm.dto.request.CreateDmRoomRequest;
+import me._hanho.ultary.domain.dm.dto.request.DmTypingRequest;
+import me._hanho.ultary.domain.dm.dto.request.DmViewingRequest;
 import me._hanho.ultary.domain.dm.dto.request.SendDmMessageRequest;
 import me._hanho.ultary.domain.dm.dto.response.DmMessageListResponse;
 import me._hanho.ultary.domain.dm.dto.response.DmMessageResponse;
@@ -57,6 +59,7 @@ public class DmService {
 	private final StoryService storyService;
 	private final FileService fileService;
 	private final RealtimePush realtimePush;
+	private final DmPresence presence;
 
 	@Transactional(readOnly = true)
 	public DmRoomListResponse listRooms(UserPrincipal principal, Integer limit) {
@@ -108,21 +111,50 @@ public class DmService {
 	public void leave(UserPrincipal principal, Long roomId) {
 		DmRoom room = requireMember(principal.getUserNo(), roomId);
 		dmMapper.leave(room.getDmRoomId(), principal.getUserNo());
+		presence.leave(principal.getUserNo(), room.getDmRoomId());
 		log.info("[leave] userNo={} roomId={}", principal.getUserNo(), roomId);
 	}
 
 	@Transactional
 	public void read(UserPrincipal principal, Long roomId) {
 		Long me = principal.getUserNo();
-		requireOpenRoom(me, roomId);
-		markReadLatest(me, roomId);
+		DmRoom room = requireOpenRoom(me, roomId);
+		markReadLatest(room, me);
+	}
+
+	/** 이 방 화면을 보고 있는 동안 true를 약 10초마다 다시 보낸다. 20초가 지나면 나간 것으로 본다 */
+	@Transactional
+	public void viewing(UserPrincipal principal, Long roomId, DmViewingRequest request) {
+		if (request == null || request.getViewing() == null) {
+			throw new BusinessException(ErrorCode.INVALID_INPUT, "보고 있는지 알려 주세요.");
+		}
+		Long me = principal.getUserNo();
+		DmRoom room = requireOpenRoom(me, roomId);
+		if (Boolean.TRUE.equals(request.getViewing())) {
+			presence.view(me, roomId);
+			markReadLatest(room, me);
+		} else {
+			presence.leave(me, roomId);
+		}
+		log.info("[viewing] userNo={} roomId={} viewing={}", me, roomId, request.getViewing());
+	}
+
+	@Transactional
+	public void typing(UserPrincipal principal, Long roomId, DmTypingRequest request) {
+		if (request == null || request.getTyping() == null) {
+			throw new BusinessException(ErrorCode.INVALID_INPUT, "입력 중인지 알려 주세요.");
+		}
+		Long me = principal.getUserNo();
+		DmRoom room = requireOpenRoom(me, roomId);
+		presence.typing(me, peerOf(room, me), roomId, Boolean.TRUE.equals(request.getTyping()));
+		log.info("[typing] userNo={} roomId={} typing={}", me, roomId, request.getTyping());
 	}
 
 	@Transactional
 	public DmMessageListResponse messages(
 			UserPrincipal principal, Long roomId, Long beforeMessageId, Integer limit) {
 		Long me = principal.getUserNo();
-		requireOpenRoom(me, roomId);
+		DmRoom room = requireOpenRoom(me, roomId);
 		int resolved = resolveLimit(limit);
 		List<DmMessageRow> rows = dmMapper.findMessages(roomId, beforeMessageId, resolved + 1);
 		boolean hasMore = rows.size() > resolved;
@@ -131,10 +163,12 @@ public class DmService {
 		}
 		Collections.reverse(rows);
 		Long nextCursor = hasMore ? rows.get(0).getDmMessageId() : null;
-		markReadLatest(me, roomId);
+		Long peerLastRead = readCursor(room, peerOf(room, me));
+		markReadLatest(room, me);
 		return DmMessageListResponse.builder()
 				.items(toMessages(rows, me))
 				.nextCursorMessageId(nextCursor)
+				.peerLastReadMessageId(peerLastRead)
 				.build();
 	}
 
@@ -177,7 +211,11 @@ public class DmService {
 		message.setStoryId(storyId);
 		dmMapper.insertMessage(message);
 		dmMapper.clearPeerLeft(roomId, me);
-		markReadLatest(me, roomId);
+		markReadLatest(room, me);
+		if (presence.isViewing(peer, roomId)) {
+			markReadUpTo(room, peer, message.getDmMessageId());
+		}
+		presence.typing(me, peer, roomId, false);
 		log.info("[send] userNo={} roomId={} messageId={} share={}", me, roomId, message.getDmMessageId(), shareType);
 		DmMessageRow row = dmMapper.findMessage(message.getDmMessageId());
 		realtimePush.pushDm(me, roomItemOrNull(me, roomId), toMessage(row, me));
@@ -210,11 +248,33 @@ public class DmService {
 		throw new BusinessException(ErrorCode.INVALID_INPUT, "공유할 게시글 사진을 찾을 수 없습니다.");
 	}
 
-	private void markReadLatest(Long userNo, Long roomId) {
-		Long latest = dmMapper.findLatestMessageId(roomId);
-		if (latest != null) {
-			dmMapper.markRead(roomId, userNo, latest);
+	private void markReadLatest(DmRoom room, Long userNo) {
+		markReadUpTo(room, userNo, dmMapper.findLatestMessageId(room.getDmRoomId()));
+	}
+
+	/** 커서가 실제로 올라갈 때만 상대에게 DM_READ를 보낸다 */
+	private void markReadUpTo(DmRoom room, Long userNo, Long messageId) {
+		if (messageId == null) {
+			return;
 		}
+		Long current = readCursor(room, userNo);
+		if (current != null && current >= messageId) {
+			return;
+		}
+		dmMapper.markRead(room.getDmRoomId(), userNo, messageId);
+		if (userNo.equals(room.getUserLow())) {
+			room.setLowLastReadMessageId(messageId);
+		} else {
+			room.setHighLastReadMessageId(messageId);
+		}
+		realtimePush.pushDmRead(peerOf(room, userNo), room.getDmRoomId(), messageId);
+	}
+
+	private Long readCursor(DmRoom room, Long userNo) {
+		Long cursor = userNo.equals(room.getUserLow())
+				? room.getLowLastReadMessageId()
+				: room.getHighLastReadMessageId();
+		return cursor == null || cursor <= 0 ? null : cursor;
 	}
 
 	private DmRoom requireOpenRoom(Long userNo, Long roomId) {

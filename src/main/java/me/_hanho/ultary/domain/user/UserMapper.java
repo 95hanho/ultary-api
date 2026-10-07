@@ -41,6 +41,12 @@ public interface UserMapper {
 			@Param("q") String q,
 			@Param("limit") int limit);
 
+	/** 펫 mention_id가 맞는 보호자. 유저당 한 줄 */
+	List<User> searchActiveByPetMention(
+			@Param("viewerUserNo") Long viewerUserNo,
+			@Param("q") String q,
+			@Param("limit") int limit);
+
 	int insert(User user);
 
 	int updateProfile(User user);
@@ -57,6 +63,10 @@ public interface UserMapper {
 	int updatePassword(
 			@Param("userNo") Long userNo,
 			@Param("password") String password);
+
+	int suspend(@Param("userNo") Long userNo);
+
+	int unsuspend(@Param("userNo") Long userNo);
 
 	int updateWithdrawalStatus(
 			@Param("userNo") Long userNo,

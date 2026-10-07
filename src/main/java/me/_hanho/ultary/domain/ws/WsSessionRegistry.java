@@ -44,6 +44,11 @@ public class WsSessionRegistry {
 		}
 	}
 
+	public boolean hasSession(Long userNo) {
+		Set<WebSocketSession> mine = sessions.get(userNo);
+		return mine != null && !mine.isEmpty();
+	}
+
 	public void send(Long userNo, Object payload) {
 		Set<WebSocketSession> mine = sessions.get(userNo);
 		if (mine == null || mine.isEmpty()) {

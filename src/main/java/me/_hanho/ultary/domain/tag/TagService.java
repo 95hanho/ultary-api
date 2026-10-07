@@ -20,6 +20,7 @@ import me._hanho.ultary.domain.tag.dto.request.CreateTagRequest;
 import me._hanho.ultary.domain.tag.dto.request.UpdateTagRequest;
 import me._hanho.ultary.domain.tag.dto.response.TagResponse;
 import me._hanho.ultary.domain.tag.model.Tag;
+import me._hanho.ultary.domain.tag.model.TagSearchHit;
 import me._hanho.ultary.domain.tag.model.TagImage;
 import me._hanho.ultary.security.principal.UserPrincipal;
 
@@ -59,7 +60,8 @@ public class TagService {
 
 	@Transactional(readOnly = true)
 	public TagResponse getDetail(Long tagId) {
-		return toResponse(requireActive(tagId));
+		Tag tag = requireActive(tagId);
+		return toResponse(tag, tagMapper.countActiveFeeds(tag.getTagId()));
 	}
 
 	@Transactional
@@ -98,6 +100,12 @@ public class TagService {
 		return tagMapper.search(q.trim(), resolveLimit(limit)).stream()
 				.map(this::toResponse)
 				.toList();
+	}
+
+	/** 검색창 태그명. 해시태그에 포함되고, feedCount는 조회자에게 보이는 글 수 */
+	@Transactional(readOnly = true)
+	public List<TagSearchHit> searchByHashtag(Long viewerUserNo, String q, int limit) {
+		return tagMapper.searchByHashtag(viewerUserNo, q, limit);
 	}
 
 	@Transactional(readOnly = true)
@@ -176,6 +184,10 @@ public class TagService {
 		}
 	}
 
+	public void ensureActive(Long tagId) {
+		requireActive(tagId);
+	}
+
 	private Tag requireActive(Long tagId) {
 		Tag tag = tagMapper.findActiveByTagId(tagId);
 		if (tag == null) {
@@ -193,6 +205,10 @@ public class TagService {
 	}
 
 	private TagResponse toResponse(Tag tag) {
+		return toResponse(tag, null);
+	}
+
+	private TagResponse toResponse(Tag tag, Integer feedCount) {
 		List<Long> imageFileIds = tagMapper.findImageFileIdsByTagId(tag.getTagId());
 		List<Long> ids = imageFileIds != null ? imageFileIds : List.of();
 		Map<Long, FileSummaryResponse> files = fileService.findSummaries(ids);
@@ -209,6 +225,7 @@ public class TagService {
 				.content(tag.getContent())
 				.link(tag.getLink())
 				.useCount(tag.getUseCount())
+				.feedCount(feedCount)
 				.createdByUserNo(tag.getCreatedByUserNo())
 				.imageFileIds(ids)
 				.images(images)

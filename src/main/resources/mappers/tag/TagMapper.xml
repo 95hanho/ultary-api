@@ -91,6 +91,26 @@
 		LIMIT #{limit}
 	</select>
 
+	<select id="searchByHashtag" resultType="me._hanho.ultary.domain.tag.model.TagSearchHit">
+		SELECT
+			t.tag_id AS tagId,
+			t.hashtag AS hashtag,
+			(
+				SELECT COUNT(*)
+				FROM ultary_feed_tag ft
+				INNER JOIN ultary_feed f ON f.feed_id = ft.feed_id
+				INNER JOIN ultary_user u ON u.user_no = f.user_no
+				WHERE ft.tag_id = t.tag_id
+				  AND ft.is_deleted = 0
+				  AND <include refid="me._hanho.ultary.domain.feed.FeedMapper.visibleToViewerAndNotBlocked"/>
+			) AS feedCount
+		FROM ultary_tag t
+		WHERE t.is_deleted = 0
+		  AND t.hashtag LIKE CONCAT('%', #{q}, '%')
+		ORDER BY feedCount DESC, t.tag_id DESC
+		LIMIT #{limit}
+	</select>
+
 	<select id="recommend" resultType="me._hanho.ultary.domain.tag.model.Tag">
 		SELECT <include refid="tagColumns"/>
 		FROM ultary_tag
@@ -143,6 +163,15 @@
 		FROM ultary_tag_image
 		WHERE tag_id = #{tagId}
 		ORDER BY sort_order ASC, tag_image_id ASC
+	</select>
+
+	<select id="countActiveFeeds" resultType="int">
+		SELECT COUNT(*)
+		FROM ultary_feed_tag ft
+		INNER JOIN ultary_feed f ON f.feed_id = ft.feed_id
+		WHERE ft.tag_id = #{tagId}
+		  AND ft.is_deleted = 0
+		  AND f.is_deleted = 0
 	</select>
 
 	<update id="incrementUseCount">

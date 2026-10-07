@@ -52,7 +52,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
 			User user = userMapper.findActiveByUserNo(userNo);
 			if (user == null) {
-				writeUnauthorized(response, ErrorCode.UNAUTHORIZED);
+				writeClosedAccount(response, userNo);
 				return;
 			}
 
@@ -64,6 +64,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 		} catch (BusinessException ex) {
 			writeUnauthorized(response, ex.getErrorCode());
 		}
+	}
+
+	private void writeClosedAccount(HttpServletResponse response, Long userNo) throws IOException {
+		User user = userMapper.findByUserNo(userNo);
+		if (user != null && "WITHDRAWN".equals(user.getWithdrawalStatus())) {
+			writeUnauthorized(response, ErrorCode.ACCOUNT_WITHDRAWN);
+			return;
+		}
+		if (user != null && "SUSPENDED".equals(user.getWithdrawalStatus())) {
+			writeUnauthorized(response, ErrorCode.ACCOUNT_SUSPENDED);
+			return;
+		}
+		writeUnauthorized(response, ErrorCode.UNAUTHORIZED);
 	}
 
 	private String resolveToken(HttpServletRequest request) {

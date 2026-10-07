@@ -51,8 +51,17 @@ Authorization: Bearer {{accessToken}}
 GET {{baseUrl}}/api/v1/main/search?q=%40choco&type=PET
 Authorization: Bearer {{accessToken}}
 
-### 4d. 검색 TAG (# → %23. 생 # 넣으면 fragment로 잘림)
-GET {{baseUrl}}/api/v1/main/search?q=%23산책&type=TAG
+### 4d. 검색 TAG (태그명 + 보이는 게시글 수. # → %23)
+# 입력 중 limit=5, 엔터 limit=20. 응답 tags[]: tagId, hashtag, feedCount
+GET {{baseUrl}}/api/v1/main/search?q=%23털브러쉬&type=TAG&limit=5
+Authorization: Bearer {{accessToken}}
+
+### 4d2. 펫 멘션 → 유저 목록 (users[].petTags)
+GET {{baseUrl}}/api/v1/main/search?q=choco&type=MENTION&limit=5
+Authorization: Bearer {{accessToken}}
+
+### 4d3. 태그 게시글 그리드 (시드 tag 108 털브러쉬)
+GET {{baseUrl}}/api/v1/main/search/tags/108/feeds?limit=30
 Authorization: Bearer {{accessToken}}
 
 ### 4e. 검색 FEED (시드 feed 101 content)

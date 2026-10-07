@@ -98,13 +98,40 @@ public class MyUltaryService {
 	}
 
 	@Transactional(readOnly = true)
+	public List<FeedGridItemResponse> getPinnedFeeds(UserPrincipal principal, Integer limit) {
+		return toGridItems(feedMapper.findPinnedByUserNo(principal.getUserNo(), resolveLimit(limit)));
+	}
+
+	/** 나만 보는 저장. 다른 사람 울타리에는 없다 */
+	@Transactional(readOnly = true)
 	public List<FeedGridItemResponse> getSavedFeeds(UserPrincipal principal, Integer limit) {
-		return toGridItems(feedMapper.findSavedByUserNo(principal.getUserNo(), resolveLimit(limit)));
+		Long me = principal.getUserNo();
+		return toGridItems(feedMapper.findSavedByUserNo(me, me, resolveLimit(limit)));
 	}
 
 	@Transactional(readOnly = true)
 	public List<FeedGridItemResponse> getTaggedFeeds(UserPrincipal principal, Integer limit) {
 		return toGridItems(feedMapper.findTaggedByUserNo(principal.getUserNo(), resolveLimit(limit)));
+	}
+
+	/** 그 유저가 울타리에 고정한 글. 본인이면 내 고정 목록과 같고, 아니면 조회자가 볼 수 있는 글만 */
+	@Transactional(readOnly = true)
+	public List<FeedGridItemResponse> getPinnedFeedsOf(UserPrincipal principal, Long ownerUserNo, Integer limit) {
+		if (principal.getUserNo().equals(ownerUserNo)) {
+			return getPinnedFeeds(principal, limit);
+		}
+		return toGridItems(feedMapper.findPinnedVisibleByOwner(
+				ownerUserNo, principal.getUserNo(), resolveLimit(limit)));
+	}
+
+	/** 그 유저가 태그된 글. 본인이면 내 태그 목록과 같고, 아니면 조회자가 볼 수 있는 글만 */
+	@Transactional(readOnly = true)
+	public List<FeedGridItemResponse> getTaggedFeedsOf(UserPrincipal principal, Long ownerUserNo, Integer limit) {
+		if (principal.getUserNo().equals(ownerUserNo)) {
+			return getTaggedFeeds(principal, limit);
+		}
+		return toGridItems(feedMapper.findTaggedVisibleByOwner(
+				ownerUserNo, principal.getUserNo(), resolveLimit(limit)));
 	}
 
 	@Transactional

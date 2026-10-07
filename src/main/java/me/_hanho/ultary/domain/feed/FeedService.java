@@ -42,7 +42,8 @@ import me._hanho.ultary.domain.feed.model.FeedMediaMention;
 import me._hanho.ultary.domain.feed.model.FeedPet;
 import me._hanho.ultary.domain.feed.model.FeedReply;
 import me._hanho.ultary.domain.feed.model.FeedReplyLike;
-import me._hanho.ultary.domain.feed.model.FeedStore;
+import me._hanho.ultary.domain.feed.model.FeedPin;
+import me._hanho.ultary.domain.feed.model.FeedSave;
 import me._hanho.ultary.domain.file.FileService;
 import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
 import me._hanho.ultary.domain.file.model.FileMeta;
@@ -227,28 +228,49 @@ public class FeedService {
 	}
 
 	@Transactional
-	public FeedResponse store(UserPrincipal principal, Long feedId) {
+	public FeedResponse pin(UserPrincipal principal, Long feedId) {
 		requireVisible(feedId, principal.getUserNo());
-		FeedStore existing = feedMapper.findStore(feedId, principal.getUserNo());
+		FeedPin existing = feedMapper.findPin(feedId, principal.getUserNo());
 		if (existing == null) {
-			feedMapper.insertStore(feedId, principal.getUserNo());
-			feedMapper.adjustStoreCount(feedId, 1);
+			feedMapper.insertPin(feedId, principal.getUserNo());
+			feedMapper.adjustPinCount(feedId, 1);
 		} else if (Boolean.TRUE.equals(existing.getIsDeleted())) {
-			if (feedMapper.restoreStore(feedId, principal.getUserNo()) > 0) {
-				feedMapper.adjustStoreCount(feedId, 1);
+			if (feedMapper.restorePin(feedId, principal.getUserNo()) > 0) {
+				feedMapper.adjustPinCount(feedId, 1);
 			}
 		}
-		log.info("[store] feedId={} userNo={}", feedId, principal.getUserNo());
+		log.info("[pin] feedId={} userNo={}", feedId, principal.getUserNo());
 		return toResponse(requireVisible(feedId, principal.getUserNo()), principal.getUserNo());
 	}
 
 	@Transactional
-	public FeedResponse unstore(UserPrincipal principal, Long feedId) {
+	public FeedResponse unpin(UserPrincipal principal, Long feedId) {
 		requireVisible(feedId, principal.getUserNo());
-		if (feedMapper.softDeleteStore(feedId, principal.getUserNo()) > 0) {
-			feedMapper.adjustStoreCount(feedId, -1);
+		if (feedMapper.softDeletePin(feedId, principal.getUserNo()) > 0) {
+			feedMapper.adjustPinCount(feedId, -1);
 		}
-		log.info("[unstore] feedId={} userNo={}", feedId, principal.getUserNo());
+		log.info("[unpin] feedId={} userNo={}", feedId, principal.getUserNo());
+		return toResponse(requireVisible(feedId, principal.getUserNo()), principal.getUserNo());
+	}
+
+	@Transactional
+	public FeedResponse save(UserPrincipal principal, Long feedId) {
+		requireVisible(feedId, principal.getUserNo());
+		FeedSave existing = feedMapper.findSave(feedId, principal.getUserNo());
+		if (existing == null) {
+			feedMapper.insertSave(feedId, principal.getUserNo());
+		} else if (Boolean.TRUE.equals(existing.getIsDeleted())) {
+			feedMapper.restoreSave(feedId, principal.getUserNo());
+		}
+		log.info("[save] feedId={} userNo={}", feedId, principal.getUserNo());
+		return toResponse(requireVisible(feedId, principal.getUserNo()), principal.getUserNo());
+	}
+
+	@Transactional
+	public FeedResponse unsave(UserPrincipal principal, Long feedId) {
+		requireVisible(feedId, principal.getUserNo());
+		feedMapper.softDeleteSave(feedId, principal.getUserNo());
+		log.info("[unsave] feedId={} userNo={}", feedId, principal.getUserNo());
 		return toResponse(requireVisible(feedId, principal.getUserNo()), principal.getUserNo());
 	}
 
@@ -749,12 +771,15 @@ public class FeedService {
 				.toList();
 
 		boolean likedByMe = false;
-		boolean storedByMe = false;
+		boolean pinnedByMe = false;
+		boolean savedByMe = false;
 		if (viewerUserNo != null) {
 			FeedLike like = feedMapper.findLike(feed.getFeedId(), viewerUserNo);
 			likedByMe = like != null && !Boolean.TRUE.equals(like.getIsDeleted());
-			FeedStore store = feedMapper.findStore(feed.getFeedId(), viewerUserNo);
-			storedByMe = store != null && !Boolean.TRUE.equals(store.getIsDeleted());
+			FeedPin pin = feedMapper.findPin(feed.getFeedId(), viewerUserNo);
+			pinnedByMe = pin != null && !Boolean.TRUE.equals(pin.getIsDeleted());
+			FeedSave save = feedMapper.findSave(feed.getFeedId(), viewerUserNo);
+			savedByMe = save != null && !Boolean.TRUE.equals(save.getIsDeleted());
 		}
 
 		Integer authorProfileFileId = author == null || authorProfiles == null
@@ -771,9 +796,10 @@ public class FeedService {
 				.visibility(feed.getVisibility())
 				.likeCount(feed.getLikeCount())
 				.commentCount(feed.getCommentCount())
-				.storeCount(feed.getStoreCount())
+				.pinCount(feed.getPinCount())
 				.likedByMe(likedByMe)
-				.storedByMe(storedByMe)
+				.pinnedByMe(pinnedByMe)
+				.savedByMe(savedByMe)
 				.media(mediaItems)
 				.pets(pets)
 				.tagIds(feedMapper.findTagIdsByFeedId(feed.getFeedId()))

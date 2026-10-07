@@ -20,7 +20,8 @@
 		created_at,
 		updated_at,
 		withdrawal_status,
-		withdrawal_completed_at
+		withdrawal_completed_at,
+		suspended_at
 	</sql>
 
 	<select id="findByUserNo" resultType="me._hanho.ultary.domain.user.model.User">
@@ -114,6 +115,31 @@
 		LIMIT #{limit}
 	</select>
 
+	<select id="searchActiveByPetMention" resultType="me._hanho.ultary.domain.user.model.User">
+		SELECT <include refid="userColumns"/>
+		FROM ultary_user u
+		WHERE u.withdrawal_status = 'ACTIVE'
+		  AND u.user_no != #{viewerUserNo}
+		  AND EXISTS (
+			SELECT 1
+			FROM ultary_pet p
+			WHERE p.user_no = u.user_no
+			  AND p.is_deleted = 0
+			  AND p.mention_id LIKE CONCAT('%', #{q}, '%')
+		  )
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM ultary_user_block b
+			WHERE b.is_deleted = 0
+			  AND (
+				(b.blocker_user_no = #{viewerUserNo} AND b.blocked_user_no = u.user_no)
+				OR (b.blocker_user_no = u.user_no AND b.blocked_user_no = #{viewerUserNo})
+			  )
+		  )
+		ORDER BY u.user_no DESC
+		LIMIT #{limit}
+	</select>
+
 	<insert id="insert" useGeneratedKeys="true" keyProperty="userNo" keyColumn="user_no">
 		INSERT INTO ultary_user (
 			password,
@@ -168,6 +194,22 @@
 		SET password = #{password}
 		WHERE user_no = #{userNo}
 		  AND withdrawal_status = 'ACTIVE'
+	</update>
+
+	<update id="suspend">
+		UPDATE ultary_user
+		SET withdrawal_status = 'SUSPENDED',
+			suspended_at = NOW()
+		WHERE user_no = #{userNo}
+		  AND withdrawal_status = 'ACTIVE'
+	</update>
+
+	<update id="unsuspend">
+		UPDATE ultary_user
+		SET withdrawal_status = 'ACTIVE',
+			suspended_at = NULL
+		WHERE user_no = #{userNo}
+		  AND withdrawal_status = 'SUSPENDED'
 	</update>
 
 	<update id="updateWithdrawalStatus">

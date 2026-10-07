@@ -19,6 +19,8 @@ public class TagResponse {
 	private String content;
 	private String link;
 	private Integer useCount;
+	/** 이 태그가 달린 삭제되지 않은 게시글 수. 상세 조회에서만 채운다. 지금 보는 글도 포함 */
+	private Integer feedCount;
 	private Long createdByUserNo;
 	private List<Long> imageFileIds;
 	private List<FileSummaryResponse> images;

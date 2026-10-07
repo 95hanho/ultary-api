@@ -21,9 +21,11 @@ public class FeedResponse {
 	private String visibility;
 	private Integer likeCount;
 	private Integer commentCount;
-	private Integer storeCount;
+	private Integer pinCount;
 	private Boolean likedByMe;
-	private Boolean storedByMe;
+	private Boolean pinnedByMe;
+	/** 나만 보는 저장. 다른 사람에게는 목록이 없다 */
+	private Boolean savedByMe;
 	private List<MediaItem> media;
 	private List<PetItem> pets;
 	private List<Long> tagIds;

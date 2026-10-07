@@ -1,6 +1,7 @@
 package me._hanho.ultary.domain.main.dto.response;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import lombok.Builder;
 import lombok.Getter;
@@ -16,5 +17,7 @@ public class SearchHistoryItemResponse {
 	private String nickname;
 	private Integer profileFileId;
 	private FileSummaryResponse profileFile;
+	/** 그 울타리 주인의 펫 멘션. @ 없음. priority 순. 없으면 빈 배열 */
+	private List<String> petTags;
 	private LocalDateTime searchedAt;
 }

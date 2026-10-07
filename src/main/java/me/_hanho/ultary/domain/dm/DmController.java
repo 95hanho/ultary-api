@@ -14,6 +14,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.response.ApiResponse;
 import me._hanho.ultary.domain.dm.dto.request.CreateDmRoomRequest;
+import me._hanho.ultary.domain.dm.dto.request.DmTypingRequest;
+import me._hanho.ultary.domain.dm.dto.request.DmViewingRequest;
 import me._hanho.ultary.domain.dm.dto.request.SendDmMessageRequest;
 import me._hanho.ultary.domain.dm.dto.response.DmMessageListResponse;
 import me._hanho.ultary.domain.dm.dto.response.DmMessageResponse;
@@ -54,6 +56,26 @@ public class DmController {
 		log.info("[leave] userNo={} roomId={}", principal.getUserNo(), roomId);
 		dmService.leave(principal, roomId);
 		return ApiResponse.okEmpty("대화방 나가기 성공");
+	}
+
+	@PostMapping("/{roomId}/viewing")
+	public ApiResponse<Void> viewing(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@PathVariable Long roomId,
+			@RequestBody DmViewingRequest request) {
+		log.info("[viewing] userNo={} roomId={}", principal.getUserNo(), roomId);
+		dmService.viewing(principal, roomId, request);
+		return ApiResponse.okEmpty("대화방 보는 중 반영 성공");
+	}
+
+	@PostMapping("/{roomId}/typing")
+	public ApiResponse<Void> typing(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@PathVariable Long roomId,
+			@RequestBody DmTypingRequest request) {
+		log.info("[typing] userNo={} roomId={}", principal.getUserNo(), roomId);
+		dmService.typing(principal, roomId, request);
+		return ApiResponse.okEmpty("입력 중 반영 성공");
 	}
 
 	@PostMapping("/{roomId}/read")

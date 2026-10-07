@@ -69,6 +69,36 @@ public class UserController {
 				"유저 게시글 목록 조회 성공");
 	}
 
+	/** 그 유저가 울타리에 고정한 글. 본인이면 내 고정 목록과 같다 */
+	@GetMapping("/{userNo}/pinned-feeds")
+	public ApiResponse<List<FeedGridItemResponse>> pinnedFeeds(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@PathVariable Long userNo,
+			@RequestParam(required = false) Integer limit,
+			@RequestParam(required = false) Integer size) {
+		log.info("[pinnedFeeds] me={} userNo={} limit={} size={}", principal.getUserNo(), userNo, limit, size);
+		neighborService.assertCanViewUltary(principal, userNo);
+		Integer pageSize = size != null ? size : limit;
+		return ApiResponse.ok(
+				myUltaryService.getPinnedFeedsOf(principal, userNo, pageSize),
+				"유저 고정 게시글 조회 성공");
+	}
+
+	/** 그 유저가 태그된 글. 본인이면 내 태그 목록과 같다 */
+	@GetMapping("/{userNo}/tagged-feeds")
+	public ApiResponse<List<FeedGridItemResponse>> taggedFeeds(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@PathVariable Long userNo,
+			@RequestParam(required = false) Integer limit,
+			@RequestParam(required = false) Integer size) {
+		log.info("[taggedFeeds] me={} userNo={} limit={} size={}", principal.getUserNo(), userNo, limit, size);
+		neighborService.assertCanViewUltary(principal, userNo);
+		Integer pageSize = size != null ? size : limit;
+		return ApiResponse.ok(
+				myUltaryService.getTaggedFeedsOf(principal, userNo, pageSize),
+				"유저 태그 게시글 조회 성공");
+	}
+
 	@GetMapping("/{userNo}/neighbors")
 	public ApiResponse<List<NeighborListItemResponse>> neighbors(
 			@AuthenticationPrincipal UserPrincipal principal,

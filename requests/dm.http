@@ -69,3 +69,22 @@ Authorization: Bearer {{accessToken}}
 ### 7. 읽음
 POST {{baseUrl}}/api/v1/dm/rooms/{{dmRoomId}}/read
 Authorization: Bearer {{accessToken}}
+
+### 8. 이 방 보는 중 (약 10초마다 true. 나갈 때 false)
+# 둘 다 true인 동안 보낸 메시지는 바로 읽음. 20초 없으면 나간 것
+POST {{baseUrl}}/api/v1/dm/rooms/{{dmRoomId}}/viewing
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "viewing": true
+}
+
+### 9. 입력 중 (멈추면 false. 4초 안에 true가 없어도 멈춤)
+POST {{baseUrl}}/api/v1/dm/rooms/{{dmRoomId}}/typing
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "typing": true
+}

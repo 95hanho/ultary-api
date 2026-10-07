@@ -61,7 +61,16 @@ public class MyUltaryController {
 		return ApiResponse.ok(myUltaryService.getFeedDetail(principal, feedId), "내 게시글 상세 조회 성공");
 	}
 
-	/** 저장한 게시글 그리드 */
+	/** 울타리에 고정한 게시글 그리드 */
+	@GetMapping("/pinned-feeds")
+	public ApiResponse<List<FeedGridItemResponse>> pinnedFeeds(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@RequestParam(required = false) Integer limit) {
+		log.info("[pinnedFeeds] userNo={} limit={}", principal.getUserNo(), limit);
+		return ApiResponse.ok(myUltaryService.getPinnedFeeds(principal, limit), "고정 게시글 조회 성공");
+	}
+
+	/** 나만 보는 저장 게시글 */
 	@GetMapping("/saved-feeds")
 	public ApiResponse<List<FeedGridItemResponse>> savedFeeds(
 			@AuthenticationPrincipal UserPrincipal principal,

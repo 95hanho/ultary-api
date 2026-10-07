@@ -29,7 +29,11 @@ Authorization: Bearer {{accessToken}}
 GET {{baseUrl}}/api/v1/my-ultary/feeds/101
 Authorization: Bearer {{accessToken}}
 
-### 4. 저장한 게시글 그리드 (시드: 101이 feed 102 저장)
+### 4. 고정 게시글 그리드 (시드: 101이 feed 102를 울타리에 고정)
+GET {{baseUrl}}/api/v1/my-ultary/pinned-feeds?limit=30
+Authorization: Bearer {{accessToken}}
+
+### 4b. 나만 보는 저장 (시드: 101이 feed 103 저장)
 GET {{baseUrl}}/api/v1/my-ultary/saved-feeds?limit=30
 Authorization: Bearer {{accessToken}}
 

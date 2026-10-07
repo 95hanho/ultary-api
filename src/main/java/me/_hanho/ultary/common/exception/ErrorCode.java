@@ -25,6 +25,10 @@ public enum ErrorCode {
 	// ==============================
 	LOGIN_FAILED("LOGIN_FAILED", "이메일/휴대폰 또는 비밀번호가 올바르지 않습니다.", HttpStatus.UNAUTHORIZED),
 	ACCOUNT_WITHDRAWN("ACCOUNT_WITHDRAWN", "탈퇴된 계정입니다.", HttpStatus.FORBIDDEN),
+	ACCOUNT_SUSPENDED("ACCOUNT_SUSPENDED", "정지된 계정입니다.", HttpStatus.FORBIDDEN),
+	ACCOUNT_ALREADY_SUSPENDED("ACCOUNT_ALREADY_SUSPENDED", "이미 정지된 계정입니다.", HttpStatus.CONFLICT),
+	ACCOUNT_NOT_SUSPENDED("ACCOUNT_NOT_SUSPENDED", "정지된 계정이 아닙니다.", HttpStatus.CONFLICT),
+	CANNOT_SUSPEND_WITHDRAWN("CANNOT_SUSPEND_WITHDRAWN", "탈퇴한 계정은 정지할 수 없습니다.", HttpStatus.CONFLICT),
 	USER_INACTIVE("USER_INACTIVE", "이용할 수 없는 계정입니다.", HttpStatus.FORBIDDEN),
 	TOKEN_EXPIRED("TOKEN_EXPIRED", "토큰이 만료되었습니다.", HttpStatus.UNAUTHORIZED),
 	INVALID_TOKEN("INVALID_TOKEN", "유효하지 않은 토큰입니다.", HttpStatus.UNAUTHORIZED),

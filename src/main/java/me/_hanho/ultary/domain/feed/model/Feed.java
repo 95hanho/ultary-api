@@ -17,7 +17,7 @@ public class Feed {
 	private String visibility;
 	private Integer likeCount;
 	private Integer commentCount;
-	private Integer storeCount;
+	private Integer pinCount;
 	private LocalDateTime createdAt;
 	private LocalDateTime updatedAt;
 	private Boolean isDeleted;

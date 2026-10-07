@@ -6,6 +6,8 @@
 # 연결 직후 첫 텍스트: {"type":"AUTH","ticket":"<아래 ticket>"}
 # 성공하면 {"type":"AUTH_OK"} 다음에 {"type":"NOTIFICATION_UNREAD","unreadCount":N}
 # 새 DM: {"type":"DM_MESSAGE","dmRoomId","room","message"}  message.fromMe 는 받는 사람 기준
+# 읽음: 상대에게만 {"type":"DM_READ","dmRoomId","lastReadMessageId"}
+# 입력 중: 상대에게만 {"type":"DM_TYPING","dmRoomId","userNo","typing"}
 # 25초마다 {"type":"PING"}
 
 ### 0. 소셜 로그인 (시드 user 101)

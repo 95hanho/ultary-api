@@ -88,12 +88,20 @@ Authorization: Bearer {{accessToken}}
 DELETE {{baseUrl}}/api/v1/feeds/{{feedId}}/like
 Authorization: Bearer {{accessToken}}
 
-### 5a. 게시글 저장
-POST {{baseUrl}}/api/v1/feeds/{{feedId}}/store
+### 5a. 울타리 고정
+POST {{baseUrl}}/api/v1/feeds/{{feedId}}/pin
 Authorization: Bearer {{accessToken}}
 
-### 5b. 게시글 저장 해제
-DELETE {{baseUrl}}/api/v1/feeds/{{feedId}}/store
+### 5b. 고정 해제
+DELETE {{baseUrl}}/api/v1/feeds/{{feedId}}/pin
+Authorization: Bearer {{accessToken}}
+
+### 5c. 나만 보는 저장
+POST {{baseUrl}}/api/v1/feeds/{{feedId}}/save
+Authorization: Bearer {{accessToken}}
+
+### 5d. 저장 해제
+DELETE {{baseUrl}}/api/v1/feeds/{{feedId}}/save
 Authorization: Bearer {{accessToken}}
 
 ### 6. 공유 경로 힌트

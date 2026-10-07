@@ -102,20 +102,36 @@ public class FeedController {
 		return ApiResponse.ok(feedService.getLikers(principal, feedId, limit), "좋아요 목록 조회 성공");
 	}
 
-	@PostMapping("/{feedId}/store")
-	public ApiResponse<FeedResponse> store(
+	@PostMapping("/{feedId}/pin")
+	public ApiResponse<FeedResponse> pin(
 			@AuthenticationPrincipal UserPrincipal principal,
 			@PathVariable Long feedId) {
-		log.info("[store] feedId={}", feedId);
-		return ApiResponse.ok(feedService.store(principal, feedId), "게시글 저장 성공");
+		log.info("[pin] feedId={}", feedId);
+		return ApiResponse.ok(feedService.pin(principal, feedId), "게시글 고정 성공");
 	}
 
-	@DeleteMapping("/{feedId}/store")
-	public ApiResponse<FeedResponse> unstore(
+	@DeleteMapping("/{feedId}/pin")
+	public ApiResponse<FeedResponse> unpin(
 			@AuthenticationPrincipal UserPrincipal principal,
 			@PathVariable Long feedId) {
-		log.info("[unstore] feedId={}", feedId);
-		return ApiResponse.ok(feedService.unstore(principal, feedId), "게시글 저장 해제 성공");
+		log.info("[unpin] feedId={}", feedId);
+		return ApiResponse.ok(feedService.unpin(principal, feedId), "게시글 고정 해제 성공");
+	}
+
+	@PostMapping("/{feedId}/save")
+	public ApiResponse<FeedResponse> save(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@PathVariable Long feedId) {
+		log.info("[save] feedId={}", feedId);
+		return ApiResponse.ok(feedService.save(principal, feedId), "게시글 저장 성공");
+	}
+
+	@DeleteMapping("/{feedId}/save")
+	public ApiResponse<FeedResponse> unsave(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@PathVariable Long feedId) {
+		log.info("[unsave] feedId={}", feedId);
+		return ApiResponse.ok(feedService.unsave(principal, feedId), "게시글 저장 해제 성공");
 	}
 
 	@PostMapping("/{feedId}/share")

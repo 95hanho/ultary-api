@@ -8,6 +8,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import me._hanho.ultary.domain.pet.model.Pet;
+import me._hanho.ultary.domain.pet.model.PetMention;
 import me._hanho.ultary.domain.pet.model.RepresentativePetProfile;
 
 @Mapper
@@ -52,6 +53,9 @@ public interface PetMapper {
 
 	List<RepresentativePetProfile> findRepresentativeProfiles(
 			@Param("userNos") Collection<Long> userNos);
+
+	/** 삭제되지 않은 펫의 멘션. priority, pet_id 순 */
+	List<PetMention> findActiveMentions(@Param("userNos") Collection<Long> userNos);
 
 	List<Pet> searchActive(
 			@Param("viewerUserNo") Long viewerUserNo,
