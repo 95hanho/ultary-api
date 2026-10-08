@@ -19,8 +19,8 @@ Spring Boot 3.4 / MyBatis / MariaDB 10.1 / 패키지 `me._hanho.ultary` / API pr
 
 ## 진행 상태 (커밋 메시지와 함께 갱신)
 
-- 스키마: **v20** (`withdrawal_status`에 `SUSPENDED`, `suspended_at`. v19는 고정·저장)
-- 완료(스모크): auth, file, pet, tag, feed, myultary, story, neighbor(block 포함), **main**(feeds/search/recommended/최근검색), **notification**(목록·읽음, 배지는 소켓 `NOTIFICATION_UNREAD`), **dm**(방·메시지·게시글/스토리 공유. 새 메시지는 `DM_MESSAGE`, 읽음은 `DM_READ`, 입력 중은 `DM_TYPING`)
+- 스키마: **v23** (`ultary_report.status`에 `CONFIRMED` 확인. v22는 신고 상태)
+- 완료(스모크): auth, file, pet, tag, feed, myultary, story, neighbor(block 포함), **main**(feeds/search/recommended/최근검색), **notification**(목록·읽음, 배지는 소켓 `NOTIFICATION_UNREAD`), **dm**(방·메시지·게시글/스토리 공유. 새 메시지는 `DM_MESSAGE`, 읽음은 `DM_READ`, 입력 중은 `DM_TYPING`), **report**(게시글·댓글·답글·유저. 사유 ENUM. 관리자 삭제·정지)
 - 로컬 시드(선택): `share/database/seed/mariadb_10_1/001_dev_sample_data.sql` — 재실행 가능, 운영에서는 제외. user **101~105**, pet 유저당 1~2. HTTP는 user 101 / `google-myultary-test-001`
 - HTTP: `requests/my-ultary.http`, `requests/story.http`, `requests/neighbor.http`, `requests/main.http`, `requests/notification.http`, `requests/dm.http`, `requests/ws.http` 등
 - **최종 E2E 재검증**은 도메인 더 붙인 뒤(또는 배포 전) 별도로 한다

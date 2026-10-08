@@ -29,6 +29,8 @@ import me._hanho.ultary.domain.neighbor.model.NeighborListRow;
 import me._hanho.ultary.domain.pet.PetMapper;
 import me._hanho.ultary.domain.settings.PrivacyService;
 import me._hanho.ultary.domain.pet.PetService;
+import me._hanho.ultary.domain.report.ReportService;
+import me._hanho.ultary.domain.report.dto.response.MyReportResponse;
 import me._hanho.ultary.domain.story.StoryService;
 import me._hanho.ultary.domain.user.UserBlockMapper;
 import me._hanho.ultary.domain.user.UserMapper;
@@ -54,6 +56,7 @@ public class NeighborService {
 	private final StoryService storyService;
 	private final FileService fileService;
 	private final NotificationService notificationService;
+	private final ReportService reportService;
 
 	/** 울타리 조회와 같다. 없는 유저 404, 상대가 나를 차단하면 403 */
 	@Transactional(readOnly = true)
@@ -103,6 +106,7 @@ public class NeighborService {
 				.neighborId(neighborId)
 				.blockedByMe(blockedByMe)
 				.blockedMe(false)
+				.myReport(me.equals(targetUserNo) ? null : reportService.mineUser(me, targetUserNo))
 				.build();
 	}
 

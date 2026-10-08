@@ -3,6 +3,7 @@ package me._hanho.ultary.domain.neighbor.dto.response;
 import lombok.Builder;
 import lombok.Getter;
 import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
+import me._hanho.ultary.domain.report.dto.response.MyReportResponse;
 
 @Getter
 @Builder
@@ -31,4 +32,6 @@ public class UserUltaryResponse {
 	private Long neighborId;
 	private boolean blockedByMe;
 	private boolean blockedMe;
+	/** 내 신고. 없으면 null. status가 REQUESTED면 취소 가능 */
+	private MyReportResponse myReport;
 }

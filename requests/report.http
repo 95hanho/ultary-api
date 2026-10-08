@@ -1,0 +1,65 @@
+@baseUrl = http://localhost:9377
+@accessToken = {{socialLogin.response.body.$.data.accessToken}}
+
+# 시드 user 101로 로그인. 본인 글은 신고할 수 없다.
+# reason: SPAM ABUSE HARASSMENT SEXUAL VIOLENCE HATE IMPERSONATION PRIVACY OTHER
+
+### 0. 소셜 로그인 (시드 user 101)
+# @name socialLogin
+POST {{baseUrl}}/api/v1/auth/social/login
+Content-Type: application/json
+
+{
+  "provider": "GOOGLE",
+  "providerUserId": "google-myultary-test-001",
+  "email": "myultary.test@example.com",
+  "name": "한호"
+}
+
+### 1. 유저 신고
+POST {{baseUrl}}/api/v1/reports
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "targetType": "USER",
+  "targetId": 102,
+  "reason": "HARASSMENT"
+}
+
+### 2. 게시글 신고
+POST {{baseUrl}}/api/v1/reports
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "targetType": "FEED",
+  "targetId": 107,
+  "reason": "SPAM"
+}
+
+### 3. 댓글 신고
+POST {{baseUrl}}/api/v1/reports
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "targetType": "COMMENT",
+  "targetId": 202,
+  "reason": "ABUSE"
+}
+
+### 4. 답글 신고
+POST {{baseUrl}}/api/v1/reports
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "targetType": "REPLY",
+  "targetId": 201,
+  "reason": "ABUSE"
+}
+
+### 5. 신고 취소 (신고요청만. reportId는 접수 응답)
+DELETE {{baseUrl}}/api/v1/reports/1
+Authorization: Bearer {{accessToken}}

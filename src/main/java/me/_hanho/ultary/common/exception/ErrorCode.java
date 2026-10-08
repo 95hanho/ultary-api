@@ -124,7 +124,12 @@ public enum ErrorCode {
 	// ==============================
 	// 신고 (report)
 	// ==============================
-	// REPORT_NOT_FOUND("REPORT_NOT_FOUND", "신고를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
+	REPORT_NOT_FOUND("REPORT_NOT_FOUND", "신고를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
+	REPORT_ALREADY_OPENED("REPORT_ALREADY_OPENED", "이미 접수된 신고가 있습니다.", HttpStatus.CONFLICT),
+	REPORT_ALREADY_CLOSED("REPORT_ALREADY_CLOSED", "이미 처리된 신고입니다.", HttpStatus.CONFLICT),
+	CANNOT_REPORT_SELF("CANNOT_REPORT_SELF", "본인 또는 본인 글은 신고할 수 없습니다.", HttpStatus.BAD_REQUEST),
+	REPORT_ACTION_MISMATCH("REPORT_ACTION_MISMATCH", "이 신고 종류에는 그 조치를 할 수 없습니다.", HttpStatus.BAD_REQUEST),
+	REPORT_CANNOT_CANCEL("REPORT_CANNOT_CANCEL", "신고요청 상태에서만 취소할 수 있습니다.", HttpStatus.CONFLICT),
 
 	// ==============================
 	// 관리자 (admin)

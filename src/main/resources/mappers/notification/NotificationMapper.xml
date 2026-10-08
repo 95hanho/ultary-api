@@ -308,18 +308,20 @@
 				FROM (
 					SELECT c.user_no
 					FROM ultary_feed_comment c
-					WHERE c.feed_id = f.feed_id
+					INNER JOIN ultary_feed owner_feed ON owner_feed.feed_id = c.feed_id
+					WHERE c.feed_id = #{feedId}
 					  AND c.is_deleted = 0
-					  AND c.user_no &lt;&gt; f.user_no
-					  AND <include refid="notBlocked"><property name="ownerExpr" value="f.user_no"/><property name="actorExpr" value="c.user_no"/></include>
+					  AND c.user_no &lt;&gt; owner_feed.user_no
+					  AND <include refid="notBlocked"><property name="ownerExpr" value="owner_feed.user_no"/><property name="actorExpr" value="c.user_no"/></include>
 					UNION
 					SELECT r.user_no
 					FROM ultary_feed_reply r
 					INNER JOIN ultary_feed_comment c ON c.feed_comment_id = r.feed_comment_id AND c.is_deleted = 0
-					WHERE c.feed_id = f.feed_id
+					INNER JOIN ultary_feed owner_feed ON owner_feed.feed_id = c.feed_id
+					WHERE c.feed_id = #{feedId}
 					  AND r.is_deleted = 0
-					  AND r.user_no &lt;&gt; f.user_no
-					  AND <include refid="notBlocked"><property name="ownerExpr" value="f.user_no"/><property name="actorExpr" value="r.user_no"/></include>
+					  AND r.user_no &lt;&gt; owner_feed.user_no
+					  AND <include refid="notBlocked"><property name="ownerExpr" value="owner_feed.user_no"/><property name="actorExpr" value="r.user_no"/></include>
 				) x
 			) AS actor_count,
 			latest.content AS content,

@@ -221,6 +221,17 @@ public class MainService {
 		log.info("[clearRecentPetTags] userNo={} deleted={}", principal.getUserNo(), deleted);
 	}
 
+	/** 최근 검색 한 건. 내 행만 지운다 */
+	@Transactional
+	public void deleteRecentSearch(UserPrincipal principal, Long userSearchHistoryId) {
+		int deleted = userSearchHistoryMapper.deleteOwnById(principal.getUserNo(), userSearchHistoryId);
+		if (deleted == 0) {
+			throw new BusinessException(ErrorCode.NOT_FOUND, "최근 검색을 찾을 수 없습니다.");
+		}
+		log.info("[deleteRecentSearch] userNo={} userSearchHistoryId={}",
+				principal.getUserNo(), userSearchHistoryId);
+	}
+
 	/** 모두 지우기. 목록에 안 보이는 탈퇴·차단 대상 행도 함께 삭제 */
 	@Transactional
 	public void clearRecentSearches(UserPrincipal principal) {

@@ -81,11 +81,12 @@ BFF: `/api/...` · Spring: `/api/v1/...`
 | 주민 게시글 조회 (무한 스크롤) | GET | `/api/main/feeds` | `/api/v1/main/feeds` | 구현 |
 | 메인 추천 게시글 | GET | `/api/main/feeds/recommended` | `/api/v1/main/feeds/recommended` | 구현 |
 | 검색 (닉네임 / 펫멘션 / 태그명) | GET | `/api/main/search` | `/api/v1/main/search` | 구현 |
-| 태그 게시글 그리드 | GET | `/api/main/search/tags/:tagId/feeds` | `/api/v1/main/search/tags/{tagId}/feeds` | 구현 |
+| 태그 게시글 그리드 | GET | `/api/main/search/tags/:tagId/feeds?limit=30` | `/api/v1/main/search/tags/{tagId}/feeds?limit=30` | 구현 |
 | 검색 추천 게시글 | GET | `/api/main/search/recommended` | `/api/v1/main/search/recommended` | 구현 |
 | 최근 검색 5건 | GET | `/api/main/search/recent` | `/api/v1/main/search/recent` | 구현 |
 | 최근 검색 더보기 20건 | GET | `/api/main/search/recent/more?cursorHistoryId=` | `/api/v1/main/search/recent/more?cursorHistoryId=` | 구현 |
 | 최근 검색 저장 | POST | `/api/main/search/recent` | `/api/v1/main/search/recent` | 구현 |
+| 최근 검색 한 건 지우기 | DELETE | `/api/main/search/recent/:userSearchHistoryId` | `/api/v1/main/search/recent/{userSearchHistoryId}` | 구현 |
 | 최근 검색 모두 지우기 | DELETE | `/api/main/search/recent` | `/api/v1/main/search/recent` | 구현 |
 | 최근 펫 태그 20건 | GET | `/api/main/pet-tags/recent` | `/api/v1/main/pet-tags/recent` | 구현 |
 | 최근 펫 태그 저장 | POST | `/api/main/pet-tags/recent` | `/api/v1/main/pet-tags/recent` | 구현 |
@@ -98,13 +99,14 @@ BFF: `/api/...` · Spring: `/api/v1/...`
 > 메인 피드: 본인 + 주민 게시글. `PUBLIC` / 본인 / `NEIGHBORS`(ACCEPTED). 차단 쌍 제외. 커서 `cursorFeedId` + `nextCursorFeedId`.  
 > **추천 게시글** (`/main/feeds/recommended`, `/main/search/recommended`): 나중에 추천 알고리즘 추가해야함. 지금은 조회 가능한 전체 피드(공개·본인·이웃공개, 차단 제외)를 최신순 `limit`건(기본 10, 최대 20). 응답은 피드 단건과 같은 `FeedResponse` 배열. 주민 타임라인과 별개.  
 > **작성자 프로필**: 항목마다 `authorProfileFile` (`FileSummary | null`). 작성자의 대표 펫 사진. 없으면 `null`. 게시글 사진(`media[].file`)과 별개. 단건 `GET /feeds/{feedId}`도 동일.  
-> 검색 `GET /main/search?q=&type=&limit=`. `@`/`#` 접두는 서버에서 제거. URL 쿼리에서는 `#`를 `%23`, `@`를 `%40`로 인코딩해야 함. `limit` 없으면 종류마다 10건, 최대 20. 입력 중은 `limit=5`, 엔터는 `limit=20`. 응답 모양은 같다.  
-> **검색 페이지 3종**: `type=USER`는 닉네임 → `users[]`. `type=MENTION`은 펫 `mention_id` → `users[]`(유저당 한 줄). `type=TAG`는 해시태그명 → `tags[]`(`tagId`, `hashtag`, `feedCount`). `users[]` 항목은 `userNo`, `nickname`, `profileFile`, `petTags`, `bio`. `petTags`는 mentionId 배열(`@` 없음, priority 순, 없으면 `[]`). 본인·차단 유저는 빠진다. `tags[].feedCount`는 그 조회자에게 보이는 게시글 수다. 태그 상세의 `feedCount`(삭제만 제외한 전체)와 다르다.  
-> **태그 클릭** `GET /main/search/tags/{tagId}/feeds?limit=`: 그 태그의 게시글 그리드. 보이는 글만, 최신순. 항목은 마이울타리 그리드와 같다(`feedId`, `coverFile`, `coverThumbnailFile`, `coverMediaType`, `mediaCount`, `likeCount`, `commentCount`, `createdAt`). `limit` 기본 30, 최대 50. 없는 태그 404.  
-> `type=PET`는 검색 페이지가 아니라 사진 태그·스토리 `@` 후보. `pets[]`에 `petId`가 있다. `mention_id`, 펫 이름, 보호자 닉네임. 본인 펫·차단은 빠진다. `type=FEED`는 게시글 본문 검색(`feeds[]`, 피드 단건과 같은 응답). `type=ALL`은 USER+PET+TAG+FEED.  
+> 검색 페이지 `GET /main/search?q=&type=&limit=`. `@`/`#` 접두는 서버에서 제거. URL 쿼리에서는 `#`를 `%23`, `@`를 `%40`로 인코딩해야 함. 입력 중과 엔터는 같은 응답이고 `limit`만 다르다. 입력 중 `limit=5`, 엔터 `limit=20`.  
+> **검색 페이지**: `type=USER`는 닉네임 → `users[]`. `type=MENTION`은 펫 멘션 → `users[]`(유저당 한 줄, `petTags`). `type=TAG`는 태그명 → `tags[]`(`tagId`, `hashtag`, `feedCount`). `users[]` 항목은 `userNo`, `nickname`, `profileFile`, `petTags`, `bio`. `petTags`는 mentionId 배열(`@` 없음, priority 순, 없으면 `[]`). 본인·차단 유저는 빠진다. `tags[].feedCount`는 태그 클릭 그리드와 같은, 그 조회자에게 보이는 게시글 수다.  
+> **태그 클릭** `GET /main/search/tags/{tagId}/feeds?limit=30`. 보이는 글만 그리드, 최신순. 항목은 마이울타리 그리드와 같다(`feedId`, `coverFile`, `coverThumbnailFile`, `coverMediaType`, `mediaCount`, `likeCount`, `commentCount`, `createdAt`). 없는 태그 404.  
+> `type=PET`는 스토리 `@` 후보용이다. 검색 페이지에서 쓰지 않는다. `pets[]`에 `petId`가 있다. `mention_id`, 펫 이름, 보호자 닉네임. 본인 펫·차단은 빠진다. `type=FEED`는 게시글 본문 검색(`feeds[]`, 피드 단건과 같은 응답). `type=ALL`은 USER+PET+TAG+FEED.  
 > **`pets[]`에 보호자 닉네임**: 각 펫에 `ownerNickname`(문자열). `userNo`는 보호자. 멘션명만 맞아도 닉네임이 있어야 목록에 `닉네임` + `@mentionId`를 같이 그린다. 없으면 펫 이름만 남는다.  
 > **최근 검색**: 검색어가 아니라, 검색 후 들어간 유저 울타리. 검색창을 열면 `GET /main/search/recent` 5건(`items`, `nextCursorHistoryId`). 더보기는 그 커서로 `GET /main/search/recent/more?cursorHistoryId=` 20건. 또 남으면 응답 커서로 반복. `null`이면 끝. 항목은 `userNo`(울타리 주인), `nickname`, `profileFile`(대표 펫 사진, 없으면 null), `petTags`, `searchedAt`. `petTags`는 그 주인 펫의 `mentionId` 문자열 배열이다. `@`는 붙이지 않고, `priority` 순이다. 펫이 없으면 `[]`. 화면에는 각 `mentionId` 앞에 `@`를 붙여 한 줄로 나열한다. 탈퇴·차단 유저는 목록에서 빠짐.  
 > **저장**: 그 울타리에 들어갈 때 `POST /main/search/recent` `{ "targetUserNo" }`. 같은 울타리는 새 행 없이 `searched_at`만 갱신. 없는 유저 404, 차단 403.  
+> **한 건 지우기**: `DELETE /main/search/recent/{userSearchHistoryId}`. 목록 항목의 `userSearchHistoryId`. 내 행만 지운다. 없거나 내 것이 아니면 404. 응답 `data`는 null.  
 > **모두 지우기**: `DELETE /main/search/recent`. 내 행을 전부 삭제한다. 목록에 안 나오던 탈퇴·차단 대상도 포함. 응답 `data`는 null.  
 > **최근 펫 태그** (`/main/pet-tags/recent`): 스토리 `@`와 사진 태그 모달의 「최근 태그」. **검색 최근 울타리와 다른 테이블**(`ultary_user_pet_tag_history`). `POST /main/search/recent`를 여기서 호출하지 않는다. 검색창 최근 목록에도 이 펫이 나오면 안 된다.  
 > **목록**: 모달을 열면 `GET /main/pet-tags/recent`. `items` 최대 20, `usedAt` 내림차순. 커서 없음. 항목은 `petId`, `mentionId`, `name`, `userNo`(보호자), `ownerNickname`, `profileFile`(그 펫 사진, 없으면 null), `usedAt`. 비활성·삭제 펫, 탈퇴 보호자, 차단(내가 막음/상대가 막음)은 목록에서 뺀다.  
@@ -195,7 +197,8 @@ BFF: `/api/...` · Spring: `/api/v1/...`
 | 답글 좋아요 | POST | `/api/feeds/:feedId/comments/:commentId/replies/:replyId/like` |
 | 답글 좋아요 취소 | DELETE | `/api/feeds/:feedId/comments/:commentId/replies/:replyId/like` |
 
-> 댓글·답글 응답: `likeCount`, `likedByMe`, `authorProfileFile` (`FileSummary | null`, 작성자 프로필. 미등록이면 null). 목록에 답글이 포함되면 답글에도 동일. 좋아요 토글·작성·수정도 해당 댓글/답글 응답을 다시 반환. 테이블은 `ultary_feed_comment_like` / `ultary_feed_reply_like` (피드 좋아요와 분리).
+> 댓글·답글 응답: `likeCount`, `likedByMe`, `authorProfileFile` (`FileSummary | null`, 작성자 프로필. 미등록이면 null), `myReport`. 목록에 답글이 포함되면 답글에도 동일. 좋아요 토글·작성·수정도 해당 댓글/답글 응답을 다시 반환. 테이블은 `ultary_feed_comment_like` / `ultary_feed_reply_like` (피드 좋아요와 분리).  
+> **내 신고** `myReport`: 게시글 상세·댓글·답글·울타리(`GET /users/{userNo}/ultary`)에 있다. 없으면 `null`. 있으면 `reportId`, `status`. `status=REQUESTED`일 때 `DELETE /reports/{reportId}`로 취소한다. 관리자가 `CONFIRMED`(확인)로 바꾼 뒤, 보류·삭제조치·거절·정지는 취소하지 않는다.
 
 ---
 
@@ -236,7 +239,7 @@ BFF: `/api/...` · Spring: `/api/v1/...`
 | 유저 차단 | POST | `/api/users/:userNo/block` | `/api/v1/users/:userNo/block` | 구현 |
 | 차단한 사용자 목록 | GET | `/api/users/blocks` | `/api/v1/users/blocks` | 구현 |
 | 유저 차단 해제 | DELETE | `/api/users/:userNo/block` | `/api/v1/users/:userNo/block` | 구현 |
-| 신고 | POST | `/api/reports` | — | 미구현 |
+| 신고 | POST | `/api/reports` | `/api/v1/reports` | 구현 |
 
 > `type=RESIDENTS`(주민/팔로잉, 기본) · `type=NEIGHBORS`(이웃/팔로워).  
 > `pair_key` = `minUserNo:maxUserNo` (한 쌍에 관계 행 1개).  
@@ -249,7 +252,8 @@ BFF: `/api/...` · Spring: `/api/v1/...`
 > 차단 시 기존 neighbor 행 삭제. 상대가 나를 차단하면 울타리/목록 조회 `USER_BLOCKED`. 펫·게시글 목록도 같다.  
 > **차단한 사용자** `GET /users/blocks`: 내가 차단한 활성 유저만. 배열. 기본 30, 최대 50, 쿼리 `limit`. 최신 `blockedAt` 순. 항목은 `userNo`, `nickname`, `profileFile`(대표 펫 사진, 없으면 null), `blockedAt`. 탈퇴한 유저는 빠진다. 화면의 취소는 해제 전 확인이라 응답에 없다. 해제는 `DELETE /users/{userNo}/block`.  
 > 피드 `visibility=NEIGHBORS`는 ACCEPTED 쌍만 조회 가능.  
-> HTTP: `requests/neighbor.http` (시드 user 101~105)
+> **신고** `POST /reports`. Body `targetType`(`USER`|`FEED`|`COMMENT`|`REPLY`), `targetId`(유저 번호·게시글 id·댓글 id·답글 id), `reason`. `reason`은 `SPAM` 스팸·광고, `ABUSE` 욕설·비방, `HARASSMENT` 괴롭힘, `SEXUAL` 음란, `VIOLENCE` 폭력, `HATE` 혐오, `IMPERSONATION` 사칭, `PRIVACY` 개인정보, `OTHER` 기타. 없는 대상은 각 404. 본인·본인 글은 `400` `CANNOT_REPORT_SELF`. 같은 대상의 미처리 신고가 있으면 `409` `REPORT_ALREADY_OPENED`. 접수 상태는 `REQUESTED`(신고요청). 취소는 `DELETE /reports/{reportId}`. 내 신고이고 `REQUESTED`일 때만. 아니면 `404` `REPORT_NOT_FOUND`, `409` `REPORT_CANNOT_CANCEL`.  
+> HTTP: `requests/neighbor.http` (시드 user 101~105), `requests/report.http`
 
 ---
 
@@ -400,8 +404,16 @@ BFF: `/api/...` · Spring: `/api/v1/...`
 | 태그 거절 | POST | `/api/admin/tags/:tagId/reject` |
 | 회원 정지 | POST | `/api/admin/users/:userNo/suspend` |
 | 회원 정지 해제 | POST | `/api/admin/users/:userNo/unsuspend` |
+| 신고 목록 | GET | `/api/admin/reports?status=&limit=` |
+| 신고 글·댓글·답글 삭제 | POST | `/api/admin/reports/:reportId/delete-content` |
+| 신고 회원 정지 | POST | `/api/admin/reports/:reportId/suspend` |
+| 신고 확인 | POST | `/api/admin/reports/:reportId/confirm` |
+| 신고 거절 | POST | `/api/admin/reports/:reportId/reject` |
+| 신고 보류 | POST | `/api/admin/reports/:reportId/hold` |
 
 회원 정지는 `withdrawal_status=SUSPENDED`, `suspended_at=지금`. 리프레시 토큰은 폐기한다. 응답 `data`는 `userNo`, `withdrawalStatus`, `suspendedAt`. 없는 회원 `404` `USER_NOT_FOUND`. 이미 정지면 `409` `ACCOUNT_ALREADY_SUSPENDED`. 탈퇴 계정이면 `409` `CANNOT_SUSPEND_WITHDRAWN`. 해제는 `ACTIVE`로 되돌리고 `suspended_at`을 비운다. 정지가 아니면 `409` `ACCOUNT_NOT_SUSPENDED`. Bearer가 있는 호출이다. 관리자 전용 로그인은 아직 없다.
+
+신고 목록 기본 `status=REQUESTED`, `limit` 기본 30 최대 50. 항목은 `reportId`, `reporterUserNo`, `targetType`, `targetUserNo`, `targetFeedId`, `targetCommentId`, `targetReplyId`, `reason`, `status`, `createdAt`, `processedAt`. `status`는 `REQUESTED` 신고요청, `CONFIRMED` 확인, `DELETED` 삭제조치, `REJECTED` 거절, `ON_HOLD` 보류, `SUSPENDED` 정지. 신고요청·확인·보류만 다시 조치할 수 있다. `confirm`은 신고요청만 `CONFIRMED`로 바꾼다. 확인 뒤에는 신고자가 취소할 수 없다. `delete-content`는 `FEED`·`COMMENT`·`REPLY`만. 대상을 소프트 삭제하고 상태를 `DELETED`로 둔다. 이미 삭제된 대상이면 상태만 바꾼다. `suspend`는 `USER` 신고만. 그 회원을 정지하고 상태를 `SUSPENDED`로 둔다. 이미 정지면 상태만 바꾼다. 대상 종류가 다르면 `400` `REPORT_ACTION_MISMATCH`. `reject`는 `REJECTED`, `hold`는 `ON_HOLD`. 없거나 이미 삭제조치·거절·정지인 신고는 `404` `REPORT_NOT_FOUND`, `409` `REPORT_ALREADY_CLOSED`.
 
 ---
 
@@ -427,7 +439,7 @@ HTTP: `requests/test.http`
 - 코드 상수: `src/lib/api/endpoints.ts` (`bffEndpoints` / `springEndpoints`)
 - BFF 스켈레톤: `src/app/api/**/route.ts`
 - REST Client 틀: `http/bff.http` (프론트) · Spring: `requests/*.http`
-- DB 스키마: `share/database/schema/mariadb_10_1/001_init_schema.sql` (**schema_version 20**)
+- DB 스키마: `share/database/schema/mariadb_10_1/001_init_schema.sql` (**schema_version 23**)
   - 기존 DB v7→v8: `002_file_source_attribution.sql`
   - 기존 DB v8→v9: `003_comment_reply_like.sql`
   - 기존 DB v9→v10: `004_search_history_user_only.sql` (최근 검색 = 들어간 유저 울타리만)
@@ -441,6 +453,9 @@ HTTP: `requests/test.http`
   - 기존 DB v17→v18: `012_dm.sql` (1:1 메시지. 게시글 사진·스토리 사진 공유)
   - 기존 DB v18→v19: `013_feed_pin_and_save.sql` (`ultary_feed_store`→`ultary_feed_pin`, `store_count`→`pin_count`, 나만 보는 `ultary_feed_save`)
   - 기존 DB v19→v20: `014_user_suspended.sql` (`withdrawal_status`에 `SUSPENDED`, `suspended_at`)
+  - 기존 DB v20→v21: `015_report_reason.sql` (`ultary_report.reason` 신고 사유 ENUM)
+  - 기존 DB v21→v22: `016_report_status.sql` (`ultary_report.status` 신고요청·삭제조치·거절·보류·정지)
+  - 기존 DB v22→v23: `017_report_confirmed.sql` (`ultary_report.status`에 `CONFIRMED` 확인)
   - `ultary_file` 출처: `source_type`(OWNED|UNSPLASH|AI|ETC), `author_name`, `source_url`, `license_url`, `copyright_notice`
 - 로컬 시드(선택): `share/database/seed/mariadb_10_1/001_dev_sample_data.sql`  
   - 스키마 직후 실행. **재실행 가능**(CLEANUP 후 INSERT). 운영/최종 배포에서는 실행하지 않음.  

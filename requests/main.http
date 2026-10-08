@@ -100,7 +100,12 @@ Content-Type: application/json
   "targetUserNo": 102
 }
 
-### 10. 최근 검색 모두 지우기
+### 10a. 최근 검색 한 건 지우기
+# userSearchHistoryId 는 7·8 목록 항목 값
+DELETE {{baseUrl}}/api/v1/main/search/recent/1
+Authorization: Bearer {{accessToken}}
+
+### 10b. 최근 검색 모두 지우기
 DELETE {{baseUrl}}/api/v1/main/search/recent
 Authorization: Bearer {{accessToken}}
 

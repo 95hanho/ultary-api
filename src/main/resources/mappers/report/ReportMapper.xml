@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="me._hanho.ultary.domain.report.ReportMapper">
+
+	<sql id="reportColumns">
+		report_id,
+		reporter_user_no,
+		target_type,
+		target_user_no,
+		target_pet_id,
+		target_feed_id,
+		target_comment_id,
+		target_reply_id,
+		reason,
+		status,
+		admin_no,
+		processed_at,
+		created_at,
+		updated_at
+	</sql>
+
+	<insert id="insert" useGeneratedKeys="true" keyProperty="reportId" keyColumn="report_id">
+		INSERT INTO ultary_report (
+			reporter_user_no,
+			target_type,
+			target_user_no,
+			target_feed_id,
+			target_comment_id,
+			target_reply_id,
+			reason,
+			status
+		) VALUES (
+			#{reporterUserNo},
+			#{targetType},
+			#{targetUserNo},
+			#{targetFeedId},
+			#{targetCommentId},
+			#{targetReplyId},
+			#{reason},
+			'REQUESTED'
+		)
+	</insert>
+
+	<select id="findById" resultType="me._hanho.ultary.domain.report.model.Report">
+		SELECT <include refid="reportColumns" />
+		FROM ultary_report
+		WHERE report_id = #{reportId}
+	</select>
+
+	<select id="findOpenByReporterAndTarget" resultType="me._hanho.ultary.domain.report.model.Report">
+		SELECT <include refid="reportColumns" />
+		FROM ultary_report
+		WHERE reporter_user_no = #{reporterUserNo}
+		  AND target_type = #{targetType}
+		  AND status IN ('REQUESTED', 'CONFIRMED', 'ON_HOLD')
+		<if test="targetUserNo != null">
+		  AND target_user_no = #{targetUserNo}
+		</if>
+		<if test="targetFeedId != null">
+		  AND target_feed_id = #{targetFeedId}
+		</if>
+		<if test="targetCommentId != null">
+		  AND target_comment_id = #{targetCommentId}
+		</if>
+		<if test="targetReplyId != null">
+		  AND target_reply_id = #{targetReplyId}
+		</if>
+		LIMIT 1
+	</select>
+
+	<select id="findList" resultType="me._hanho.ultary.domain.report.model.Report">
+		SELECT <include refid="reportColumns" />
+		FROM ultary_report
+		<where>
+			<if test="status != null and status != ''">
+				status = #{status}
+			</if>
+		</where>
+		ORDER BY created_at DESC, report_id DESC
+		LIMIT #{limit}
+	</select>
+
+	<update id="close">
+		UPDATE ultary_report
+		SET status = #{status},
+			processed_at = NOW(),
+			updated_at = NOW()
+		WHERE report_id = #{reportId}
+		  AND status IN ('REQUESTED', 'CONFIRMED', 'ON_HOLD')
+	</update>
+
+	<update id="confirm">
+		UPDATE ultary_report
+		SET status = 'CONFIRMED',
+			processed_at = NOW(),
+			updated_at = NOW()
+		WHERE report_id = #{reportId}
+		  AND status = 'REQUESTED'
+	</update>
+
+	<select id="findMineByFeedIds" resultType="me._hanho.ultary.domain.report.model.Report">
+		SELECT report_id, target_feed_id, status
+		FROM ultary_report
+		WHERE reporter_user_no = #{reporterUserNo}
+		  AND target_type = 'FEED'
+		  AND target_feed_id IN
+		<foreach collection="targetIds" item="id" open="(" separator="," close=")">
+			#{id}
+		</foreach>
+	</select>
+
+	<select id="findMineByCommentIds" resultType="me._hanho.ultary.domain.report.model.Report">
+		SELECT report_id, target_comment_id, status
+		FROM ultary_report
+		WHERE reporter_user_no = #{reporterUserNo}
+		  AND target_type = 'COMMENT'
+		  AND target_comment_id IN
+		<foreach collection="targetIds" item="id" open="(" separator="," close=")">
+			#{id}
+		</foreach>
+	</select>
+
+	<select id="findMineByReplyIds" resultType="me._hanho.ultary.domain.report.model.Report">
+		SELECT report_id, target_reply_id, status
+		FROM ultary_report
+		WHERE reporter_user_no = #{reporterUserNo}
+		  AND target_type = 'REPLY'
+		  AND target_reply_id IN
+		<foreach collection="targetIds" item="id" open="(" separator="," close=")">
+			#{id}
+		</foreach>
+	</select>
+
+	<select id="findMineByUserNos" resultType="me._hanho.ultary.domain.report.model.Report">
+		SELECT report_id, target_user_no, status
+		FROM ultary_report
+		WHERE reporter_user_no = #{reporterUserNo}
+		  AND target_type = 'USER'
+		  AND target_user_no IN
+		<foreach collection="targetIds" item="id" open="(" separator="," close=")">
+			#{id}
+		</foreach>
+	</select>
+
+	<delete id="deleteOwnRequested">
+		DELETE FROM ultary_report
+		WHERE report_id = #{reportId}
+		  AND reporter_user_no = #{reporterUserNo}
+		  AND status = 'REQUESTED'
+	</delete>
+
+</mapper>

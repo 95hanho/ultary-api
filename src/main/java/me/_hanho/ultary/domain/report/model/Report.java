@@ -20,7 +20,7 @@ public class Report {
 	private Long targetCommentId;
 	private Long targetReplyId;
 	private String reason;
-	/** PENDING | REVIEWING | RESOLVED | REJECTED */
+	/** REQUESTED 신고요청 | CONFIRMED 확인 | DELETED 삭제조치 | REJECTED 거절 | ON_HOLD 보류 | SUSPENDED 정지 */
 	private String status;
 	private Long adminNo;
 	private LocalDateTime processedAt;

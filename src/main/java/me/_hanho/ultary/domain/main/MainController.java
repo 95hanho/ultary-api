@@ -168,6 +168,17 @@ public class MainController {
 				"최근 검색 저장 성공");
 	}
 
+	/** 최근 검색 한 건 삭제. userSearchHistoryId는 목록 항목 값 */
+	@DeleteMapping("/search/recent/{userSearchHistoryId}")
+	public ApiResponse<Void> deleteRecentSearch(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@PathVariable Long userSearchHistoryId) {
+		log.info("[deleteRecentSearch] userNo={} userSearchHistoryId={}",
+				principal.getUserNo(), userSearchHistoryId);
+		mainService.deleteRecentSearch(principal, userSearchHistoryId);
+		return ApiResponse.okEmpty("최근 검색 삭제 성공");
+	}
+
 	/** 최근 검색 모두 지우기 */
 	@DeleteMapping("/search/recent")
 	public ApiResponse<Void> clearRecentSearches(

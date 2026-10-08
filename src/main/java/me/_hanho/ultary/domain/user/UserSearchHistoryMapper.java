@@ -31,4 +31,8 @@ public interface UserSearchHistoryMapper {
 			@Param("targetUserNo") Long targetUserNo);
 
 	int deleteByUserNo(@Param("userNo") Long userNo);
+
+	int deleteOwnById(
+			@Param("userNo") Long userNo,
+			@Param("userSearchHistoryId") Long userSearchHistoryId);
 }

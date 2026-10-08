@@ -7,6 +7,7 @@ import java.util.List;
 import lombok.Builder;
 import lombok.Getter;
 import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
+import me._hanho.ultary.domain.report.dto.response.MyReportResponse;
 
 @Getter
 @Builder
@@ -26,6 +27,8 @@ public class FeedResponse {
 	private Boolean pinnedByMe;
 	/** 나만 보는 저장. 다른 사람에게는 목록이 없다 */
 	private Boolean savedByMe;
+	/** 내 신고. 없으면 null. status가 REQUESTED면 취소 가능 */
+	private MyReportResponse myReport;
 	private List<MediaItem> media;
 	private List<PetItem> pets;
 	private List<Long> tagIds;

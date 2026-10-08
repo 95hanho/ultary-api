@@ -23,3 +23,30 @@ Authorization: Bearer {{accessToken}}
 ### 2. 회원 정지 해제
 POST {{baseUrl}}/api/v1/admin/users/104/unsuspend
 Authorization: Bearer {{accessToken}}
+
+### 3. 신고 목록
+GET {{baseUrl}}/api/v1/admin/reports?status=REQUESTED&limit=30
+Authorization: Bearer {{accessToken}}
+
+# 4~6의 reportId는 목록 항목으로 바꾼다.
+# delete-content 는 게시글·댓글·답글을 소프트 삭제한다. suspend 는 유저 신고만.
+
+### 4. 신고 글·댓글·답글 삭제
+POST {{baseUrl}}/api/v1/admin/reports/105/delete-content
+Authorization: Bearer {{accessToken}}
+
+### 5. 신고 회원 정지
+POST {{baseUrl}}/api/v1/admin/reports/101/suspend
+Authorization: Bearer {{accessToken}}
+
+### 6. 신고 거절
+POST {{baseUrl}}/api/v1/admin/reports/1/reject
+Authorization: Bearer {{accessToken}}
+
+### 7. 신고 보류
+POST {{baseUrl}}/api/v1/admin/reports/1/hold
+Authorization: Bearer {{accessToken}}
+
+### 8. 신고 확인 (신고요청만. 이후 신고자는 취소 불가)
+POST {{baseUrl}}/api/v1/admin/reports/1/confirm
+Authorization: Bearer {{accessToken}}

@@ -19,6 +19,8 @@ import me._hanho.ultary.common.exception.ErrorCode;
 import me._hanho.ultary.domain.neighbor.NeighborService;
 import me._hanho.ultary.domain.settings.PrivacyService;
 import me._hanho.ultary.domain.notification.NotificationService;
+import me._hanho.ultary.domain.report.ReportService;
+import me._hanho.ultary.domain.report.dto.response.MyReportResponse;
 import me._hanho.ultary.domain.feed.dto.request.CommentMentionRequest;
 import me._hanho.ultary.domain.feed.dto.request.CreateCommentRequest;
 import me._hanho.ultary.domain.feed.dto.request.CreateFeedRequest;
@@ -76,6 +78,7 @@ public class FeedService {
 	private final NeighborService neighborService;
 	private final NotificationService notificationService;
 	private final PrivacyService privacyService;
+	private final ReportService reportService;
 
 	@Transactional
 	public FeedResponse create(UserPrincipal principal, CreateFeedRequest request) {
@@ -132,6 +135,9 @@ public class FeedService {
 			fileIds.add(profileFileId.longValue());
 		}
 		Map<Long, FileSummaryResponse> files = fileService.findSummaries(fileIds);
+		Map<Long, MyReportResponse> myReports = reportService.mineFeeds(
+				viewerUserNo,
+				feeds.stream().map(Feed::getFeedId).toList());
 		List<FeedResponse> result = new ArrayList<>();
 		for (Feed feed : feeds) {
 			result.add(toResponse(
@@ -140,7 +146,8 @@ public class FeedService {
 					authors.get(feed.getUserNo()),
 					mediaByFeed.get(feed.getFeedId()),
 					files,
-					authorProfiles));
+					authorProfiles,
+					myReports));
 		}
 		return result;
 	}
@@ -306,6 +313,13 @@ public class FeedService {
 			}
 		}
 		Map<Long, FileSummaryResponse> profiles = fileService.findSummaries(profileIds);
+		List<Long> commentIds = comments.stream().map(FeedComment::getFeedCommentId).toList();
+		List<Long> replyIds = repliesByComment.values().stream()
+				.flatMap(List::stream)
+				.map(FeedReply::getFeedReplyId)
+				.toList();
+		Map<Long, MyReportResponse> myCommentReports = reportService.mineComments(viewerUserNo, commentIds);
+		Map<Long, MyReportResponse> myReplyReports = reportService.mineReplies(viewerUserNo, replyIds);
 		return comments.stream()
 				.map(comment -> toCommentResponse(
 						comment,
@@ -315,7 +329,9 @@ public class FeedService {
 						profiles,
 						embedReplies
 								? repliesByComment.getOrDefault(comment.getFeedCommentId(), List.of())
-								: null))
+								: null,
+						myCommentReports,
+						myReplyReports))
 				.toList();
 	}
 
@@ -421,8 +437,11 @@ public class FeedService {
 			collectProfileId(profileIds, reply.getAuthorProfileFileId());
 		}
 		Map<Long, FileSummaryResponse> profiles = fileService.findSummaries(profileIds);
+		Map<Long, MyReportResponse> myReplyReports = reportService.mineReplies(
+				principal.getUserNo(),
+				replies.stream().map(FeedReply::getFeedReplyId).toList());
 		return replies.stream()
-				.map(reply -> toReplyResponse(reply, principal.getUserNo(), likedReplyIds, profiles))
+				.map(reply -> toReplyResponse(reply, principal.getUserNo(), likedReplyIds, profiles, myReplyReports))
 				.toList();
 	}
 
@@ -521,6 +540,41 @@ public class FeedService {
 		notificationService.removeReply(replyId);
 		notificationService.syncFeedThread(feedId, false);
 		log.info("[deleteReply] replyId={} by={}", replyId, principal.getUserNo());
+	}
+
+	/** 관리자 삭제. 이미 없으면 아무 것도 하지 않는다. */
+	@Transactional
+	public void deleteByAdmin(Long feedId) {
+		if (feedMapper.softDeleteFeedByAdmin(feedId) > 0) {
+			notificationService.removeByFeed(feedId);
+			log.info("[deleteByAdmin] feedId={}", feedId);
+		}
+	}
+
+	@Transactional
+	public void deleteCommentByAdmin(Long commentId) {
+		FeedComment comment = feedMapper.findActiveCommentById(commentId);
+		if (comment == null || feedMapper.softDeleteCommentByAdmin(commentId) == 0) {
+			return;
+		}
+		feedMapper.adjustCommentCount(comment.getFeedId(), -1);
+		notificationService.removeCommentTree(commentId);
+		notificationService.syncFeedThread(comment.getFeedId(), false);
+		log.info("[deleteCommentByAdmin] feedId={} commentId={}", comment.getFeedId(), commentId);
+	}
+
+	@Transactional
+	public void deleteReplyByAdmin(Long replyId) {
+		FeedReply reply = feedMapper.findActiveReplyById(replyId);
+		if (reply == null || feedMapper.softDeleteReplyByAdmin(replyId) == 0) {
+			return;
+		}
+		notificationService.removeReply(replyId);
+		FeedComment comment = feedMapper.findActiveCommentById(reply.getFeedCommentId());
+		if (comment != null) {
+			notificationService.syncFeedThread(comment.getFeedId(), false);
+		}
+		log.info("[deleteReplyByAdmin] replyId={}", replyId);
 	}
 
 	private void insertMedia(Long feedId, Long userNo, List<CreateFeedRequest.MediaItem> mediaItems) {
@@ -725,7 +779,8 @@ public class FeedService {
 			}
 		}
 		return toResponse(
-				feed, viewerUserNo, author, mediaList, fileService.findSummaries(fileIds), authorProfiles);
+				feed, viewerUserNo, author, mediaList, fileService.findSummaries(fileIds), authorProfiles,
+				reportService.mineFeeds(viewerUserNo, List.of(feed.getFeedId())));
 	}
 
 	private FeedResponse toResponse(
@@ -734,7 +789,8 @@ public class FeedService {
 			User author,
 			List<FeedMedia> mediaList,
 			Map<Long, FileSummaryResponse> files,
-			Map<Long, Integer> authorProfiles) {
+			Map<Long, Integer> authorProfiles,
+			Map<Long, MyReportResponse> myReports) {
 		List<FeedResponse.MediaItem> mediaItems = new ArrayList<>();
 		List<FeedMedia> resolvedMedia = mediaList != null ? mediaList : List.of();
 		for (FeedMedia media : resolvedMedia) {
@@ -800,6 +856,7 @@ public class FeedService {
 				.likedByMe(likedByMe)
 				.pinnedByMe(pinnedByMe)
 				.savedByMe(savedByMe)
+				.myReport(myReports.get(feed.getFeedId()))
 				.media(mediaItems)
 				.pets(pets)
 				.tagIds(feedMapper.findTagIdsByFeedId(feed.getFeedId()))
@@ -881,7 +938,7 @@ public class FeedService {
 			boolean embedReplies,
 			Long viewerUserNo,
 			Set<Long> likedCommentIds) {
-		return toCommentResponse(comment, embedReplies, viewerUserNo, likedCommentIds, null, null);
+		return toCommentResponse(comment, embedReplies, viewerUserNo, likedCommentIds, null, null, null, null);
 	}
 
 	private FeedCommentResponse toCommentResponse(
@@ -890,7 +947,9 @@ public class FeedService {
 			Long viewerUserNo,
 			Set<Long> likedCommentIds,
 			Map<Long, FileSummaryResponse> profiles,
-			List<FeedReply> preloadedReplies) {
+			List<FeedReply> preloadedReplies,
+			Map<Long, MyReportResponse> myCommentReports,
+			Map<Long, MyReportResponse> myReplyReports) {
 		AuthorProfile author = resolveAuthor(
 				comment.getUserNo(),
 				comment.getAuthorNickname(),
@@ -906,12 +965,15 @@ public class FeedService {
 					replyRows.stream().map(FeedReply::getFeedReplyId).toList(),
 					viewerUserNo);
 			replies = replyRows.stream()
-					.map(reply -> toReplyResponse(reply, viewerUserNo, likedReplyIds, profiles))
+					.map(reply -> toReplyResponse(reply, viewerUserNo, likedReplyIds, profiles, myReplyReports))
 					.toList();
 		}
 		boolean likedByMe = likedCommentIds != null
 				? likedCommentIds.contains(comment.getFeedCommentId())
 				: isCommentLikedBy(comment.getFeedCommentId(), viewerUserNo);
+		MyReportResponse myReport = myCommentReports != null
+				? myCommentReports.get(comment.getFeedCommentId())
+				: reportService.mineComment(viewerUserNo, comment.getFeedCommentId());
 		return FeedCommentResponse.builder()
 				.feedCommentId(comment.getFeedCommentId())
 				.feedId(comment.getFeedId())
@@ -921,6 +983,7 @@ public class FeedService {
 				.content(comment.getContent())
 				.likeCount(comment.getLikeCount() == null ? 0 : comment.getLikeCount())
 				.likedByMe(likedByMe)
+				.myReport(myReport)
 				.mentions(toMentionResponses(feedMapper.findMentionsByCommentId(comment.getFeedCommentId())))
 				.replyCount(replyCount)
 				.replies(replies)
@@ -930,7 +993,7 @@ public class FeedService {
 	}
 
 	private FeedReplyResponse toReplyResponse(FeedReply reply, Long viewerUserNo, Set<Long> likedReplyIds) {
-		return toReplyResponse(reply, viewerUserNo, likedReplyIds, null);
+		return toReplyResponse(reply, viewerUserNo, likedReplyIds, null, null);
 	}
 
 	private FeedReplyResponse toReplyResponse(
@@ -938,6 +1001,15 @@ public class FeedService {
 			Long viewerUserNo,
 			Set<Long> likedReplyIds,
 			Map<Long, FileSummaryResponse> profiles) {
+		return toReplyResponse(reply, viewerUserNo, likedReplyIds, profiles, null);
+	}
+
+	private FeedReplyResponse toReplyResponse(
+			FeedReply reply,
+			Long viewerUserNo,
+			Set<Long> likedReplyIds,
+			Map<Long, FileSummaryResponse> profiles,
+			Map<Long, MyReportResponse> myReplyReports) {
 		AuthorProfile author = resolveAuthor(
 				reply.getUserNo(),
 				reply.getAuthorNickname(),
@@ -946,6 +1018,9 @@ public class FeedService {
 		boolean likedByMe = likedReplyIds != null
 				? likedReplyIds.contains(reply.getFeedReplyId())
 				: isReplyLikedBy(reply.getFeedReplyId(), viewerUserNo);
+		MyReportResponse myReport = myReplyReports != null
+				? myReplyReports.get(reply.getFeedReplyId())
+				: reportService.mineReply(viewerUserNo, reply.getFeedReplyId());
 		return FeedReplyResponse.builder()
 				.feedReplyId(reply.getFeedReplyId())
 				.feedCommentId(reply.getFeedCommentId())
@@ -955,6 +1030,7 @@ public class FeedService {
 				.content(reply.getContent())
 				.likeCount(reply.getLikeCount() == null ? 0 : reply.getLikeCount())
 				.likedByMe(likedByMe)
+				.myReport(myReport)
 				.mentions(toMentionResponses(feedMapper.findMentionsByReplyId(reply.getFeedReplyId())))
 				.createdAt(reply.getCreatedAt())
 				.updatedAt(reply.getUpdatedAt())

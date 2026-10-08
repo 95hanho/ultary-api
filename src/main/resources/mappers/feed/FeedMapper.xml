@@ -411,6 +411,16 @@
 		  AND is_deleted = 0
 	</update>
 
+	<update id="softDeleteFeedByAdmin">
+		UPDATE ultary_feed
+		SET is_deleted = 1,
+			deleted_at = NOW(),
+			deleted_by_user_no = NULL,
+			updated_at = NOW()
+		WHERE feed_id = #{feedId}
+		  AND is_deleted = 0
+	</update>
+
 	<select id="countCollaboratorOwnedByUser" resultType="int">
 		SELECT COUNT(1)
 		FROM ultary_feed_pet fp
@@ -829,6 +839,26 @@
 		  AND is_deleted = 0
 	</update>
 
+	<select id="findActiveCommentById" resultType="me._hanho.ultary.domain.feed.model.FeedComment">
+		SELECT
+			feed_comment_id,
+			feed_id,
+			user_no,
+			is_deleted
+		FROM ultary_feed_comment
+		WHERE feed_comment_id = #{commentId}
+		  AND is_deleted = 0
+	</select>
+
+	<update id="softDeleteCommentByAdmin">
+		UPDATE ultary_feed_comment
+		SET is_deleted = 1,
+			deleted_at = NOW(),
+			updated_at = NOW()
+		WHERE feed_comment_id = #{commentId}
+		  AND is_deleted = 0
+	</update>
+
 	<update id="softDeleteCommentByFeedAuthor">
 		UPDATE ultary_feed_comment
 		SET is_deleted = 1,
@@ -931,6 +961,26 @@
 			updated_at = NOW()
 		WHERE feed_reply_id = #{replyId}
 		  AND user_no = #{userNo}
+		  AND is_deleted = 0
+	</update>
+
+	<select id="findActiveReplyById" resultType="me._hanho.ultary.domain.feed.model.FeedReply">
+		SELECT
+			feed_reply_id,
+			feed_comment_id,
+			user_no,
+			is_deleted
+		FROM ultary_feed_reply
+		WHERE feed_reply_id = #{replyId}
+		  AND is_deleted = 0
+	</select>
+
+	<update id="softDeleteReplyByAdmin">
+		UPDATE ultary_feed_reply
+		SET is_deleted = 1,
+			deleted_at = NOW(),
+			updated_at = NOW()
+		WHERE feed_reply_id = #{replyId}
 		  AND is_deleted = 0
 	</update>
 
