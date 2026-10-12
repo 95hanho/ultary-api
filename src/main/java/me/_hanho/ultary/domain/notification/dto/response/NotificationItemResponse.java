@@ -28,7 +28,7 @@ public class NotificationItemResponse {
 	private Long feedReplyId;
 	private Long storyId;
 	private Long neighborId;
-	/** PENDING 일 때만 수락 버튼. 이웃 신청이 아니면 null */
+	/** PENDING 일 때만 수락 버튼. 팔로우 신청이 아니면 null */
 	private String neighborStatus;
 	private boolean read;
 	private LocalDateTime updatedAt;

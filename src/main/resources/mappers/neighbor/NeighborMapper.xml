@@ -11,6 +11,8 @@
 		receiver_user_no,
 		pair_key,
 		status,
+		followed_back,
+		followed_back_at,
 		requested_at,
 		accepted_at,
 		rejected_at,
@@ -22,15 +24,35 @@
 	<select id="countAcceptedAsRequester" resultType="int">
 		SELECT COUNT(1)
 		FROM ultary_neighbor
-		WHERE requester_user_no = #{userNo}
-		  AND status = 'ACCEPTED'
+		WHERE status = 'ACCEPTED'
+		  AND (
+			requester_user_no = #{userNo}
+			OR (receiver_user_no = #{userNo} AND followed_back = 1)
+		  )
 	</select>
 
 	<select id="countAcceptedAsReceiver" resultType="int">
 		SELECT COUNT(1)
 		FROM ultary_neighbor
-		WHERE receiver_user_no = #{userNo}
-		  AND status = 'ACCEPTED'
+		WHERE status = 'ACCEPTED'
+		  AND (
+			receiver_user_no = #{userNo}
+			OR (requester_user_no = #{userNo} AND followed_back = 1)
+		  )
+	</select>
+
+	<select id="countViewerFollows" resultType="int">
+		SELECT COUNT(1)
+		FROM ultary_neighbor
+		WHERE status = 'ACCEPTED'
+		  AND (
+			(requester_user_no = #{viewerUserNo} AND receiver_user_no = #{ownerUserNo})
+			OR (
+				requester_user_no = #{ownerUserNo}
+				AND receiver_user_no = #{viewerUserNo}
+				AND followed_back = 1
+			)
+		  )
 	</select>
 
 	<select id="countAcceptedPair" resultType="int">
@@ -95,6 +117,8 @@
 		SET requester_user_no = #{requesterUserNo},
 			receiver_user_no = #{receiverUserNo},
 			status = 'PENDING',
+			followed_back = 0,
+			followed_back_at = NULL,
 			requested_at = NOW(),
 			accepted_at = NULL,
 			rejected_at = NULL,
@@ -102,33 +126,76 @@
 		WHERE neighbor_id = #{neighborId}
 	</update>
 
+	<update id="updateFollowBack">
+		UPDATE ultary_neighbor
+		SET followed_back = 1,
+			followed_back_at = NOW()
+		WHERE neighbor_id = #{neighborId}
+		  AND receiver_user_no = #{userNo}
+		  AND status = 'ACCEPTED'
+		  AND followed_back = 0
+	</update>
+
+	<update id="keepIncomingFollow">
+		UPDATE ultary_neighbor
+		SET requester_user_no = #{requesterUserNo},
+			receiver_user_no = #{receiverUserNo},
+			followed_back = 0,
+			followed_back_at = NULL
+		WHERE neighbor_id = #{neighborId}
+		  AND status = 'ACCEPTED'
+		  AND followed_back = 1
+	</update>
+
+	<update id="clearFollowBack">
+		UPDATE ultary_neighbor
+		SET followed_back = 0,
+			followed_back_at = NULL
+		WHERE neighbor_id = #{neighborId}
+		  AND status = 'ACCEPTED'
+		  AND followed_back = 1
+	</update>
+
 	<delete id="deleteByNeighborId">
 		DELETE FROM ultary_neighbor
 		WHERE neighbor_id = #{neighborId}
 	</delete>
+
+	<sql id="listProfileFileId">
+		(
+			SELECT rp.profile_file_id
+			FROM ultary_pet rp
+			WHERE rp.user_no = u.user_no
+			  AND rp.is_deleted = 0
+			  AND rp.profile_file_id IS NOT NULL
+			ORDER BY rp.priority ASC, rp.pet_id ASC
+			LIMIT 1
+		)
+	</sql>
 
 	<select id="findAcceptedResidents" resultType="me._hanho.ultary.domain.neighbor.model.NeighborListRow">
 		SELECT
 			n.neighbor_id AS neighborId,
 			u.user_no AS userNo,
 			u.nickname AS nickname,
-			(
-				SELECT rp.profile_file_id
-				FROM ultary_pet rp
-				WHERE rp.user_no = u.user_no
-				  AND rp.is_deleted = 0
-				  AND rp.profile_file_id IS NOT NULL
-				ORDER BY rp.priority ASC, rp.pet_id ASC
-				LIMIT 1
-			) AS profileFileId,
+			<include refid="listProfileFileId"/> AS profileFileId,
 			n.status AS status,
-			'RESIDENTS' AS listType
-		FROM ultary_neighbor n
-		INNER JOIN ultary_user u ON u.user_no = n.receiver_user_no
+			'FOLLOW' AS listType
+		FROM (
+			SELECT neighbor_id, receiver_user_no AS other_user_no, status, accepted_at AS sort_at
+			FROM ultary_neighbor
+			WHERE requester_user_no = #{userNo}
+			  AND status = 'ACCEPTED'
+			UNION ALL
+			SELECT neighbor_id, requester_user_no, status, followed_back_at
+			FROM ultary_neighbor
+			WHERE receiver_user_no = #{userNo}
+			  AND status = 'ACCEPTED'
+			  AND followed_back = 1
+		) n
+		INNER JOIN ultary_user u ON u.user_no = n.other_user_no
 			AND u.withdrawal_status = 'ACTIVE'
-		WHERE n.requester_user_no = #{userNo}
-		  AND n.status = 'ACCEPTED'
-		ORDER BY n.accepted_at DESC, n.neighbor_id DESC
+		ORDER BY n.sort_at DESC, n.neighbor_id DESC
 		LIMIT #{limit}
 	</select>
 
@@ -137,24 +204,77 @@
 			n.neighbor_id AS neighborId,
 			u.user_no AS userNo,
 			u.nickname AS nickname,
-			(
-				SELECT rp.profile_file_id
-				FROM ultary_pet rp
-				WHERE rp.user_no = u.user_no
-				  AND rp.is_deleted = 0
-				  AND rp.profile_file_id IS NOT NULL
-				ORDER BY rp.priority ASC, rp.pet_id ASC
-				LIMIT 1
-			) AS profileFileId,
+			<include refid="listProfileFileId"/> AS profileFileId,
 			n.status AS status,
-			'NEIGHBORS' AS listType
-		FROM ultary_neighbor n
-		INNER JOIN ultary_user u ON u.user_no = n.requester_user_no
+			'FOLLOWER' AS listType
+		FROM (
+			SELECT neighbor_id, requester_user_no AS other_user_no, status, accepted_at AS sort_at
+			FROM ultary_neighbor
+			WHERE receiver_user_no = #{userNo}
+			  AND status = 'ACCEPTED'
+			UNION ALL
+			SELECT neighbor_id, receiver_user_no, status, followed_back_at
+			FROM ultary_neighbor
+			WHERE requester_user_no = #{userNo}
+			  AND status = 'ACCEPTED'
+			  AND followed_back = 1
+		) n
+		INNER JOIN ultary_user u ON u.user_no = n.other_user_no
 			AND u.withdrawal_status = 'ACTIVE'
-		WHERE n.receiver_user_no = #{userNo}
-		  AND n.status = 'ACCEPTED'
-		ORDER BY n.accepted_at DESC, n.neighbor_id DESC
+		ORDER BY n.sort_at DESC, n.neighbor_id DESC
 		LIMIT #{limit}
+	</select>
+
+	<select id="findFollowedUserNos" resultType="long">
+		SELECT CASE
+			WHEN requester_user_no = #{viewerUserNo} THEN receiver_user_no
+			ELSE requester_user_no
+		END
+		FROM ultary_neighbor
+		WHERE status = 'ACCEPTED'
+		  AND (
+			(
+				requester_user_no = #{viewerUserNo}
+				AND receiver_user_no IN
+				<foreach collection="userNos" item="userNo" open="(" separator="," close=")">
+					#{userNo}
+				</foreach>
+			)
+			OR (
+				receiver_user_no = #{viewerUserNo}
+				AND followed_back = 1
+				AND requester_user_no IN
+				<foreach collection="userNos" item="userNo" open="(" separator="," close=")">
+					#{userNo}
+				</foreach>
+			)
+		  )
+	</select>
+
+	<select id="findFollowerUserNos" resultType="long">
+		SELECT CASE
+			WHEN receiver_user_no = #{viewerUserNo} THEN requester_user_no
+			ELSE receiver_user_no
+		END
+		FROM ultary_neighbor
+		WHERE status = 'ACCEPTED'
+		  AND (
+			(
+				receiver_user_no = #{viewerUserNo}
+				AND requester_user_no IN
+				<foreach collection="userNos" item="userNo" open="(" separator="," close=")">
+					#{userNo}
+				</foreach>
+			)
+			OR (
+				requester_user_no = #{viewerUserNo}
+				AND followed_back = 1
+				AND receiver_user_no IN
+				<foreach collection="userNos" item="userNo" open="(" separator="," close=")">
+					#{userNo}
+				</foreach>
+			)
+		  )
 	</select>
 
 </mapper>

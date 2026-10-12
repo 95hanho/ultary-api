@@ -27,7 +27,7 @@ public class NeighborController {
 			@AuthenticationPrincipal UserPrincipal principal,
 			@PathVariable Long neighborId) {
 		log.info("[accept] userNo={} neighborId={}", principal.getUserNo(), neighborId);
-		return ApiResponse.ok(neighborService.accept(principal, neighborId), "주민 요청 수락 성공");
+		return ApiResponse.ok(neighborService.accept(principal, neighborId), "팔로우 요청 수락 성공");
 	}
 
 	@PostMapping("/{neighborId}/reject")
@@ -35,7 +35,7 @@ public class NeighborController {
 			@AuthenticationPrincipal UserPrincipal principal,
 			@PathVariable Long neighborId) {
 		log.info("[reject] userNo={} neighborId={}", principal.getUserNo(), neighborId);
-		return ApiResponse.ok(neighborService.reject(principal, neighborId), "주민 요청 거절 성공");
+		return ApiResponse.ok(neighborService.reject(principal, neighborId), "팔로우 요청 거절 성공");
 	}
 
 	@DeleteMapping("/{neighborId}")
@@ -44,6 +44,6 @@ public class NeighborController {
 			@PathVariable Long neighborId) {
 		log.info("[cancel] userNo={} neighborId={}", principal.getUserNo(), neighborId);
 		neighborService.cancelOrRemove(principal, neighborId);
-		return ApiResponse.okEmpty("주민 요청 취소·이웃 해제 성공");
+		return ApiResponse.okEmpty("팔로우 해제 성공");
 	}
 }

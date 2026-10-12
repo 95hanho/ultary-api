@@ -16,6 +16,9 @@ public class Neighbor {
 	private String pairKey;
 	/** PENDING | ACCEPTED | REJECTED | BLOCKED */
 	private String status;
+	/** 1이면 수신자도 요청자를 팔로우 */
+	private Boolean followedBack;
+	private LocalDateTime followedBackAt;
 	private LocalDateTime requestedAt;
 	private LocalDateTime acceptedAt;
 	private LocalDateTime rejectedAt;

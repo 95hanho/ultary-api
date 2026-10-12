@@ -35,18 +35,7 @@
 				)
 			)
 			OR (
-				(
-					f.visibility = 'NEIGHBORS'
-					OR (
-						f.visibility = 'PUBLIC'
-						AND EXISTS (
-							SELECT 1
-							FROM ultary_user_privacy p
-							WHERE p.user_no = f.user_no
-							  AND p.private_account = 1
-						)
-					)
-				)
+				f.visibility = 'NEIGHBORS'
 				AND EXISTS (
 					SELECT 1
 					FROM ultary_neighbor n
@@ -54,6 +43,28 @@
 					  AND (
 						(n.requester_user_no = #{viewerUserNo} AND n.receiver_user_no = f.user_no)
 						OR (n.requester_user_no = f.user_no AND n.receiver_user_no = #{viewerUserNo})
+					  )
+				)
+			)
+			OR (
+				f.visibility = 'PUBLIC'
+				AND EXISTS (
+					SELECT 1
+					FROM ultary_user_privacy p
+					WHERE p.user_no = f.user_no
+					  AND p.private_account = 1
+				)
+				AND EXISTS (
+					SELECT 1
+					FROM ultary_neighbor n
+					WHERE n.status = 'ACCEPTED'
+					  AND (
+						(n.requester_user_no = #{viewerUserNo} AND n.receiver_user_no = f.user_no)
+						OR (
+							n.requester_user_no = f.user_no
+							AND n.receiver_user_no = #{viewerUserNo}
+							AND n.followed_back = 1
+						)
 					  )
 				)
 			)
@@ -114,18 +125,7 @@
 				)
 			)
 			OR (
-				(
-					visibility = 'NEIGHBORS'
-					OR (
-						visibility = 'PUBLIC'
-						AND EXISTS (
-							SELECT 1
-							FROM ultary_user_privacy p
-							WHERE p.user_no = #{ownerUserNo}
-							  AND p.private_account = 1
-						)
-					)
-				)
+				visibility = 'NEIGHBORS'
 				AND EXISTS (
 					SELECT 1
 					FROM ultary_neighbor n
@@ -133,6 +133,28 @@
 					  AND (
 						(n.requester_user_no = #{viewerUserNo} AND n.receiver_user_no = #{ownerUserNo})
 						OR (n.requester_user_no = #{ownerUserNo} AND n.receiver_user_no = #{viewerUserNo})
+					  )
+				)
+			)
+			OR (
+				visibility = 'PUBLIC'
+				AND EXISTS (
+					SELECT 1
+					FROM ultary_user_privacy p
+					WHERE p.user_no = #{ownerUserNo}
+					  AND p.private_account = 1
+				)
+				AND EXISTS (
+					SELECT 1
+					FROM ultary_neighbor n
+					WHERE n.status = 'ACCEPTED'
+					  AND (
+						(n.requester_user_no = #{viewerUserNo} AND n.receiver_user_no = #{ownerUserNo})
+						OR (
+							n.requester_user_no = #{ownerUserNo}
+							AND n.receiver_user_no = #{viewerUserNo}
+							AND n.followed_back = 1
+						)
 					  )
 				)
 			)
@@ -299,9 +321,11 @@
 			OR EXISTS (
 				SELECT 1
 				FROM ultary_neighbor n
-				WHERE n.requester_user_no = #{viewerUserNo}
-				  AND n.receiver_user_no = f.user_no
-				  AND n.status = 'ACCEPTED'
+				WHERE n.status = 'ACCEPTED'
+				  AND (
+					(n.requester_user_no = #{viewerUserNo} AND n.receiver_user_no = f.user_no)
+					OR (n.receiver_user_no = #{viewerUserNo} AND n.followed_back = 1 AND n.requester_user_no = f.user_no)
+				  )
 			)
 		  )
 		<if test="cursorCreatedAt != null and cursorFeedId != null">

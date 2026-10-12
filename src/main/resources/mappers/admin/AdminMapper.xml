@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="me._hanho.ultary.domain.admin.AdminMapper">
+
+	<sql id="adminColumns">
+		admin_no,
+		login_id,
+		password,
+		name,
+		role,
+		status,
+		last_login_at,
+		created_at,
+		updated_at
+	</sql>
+
+	<select id="findByLoginId" resultType="me._hanho.ultary.domain.admin.model.Admin">
+		SELECT <include refid="adminColumns"/>
+		FROM ultary_admin
+		WHERE login_id = #{loginId}
+	</select>
+
+	<select id="findByAdminNo" resultType="me._hanho.ultary.domain.admin.model.Admin">
+		SELECT <include refid="adminColumns"/>
+		FROM ultary_admin
+		WHERE admin_no = #{adminNo}
+	</select>
+
+	<update id="updateLastLoginAt">
+		UPDATE ultary_admin
+		SET last_login_at = NOW()
+		WHERE admin_no = #{adminNo}
+	</update>
+
+</mapper>

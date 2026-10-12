@@ -1,5 +1,7 @@
 package me._hanho.ultary.domain.neighbor.dto.response;
 
+import java.util.List;
+
 import lombok.Builder;
 import lombok.Getter;
 import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
@@ -16,7 +18,11 @@ public class NeighborListItemResponse {
 	private FileSummaryResponse profileFile;
 	/** PENDING | ACCEPTED | REJECTED | BLOCKED */
 	private String status;
-	/** RESIDENTS(내가 요청) | NEIGHBORS(상대가 요청) */
+	/** FOLLOW(내가 팔로우) | FOLLOWER(상대가 팔로우) */
 	private String listType;
 	private boolean hasStory;
+	/** 그 유저 펫 mentionId. @ 없음. priority 순. 없으면 빈 배열 */
+	private List<String> petTags;
+	/** 로그인한 조회자가 이 유저를 팔로우 중이면 true */
+	private boolean following;
 }

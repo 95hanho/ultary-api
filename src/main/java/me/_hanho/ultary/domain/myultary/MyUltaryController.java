@@ -36,7 +36,7 @@ public class MyUltaryController {
 
 	private final MyUltaryService myUltaryService;
 
-	/** 마이울타리 정보 (프로필·스토리유무·주민/이웃수·펫/피드수) */
+	/** 마이울타리 정보 (프로필·스토리유무·팔로우/팔로워 수·펫/피드수) */
 	@GetMapping
 	public ApiResponse<MyUltaryProfileResponse> profile(@AuthenticationPrincipal UserPrincipal principal) {
 		log.info("[profile] userNo={}", principal.getUserNo());

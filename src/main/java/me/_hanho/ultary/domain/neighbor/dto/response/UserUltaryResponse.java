@@ -20,8 +20,10 @@ public class UserUltaryResponse {
 	private boolean hasStory;
 	/** 그 울타리 활성 스토리 중 내가 안 읽은 것이 있으면 true. 스토리가 없으면 false */
 	private boolean hasUnviewed;
-	private int residentCount;
-	private int neighborCount;
+	/** 이 유저가 팔로우한 수 */
+	private int followCount;
+	/** 이 유저를 팔로우한 수 */
+	private int followerCount;
 	private int petCount;
 	private int feedCount;
 	/**
@@ -29,6 +31,12 @@ public class UserUltaryResponse {
 	 * NONE | PENDING_SENT | PENDING_RECEIVED | ACCEPTED | REJECTED | BLOCKED
 	 */
 	private String relationStatus;
+	/** 비공개 계정. 본인이 아니고 following이 false면 게시글·고정·태그 그리드는 빈 배열 */
+	private boolean privateAccount;
+	/** 내가 이 유저를 팔로우 중 */
+	private boolean following;
+	/** 이 유저가 나를 팔로우 중 (팔로워) */
+	private boolean followedBy;
 	private Long neighborId;
 	private boolean blockedByMe;
 	private boolean blockedMe;

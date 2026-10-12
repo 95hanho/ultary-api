@@ -604,7 +604,7 @@ public class AuthService {
 		token.setConnectIp(resolveClientIp(httpRequest));
 		token.setConnectAgent(trimAgent(httpRequest.getHeader("User-Agent")));
 		token.setRefreshToken(refreshToken);
-		token.setExpiresAt(LocalDateTime.now().plusSeconds(jwtTokenProvider.getRefreshTokenExpiresInSeconds()));
+		token.setExpiresAt(LocalDateTime.now().plusSeconds(jwtTokenProvider.refreshLifetimeSeconds()));
 		tokenMapper.insert(token);
 
 		return TokenResponse.builder()

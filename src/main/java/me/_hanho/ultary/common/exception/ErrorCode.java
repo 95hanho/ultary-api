@@ -24,6 +24,7 @@ public enum ErrorCode {
 	// 인증 (auth)
 	// ==============================
 	LOGIN_FAILED("LOGIN_FAILED", "이메일/휴대폰 또는 비밀번호가 올바르지 않습니다.", HttpStatus.UNAUTHORIZED),
+	ADMIN_LOGIN_FAILED("ADMIN_LOGIN_FAILED", "아이디 또는 비밀번호가 올바르지 않습니다.", HttpStatus.UNAUTHORIZED),
 	ACCOUNT_WITHDRAWN("ACCOUNT_WITHDRAWN", "탈퇴된 계정입니다.", HttpStatus.FORBIDDEN),
 	ACCOUNT_SUSPENDED("ACCOUNT_SUSPENDED", "정지된 계정입니다.", HttpStatus.FORBIDDEN),
 	ACCOUNT_ALREADY_SUSPENDED("ACCOUNT_ALREADY_SUSPENDED", "이미 정지된 계정입니다.", HttpStatus.CONFLICT),
@@ -85,15 +86,15 @@ public enum ErrorCode {
 	STORY_FORBIDDEN("STORY_FORBIDDEN", "스토리를 볼 권한이 없습니다.", HttpStatus.FORBIDDEN),
 
 	// ==============================
-	// 이웃 (neighbor)
+	// 팔로우 (neighbor)
 	// ==============================
-	NEIGHBOR_NOT_FOUND("NEIGHBOR_NOT_FOUND", "이웃 관계를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
-	NEIGHBOR_ALREADY_EXISTS("NEIGHBOR_ALREADY_EXISTS", "이미 주민/이웃 관계가 있습니다.", HttpStatus.CONFLICT),
-	NEIGHBOR_ALREADY_REQUESTED("NEIGHBOR_ALREADY_REQUESTED", "이미 주민 요청을 보냈습니다.", HttpStatus.CONFLICT),
-	NEIGHBOR_PENDING_RECEIVED("NEIGHBOR_PENDING_RECEIVED", "상대가 이미 주민 요청을 보냈습니다. 수락해 주세요.", HttpStatus.CONFLICT),
+	NEIGHBOR_NOT_FOUND("NEIGHBOR_NOT_FOUND", "팔로우 관계를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
+	NEIGHBOR_ALREADY_EXISTS("NEIGHBOR_ALREADY_EXISTS", "이미 팔로우 관계가 있습니다.", HttpStatus.CONFLICT),
+	NEIGHBOR_ALREADY_REQUESTED("NEIGHBOR_ALREADY_REQUESTED", "이미 팔로우 요청을 보냈습니다.", HttpStatus.CONFLICT),
+	NEIGHBOR_PENDING_RECEIVED("NEIGHBOR_PENDING_RECEIVED", "상대가 이미 팔로우 요청을 보냈습니다. 수락해 주세요.", HttpStatus.CONFLICT),
 	NEIGHBOR_SELF("NEIGHBOR_SELF", "자기 자신에게는 요청할 수 없습니다.", HttpStatus.BAD_REQUEST),
-	NEIGHBOR_BLOCKED("NEIGHBOR_BLOCKED", "차단된 사용자와는 주민 요청을 할 수 없습니다.", HttpStatus.FORBIDDEN),
-	NEIGHBOR_REQUEST_CLOSED("NEIGHBOR_REQUEST_CLOSED", "이웃 신청을 받지 않는 계정입니다.", HttpStatus.FORBIDDEN),
+	NEIGHBOR_BLOCKED("NEIGHBOR_BLOCKED", "차단된 사용자와는 팔로우 요청을 할 수 없습니다.", HttpStatus.FORBIDDEN),
+	NEIGHBOR_REQUEST_CLOSED("NEIGHBOR_REQUEST_CLOSED", "팔로우 신청을 받지 않는 계정입니다.", HttpStatus.FORBIDDEN),
 	COMMENT_NOT_ALLOWED("COMMENT_NOT_ALLOWED", "댓글을 허용하지 않는 게시글입니다.", HttpStatus.FORBIDDEN),
 	MENTION_NOT_ALLOWED("MENTION_NOT_ALLOWED", "멘션을 허용하지 않는 계정입니다.", HttpStatus.FORBIDDEN),
 	TAG_NOT_ALLOWED("TAG_NOT_ALLOWED", "태그를 허용하지 않는 계정입니다.", HttpStatus.FORBIDDEN),
@@ -118,7 +119,7 @@ public enum ErrorCode {
 	// 메시지 (dm)
 	// ==============================
 	DM_ROOM_NOT_FOUND("DM_ROOM_NOT_FOUND", "대화방을 찾을 수 없습니다.", HttpStatus.NOT_FOUND),
-	DM_NOT_NEIGHBOR("DM_NOT_NEIGHBOR", "주민 또는 이웃에게만 메시지를 보낼 수 있습니다.", HttpStatus.FORBIDDEN),
+	DM_NOT_NEIGHBOR("DM_NOT_NEIGHBOR", "팔로우하거나 팔로워인 사람에게만 메시지를 보낼 수 있습니다.", HttpStatus.FORBIDDEN),
 	DM_SELF("DM_SELF", "자기 자신에게는 메시지를 보낼 수 없습니다.", HttpStatus.BAD_REQUEST),
 
 	// ==============================

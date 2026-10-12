@@ -17,4 +17,10 @@ public interface TokenMapper {
 	int revokeByTokenId(@Param("tokenId") Long tokenId);
 
 	int revokeAllByUserNo(@Param("userNo") Long userNo);
+
+	Token findValidAdminRefreshToken(
+			@Param("adminNo") Long adminNo,
+			@Param("refreshToken") String refreshToken);
+
+	int revokeAllByAdminNo(@Param("adminNo") Long adminNo);
 }

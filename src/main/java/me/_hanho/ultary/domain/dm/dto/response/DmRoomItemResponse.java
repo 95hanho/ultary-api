@@ -18,4 +18,8 @@ public class DmRoomItemResponse {
 	private String lastMessage;
 	private LocalDateTime lastMessageAt;
 	private int unreadCount;
+	/** 내가 상대를 팔로우 중. ACCEPTED만. 신청 중·없으면 false */
+	private boolean following;
+	/** 상대가 나를 팔로우 중. ACCEPTED만. 없으면 false */
+	private boolean followedBy;
 }

@@ -65,7 +65,7 @@ public interface FeedMapper {
 			@Param("viewerUserNo") Long viewerUserNo,
 			@Param("limit") int limit);
 
-	/** 본인 + 주민(requester ACCEPTED) 타임라인. cursor 이후(더 오래된) limit건 */
+	/** 본인 + 팔로우(requester ACCEPTED 또는 맞팔) 타임라인. cursor 이후(더 오래된) limit건 */
 	List<Feed> findMainTimeline(
 			@Param("viewerUserNo") Long viewerUserNo,
 			@Param("cursorCreatedAt") LocalDateTime cursorCreatedAt,

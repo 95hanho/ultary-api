@@ -1,6 +1,8 @@
 package me._hanho.ultary.domain.neighbor;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -27,6 +29,7 @@ import me._hanho.ultary.domain.neighbor.model.BlockedUserRow;
 import me._hanho.ultary.domain.neighbor.model.Neighbor;
 import me._hanho.ultary.domain.neighbor.model.NeighborListRow;
 import me._hanho.ultary.domain.pet.PetMapper;
+import me._hanho.ultary.domain.pet.model.PetMention;
 import me._hanho.ultary.domain.settings.PrivacyService;
 import me._hanho.ultary.domain.pet.PetService;
 import me._hanho.ultary.domain.report.ReportService;
@@ -98,11 +101,14 @@ public class NeighborService {
 				.regionSigungu(target.getRegionSigungu())
 				.hasStory(hasStory)
 				.hasUnviewed(hasStory && storyService.hasUnviewedStory(targetUserNo, me))
-				.residentCount(neighborMapper.countAcceptedAsRequester(targetUserNo))
-				.neighborCount(neighborMapper.countAcceptedAsReceiver(targetUserNo))
+				.followCount(neighborMapper.countAcceptedAsRequester(targetUserNo))
+				.followerCount(neighborMapper.countAcceptedAsReceiver(targetUserNo))
 				.petCount(petMapper.countActiveByUserNo(targetUserNo))
 				.feedCount(feedMapper.countActiveByUserNo(targetUserNo))
 				.relationStatus(relationStatus)
+				.privateAccount(privacyService.isPrivateAccount(targetUserNo))
+				.following(follows(me, neighbor))
+				.followedBy(followedBy(me, neighbor))
 				.neighborId(neighborId)
 				.blockedByMe(blockedByMe)
 				.blockedMe(false)
@@ -121,7 +127,7 @@ public class NeighborService {
 
 		int resolvedLimit = resolveLimit(limit);
 		String listType = normalizeListType(type);
-		List<NeighborListRow> rows = "NEIGHBORS".equals(listType)
+		List<NeighborListRow> rows = "FOLLOWER".equals(listType)
 				? neighborMapper.findAcceptedNeighbors(targetUserNo, resolvedLimit)
 				: neighborMapper.findAcceptedResidents(targetUserNo, resolvedLimit);
 
@@ -133,6 +139,14 @@ public class NeighborService {
 			}
 		}
 		Map<Long, FileSummaryResponse> files = fileService.findSummaries(profileIds);
+		List<Long> userNos = new ArrayList<>();
+		for (NeighborListRow row : rows) {
+			userNos.add(row.getUserNo());
+		}
+		Map<Long, List<String>> petTags = petTagsByUser(userNos);
+		Set<Long> followed = userNos.isEmpty()
+				? Set.of()
+				: new HashSet<>(neighborMapper.findFollowedUserNos(me, userNos));
 		for (NeighborListRow row : rows) {
 			Long profileId = row.getProfileFileId() == null ? null : row.getProfileFileId().longValue();
 			result.add(NeighborListItemResponse.builder()
@@ -144,6 +158,8 @@ public class NeighborService {
 					.status(row.getStatus())
 					.listType(row.getListType())
 					.hasStory(storyService.hasVisibleStory(principal.getUserNo(), row.getUserNo()))
+					.petTags(petTags.getOrDefault(row.getUserNo(), List.of()))
+					.following(followed.contains(row.getUserNo()))
 					.build());
 		}
 		return result;
@@ -174,7 +190,15 @@ public class NeighborService {
 		}
 
 		if ("ACCEPTED".equals(existing.getStatus())) {
-			throw new BusinessException(ErrorCode.NEIGHBOR_ALREADY_EXISTS);
+			if (me.equals(existing.getRequesterUserNo()) || Boolean.TRUE.equals(existing.getFollowedBack())) {
+				throw new BusinessException(ErrorCode.NEIGHBOR_ALREADY_EXISTS);
+			}
+			int updated = neighborMapper.updateFollowBack(existing.getNeighborId(), me);
+			if (updated == 0) {
+				throw new BusinessException(ErrorCode.NEIGHBOR_ALREADY_EXISTS);
+			}
+			log.info("[request:followBack] me={} target={} neighborId={}", me, targetUserNo, existing.getNeighborId());
+			return toRelation(neighborMapper.findByNeighborId(existing.getNeighborId()));
 		}
 		if ("PENDING".equals(existing.getStatus())) {
 			if (me.equals(existing.getRequesterUserNo())) {
@@ -243,6 +267,23 @@ public class NeighborService {
 		}
 		if (!"PENDING".equals(neighbor.getStatus()) && !"ACCEPTED".equals(neighbor.getStatus())) {
 			throw new BusinessException(ErrorCode.INVALID_INPUT, "취소·해제할 수 있는 상태가 아닙니다.");
+		}
+		if ("ACCEPTED".equals(neighbor.getStatus()) && Boolean.TRUE.equals(neighbor.getFollowedBack())) {
+			if (me.equals(neighbor.getRequesterUserNo())) {
+				int updated = neighborMapper.keepIncomingFollow(
+						neighborId, neighbor.getReceiverUserNo(), neighbor.getRequesterUserNo());
+				if (updated == 0) {
+					throw new BusinessException(ErrorCode.NEIGHBOR_NOT_FOUND);
+				}
+				log.info("[unfollow:keepIncoming] neighborId={} by={}", neighborId, me);
+				return;
+			}
+			int updated = neighborMapper.clearFollowBack(neighborId);
+			if (updated == 0) {
+				throw new BusinessException(ErrorCode.NEIGHBOR_NOT_FOUND);
+			}
+			log.info("[unfollow:clearBack] neighborId={} by={}", neighborId, me);
+			return;
 		}
 		notificationService.removeByNeighbor(neighborId);
 		neighborMapper.deleteByNeighborId(neighborId);
@@ -315,7 +356,34 @@ public class NeighborService {
 		log.info("[unblock] me={} target={}", me, targetUserNo);
 	}
 
-	/** 피드 NEIGHBORS 공개 범위 검사용 */
+	/** 조회자가 그 계정을 팔로우 중. 맞팔 포함. 상대만 팔로우한 ACCEPTED는 false */
+	@Transactional(readOnly = true)
+	public boolean viewerFollows(Long viewerUserNo, Long ownerUserNo) {
+		if (viewerUserNo == null || ownerUserNo == null || viewerUserNo.equals(ownerUserNo)) {
+			return false;
+		}
+		return neighborMapper.countViewerFollows(viewerUserNo, ownerUserNo) > 0;
+	}
+
+	/** userNos 중 조회자가 팔로우 중인 사람. ACCEPTED. 맞팔 포함 */
+	@Transactional(readOnly = true)
+	public Set<Long> followedUserNos(Long viewerUserNo, Collection<Long> userNos) {
+		if (viewerUserNo == null || userNos == null || userNos.isEmpty()) {
+			return Set.of();
+		}
+		return new HashSet<>(neighborMapper.findFollowedUserNos(viewerUserNo, userNos));
+	}
+
+	/** userNos 중 조회자를 팔로우 중인 사람. ACCEPTED. 맞팔 포함 */
+	@Transactional(readOnly = true)
+	public Set<Long> followerUserNos(Long viewerUserNo, Collection<Long> userNos) {
+		if (viewerUserNo == null || userNos == null || userNos.isEmpty()) {
+			return Set.of();
+		}
+		return new HashSet<>(neighborMapper.findFollowerUserNos(viewerUserNo, userNos));
+	}
+
+	/** 피드 NEIGHBORS 공개 범위 검사용. 어느 방향이든 ACCEPTED */
 	@Transactional(readOnly = true)
 	public boolean isAcceptedPair(Long userNoA, Long userNoB) {
 		if (userNoA == null || userNoB == null || userNoA.equals(userNoB)) {
@@ -376,19 +444,18 @@ public class NeighborService {
 
 	private String normalizeListType(String type) {
 		if (!StringUtils.hasText(type)) {
-			return "RESIDENTS";
+			return "FOLLOW";
 		}
 		String value = type.trim().toUpperCase(Locale.ROOT);
-		if ("RESIDENT".equals(value) || "FOLLOWING".equals(value)) {
-			return "RESIDENTS";
+		if ("FOLLOW".equals(value) || "FOLLOWING".equals(value)
+				|| "RESIDENTS".equals(value) || "RESIDENT".equals(value)) {
+			return "FOLLOW";
 		}
-		if ("NEIGHBOR".equals(value) || "FOLLOWER".equals(value) || "FOLLOWERS".equals(value)) {
-			return "NEIGHBORS";
+		if ("FOLLOWER".equals(value) || "FOLLOWERS".equals(value)
+				|| "NEIGHBORS".equals(value) || "NEIGHBOR".equals(value)) {
+			return "FOLLOWER";
 		}
-		if (!"RESIDENTS".equals(value) && !"NEIGHBORS".equals(value)) {
-			throw new BusinessException(ErrorCode.INVALID_INPUT, "type은 RESIDENTS 또는 NEIGHBORS 입니다.");
-		}
-		return value;
+		throw new BusinessException(ErrorCode.INVALID_INPUT, "type은 FOLLOW 또는 FOLLOWER 입니다.");
 	}
 
 	private int resolveLimit(Integer limit) {
@@ -404,6 +471,38 @@ public class NeighborService {
 				.requesterUserNo(neighbor.getRequesterUserNo())
 				.receiverUserNo(neighbor.getReceiverUserNo())
 				.status(neighbor.getStatus())
+				.followedBack(Boolean.TRUE.equals(neighbor.getFollowedBack()))
 				.build();
+	}
+
+	private boolean follows(Long me, Neighbor neighbor) {
+		if (neighbor == null || !"ACCEPTED".equals(neighbor.getStatus())) {
+			return false;
+		}
+		if (me.equals(neighbor.getRequesterUserNo())) {
+			return true;
+		}
+		return me.equals(neighbor.getReceiverUserNo()) && Boolean.TRUE.equals(neighbor.getFollowedBack());
+	}
+
+	private boolean followedBy(Long me, Neighbor neighbor) {
+		if (neighbor == null || !"ACCEPTED".equals(neighbor.getStatus())) {
+			return false;
+		}
+		if (me.equals(neighbor.getReceiverUserNo())) {
+			return true;
+		}
+		return me.equals(neighbor.getRequesterUserNo()) && Boolean.TRUE.equals(neighbor.getFollowedBack());
+	}
+
+	private Map<Long, List<String>> petTagsByUser(List<Long> userNos) {
+		if (userNos.isEmpty()) {
+			return Map.of();
+		}
+		Map<Long, List<String>> tags = new HashMap<>();
+		for (PetMention mention : petMapper.findActiveMentions(userNos)) {
+			tags.computeIfAbsent(mention.getUserNo(), key -> new ArrayList<>()).add(mention.getMentionId());
+		}
+		return tags;
 	}
 }

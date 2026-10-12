@@ -47,11 +47,14 @@ public interface StoryMapper {
 
 	List<StoryOwnerRow> findResidentOwnersWithActiveStories(@Param("viewerUserNo") Long viewerUserNo);
 
+	/** 활성 스토리가 없으면 null */
+	StoryOwnerRow findOwnActiveStoryOwner(@Param("viewerUserNo") Long viewerUserNo);
+
 	int countUnviewedActiveByOwner(
 			@Param("ownerUserNo") Long ownerUserNo,
 			@Param("viewerUserNo") Long viewerUserNo);
 
-	/** 나와 ACCEPTED 이웃 관계인지 (양방향) */
+	/** 나와 ACCEPTED 팔로우 관계인지 (한쪽이라도) */
 	int countAcceptedNeighborPair(
 			@Param("userNoA") Long userNoA,
 			@Param("userNoB") Long userNoB);

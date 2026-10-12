@@ -28,6 +28,8 @@ public class JwtTokenProvider {
 	private static final String CLAIM_OWNER_TYPE = "ownerType";
 	private static final String CLAIM_TOKEN_TYPE = "tokenType";
 	private static final String CLAIM_PHONE = "phone";
+	/** 쿠키 maxAge보다 JWT·리프레시 DB 만료를 늦게 둔다. 응답 expiresIn에는 넣지 않는다. */
+	private static final long COOKIE_SKEW_SECONDS = 30;
 
 	private final JwtProperties jwtProperties;
 
@@ -37,7 +39,17 @@ public class JwtTokenProvider {
 				TokenOwnerType.USER,
 				JwtTokenType.ACCESS,
 				jwtProperties.getSecret().getUser(),
-				jwtProperties.getExpiration().getAccess(),
+				accessLifetimeSeconds(),
+				null);
+	}
+
+	public String createAdminAccessToken(Long adminNo) {
+		return createToken(
+				String.valueOf(adminNo),
+				TokenOwnerType.ADMIN,
+				JwtTokenType.ACCESS,
+				jwtProperties.getSecret().getAdmin(),
+				accessLifetimeSeconds(),
 				null);
 	}
 
@@ -47,7 +59,7 @@ public class JwtTokenProvider {
 				ownerType,
 				JwtTokenType.REFRESH,
 				jwtProperties.getSecret().getRefresh(),
-				jwtProperties.getExpiration().getRefresh(),
+				refreshLifetimeSeconds(),
 				null);
 	}
 
@@ -93,9 +105,25 @@ public class JwtTokenProvider {
 		return jwtProperties.getExpiration().getRefresh();
 	}
 
+	/** 액세스 JWT exp. 응답 expiresIn보다 {@link #COOKIE_SKEW_SECONDS} 길다. */
+	public long accessLifetimeSeconds() {
+		return jwtProperties.getExpiration().getAccess() + COOKIE_SKEW_SECONDS;
+	}
+
+	/** 리프레시 JWT exp와 ultary_token.expires_at. 쿠키 14일보다 {@link #COOKIE_SKEW_SECONDS} 길다. */
+	public long refreshLifetimeSeconds() {
+		return jwtProperties.getExpiration().getRefresh() + COOKIE_SKEW_SECONDS;
+	}
+
 	public Claims parseUserAccessToken(String token) {
 		Claims claims = parseClaims(token, jwtProperties.getSecret().getUser());
 		validateClaims(claims, TokenOwnerType.USER, JwtTokenType.ACCESS);
+		return claims;
+	}
+
+	public Claims parseAdminAccessToken(String token) {
+		Claims claims = parseClaims(token, jwtProperties.getSecret().getAdmin());
+		validateClaims(claims, TokenOwnerType.ADMIN, JwtTokenType.ACCESS);
 		return claims;
 	}
 

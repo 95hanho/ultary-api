@@ -194,15 +194,17 @@
 			) AS profileFileId,
 			COUNT(s.story_id) AS storyCount
 		FROM ultary_neighbor n
-		INNER JOIN ultary_user u ON u.user_no = n.receiver_user_no
-			AND u.withdrawal_status = 'ACTIVE'
+		INNER JOIN ultary_user u ON u.withdrawal_status = 'ACTIVE'
+			AND (
+				(n.requester_user_no = #{viewerUserNo} AND u.user_no = n.receiver_user_no)
+				OR (n.receiver_user_no = #{viewerUserNo} AND n.followed_back = 1 AND u.user_no = n.requester_user_no)
+			)
 		INNER JOIN ultary_story s ON s.user_no = u.user_no
 			AND s.is_deleted = 0
 			<!-- TEST: 24h 만료 비활성
 			AND s.expires_at &gt; NOW()
 			-->
-		WHERE n.requester_user_no = #{viewerUserNo}
-		  AND n.status = 'ACCEPTED'
+		WHERE n.status = 'ACCEPTED'
 		  AND NOT EXISTS (
 			SELECT 1
 			FROM ultary_user_privacy p
@@ -211,6 +213,31 @@
 		  )
 		GROUP BY u.user_no, u.nickname
 		ORDER BY MAX(s.created_at) DESC
+	</select>
+
+	<select id="findOwnActiveStoryOwner" resultType="me._hanho.ultary.domain.story.model.StoryOwnerRow">
+		SELECT
+			u.user_no AS userNo,
+			u.nickname AS nickname,
+			(
+				SELECT rp.profile_file_id
+				FROM ultary_pet rp
+				WHERE rp.user_no = u.user_no
+				  AND rp.is_deleted = 0
+				  AND rp.profile_file_id IS NOT NULL
+				ORDER BY rp.priority ASC, rp.pet_id ASC
+				LIMIT 1
+			) AS profileFileId,
+			COUNT(s.story_id) AS storyCount
+		FROM ultary_user u
+		INNER JOIN ultary_story s ON s.user_no = u.user_no
+			AND s.is_deleted = 0
+			<!-- TEST: 24h 만료 비활성
+			AND s.expires_at &gt; NOW()
+			-->
+		WHERE u.user_no = #{viewerUserNo}
+		  AND u.withdrawal_status = 'ACTIVE'
+		GROUP BY u.user_no, u.nickname
 	</select>
 
 	<select id="countUnviewedActiveByOwner" resultType="int">

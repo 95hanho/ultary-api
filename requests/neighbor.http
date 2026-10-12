@@ -45,16 +45,21 @@ Authorization: Bearer {{accessToken}}
 GET {{baseUrl}}/api/v1/users/104/ultary
 Authorization: Bearer {{accessToken}}
 
-### 3a. 내(101) 주민 목록 (RESIDENTS = 102, 103)
-GET {{baseUrl}}/api/v1/users/101/neighbors?type=RESIDENTS&limit=30
+### 3a. 내(101) 팔로우 목록 (FOLLOW = 102, 103)
+GET {{baseUrl}}/api/v1/users/101/neighbors?type=FOLLOW&limit=30
 Authorization: Bearer {{accessToken}}
 
-### 3b. 내(101) 이웃 목록 (NEIGHBORS = 105)
-GET {{baseUrl}}/api/v1/users/101/neighbors?type=NEIGHBORS&limit=30
+### 3b. 내(101) 팔로워 목록 (FOLLOWER = 105)
+GET {{baseUrl}}/api/v1/users/101/neighbors?type=FOLLOWER&limit=30
 Authorization: Bearer {{accessToken}}
 
-### 4. 주민 요청 (이미 ACCEPTED인 102는 CONFLICT 예상)
+### 4a. 팔로우 요청 (이미 내가 팔로우한 102는 CONFLICT 예상)
 POST {{baseUrl}}/api/v1/users/102/neighbors/request
+Authorization: Bearer {{accessToken}}
+
+### 4b. 맞팔 (105→101 ACCEPTED. 101이 105를 팔로우. followedBack=true)
+# 한 번 더 호출하면 NEIGHBOR_ALREADY_EXISTS
+POST {{baseUrl}}/api/v1/users/105/neighbors/request
 Authorization: Bearer {{accessToken}}
 
 ### 5a. 대기 요청 수락 (104→101, neighborId=104) — 101이 수신자
@@ -66,7 +71,7 @@ Authorization: Bearer {{accessToken}}
 # POST {{baseUrl}}/api/v1/neighbors/{{neighborIdPending}}/reject
 # Authorization: Bearer {{accessToken}}
 
-### 6. 주민 해제 (ACCEPTED 101:102) — 필요 시 시드 재실행
+### 6. 팔로우 해제 (ACCEPTED 101:102) — 필요 시 시드 재실행
 # DELETE {{baseUrl}}/api/v1/neighbors/{{neighborIdAccepted}}
 # Authorization: Bearer {{accessToken}}
 
@@ -99,6 +104,6 @@ Content-Type: application/json
 # DELETE {{baseUrl}}/api/v1/neighbors/{{neighborIdPending}}
 # Authorization: Bearer {{accessToken104}}
 
-### 9. 스토리 owners (101 주민 중 활성 스토리 → 103)
+### 9. 스토리 owners (101 팔로우 중 활성 스토리 → 103)
 GET {{baseUrl}}/api/v1/main/stories/owners
 Authorization: Bearer {{accessToken}}

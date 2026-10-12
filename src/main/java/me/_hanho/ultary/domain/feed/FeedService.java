@@ -719,6 +719,13 @@ public class FeedService {
 		if ("PRIVATE".equals(audience) && !feed.getUserNo().equals(viewerUserNo)) {
 			throw new BusinessException(ErrorCode.FEED_NOT_FOUND);
 		}
+		if (viewerUserNo != null
+				&& !feed.getUserNo().equals(viewerUserNo)
+				&& "PUBLIC".equals(feed.getVisibility())
+				&& privacyService.isPrivateAccount(feed.getUserNo())
+				&& !neighborService.viewerFollows(viewerUserNo, feed.getUserNo())) {
+			throw new BusinessException(ErrorCode.FEED_NOT_FOUND);
+		}
 		if ("NEIGHBORS".equals(audience)
 				&& !feed.getUserNo().equals(viewerUserNo)
 				&& !neighborService.isAcceptedPair(viewerUserNo, feed.getUserNo())) {

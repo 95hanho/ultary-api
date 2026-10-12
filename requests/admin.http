@@ -1,52 +1,75 @@
 @baseUrl = http://localhost:9377
-@accessToken = {{socialLogin.response.body.$.data.accessToken}}
+@adminAccessToken = {{adminLogin.response.body.$.data.accessToken}}
+@adminRefreshToken = {{adminLogin.response.body.$.data.refreshToken}}
 
+# 관리자 계정은 API로 가입하지 않는다. ultary_admin 에 직접 넣는다.
+# password 컬럼은 0a 응답 encodedPassword ({bcrypt}$2a$10$...) 를 넣는다.
+# 회원 Bearer 로는 /api/v1/admin 이 열리지 않는다. 0b 관리자 토큰을 쓴다.
 # 시드 user 104. 101은 로그인 계정이라 정지하지 않는다.
-# 관리자 전용 로그인은 아직 없다. Bearer는 일반 회원 토큰.
 
-### 0. 소셜 로그인 (시드 user 101)
-# @name socialLogin
-POST {{baseUrl}}/api/v1/auth/social/login
+### 0a. 평문 비밀번호 → DB용 해시 (local 프로필 전용. 인증 없음)
+# 규칙: 8자 이상, 영문·숫자·특수문자 각 1자. 호출마다 해시가 달라진다.
+POST {{baseUrl}}/api/v1/test/password/encode
 Content-Type: application/json
 
 {
-  "provider": "GOOGLE",
-  "providerUserId": "google-myultary-test-001",
-  "email": "myultary.test@example.com",
-  "name": "한호"
+  "password": "Test1234!"
+}
+
+### 0b. 관리자 로그인
+# @name adminLogin
+POST {{baseUrl}}/api/v1/admin/auth/login
+Content-Type: application/json
+
+{
+  "loginId": "admin",
+  "password": "Test1234!"
+}
+
+### 0c. 관리자 토큰 재발급
+POST {{baseUrl}}/api/v1/admin/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{adminRefreshToken}}"
 }
 
 ### 1. 회원 정지
 POST {{baseUrl}}/api/v1/admin/users/104/suspend
-Authorization: Bearer {{accessToken}}
+Authorization: Bearer {{adminAccessToken}}
 
 ### 2. 회원 정지 해제
 POST {{baseUrl}}/api/v1/admin/users/104/unsuspend
-Authorization: Bearer {{accessToken}}
+Authorization: Bearer {{adminAccessToken}}
 
 ### 3. 신고 목록
 GET {{baseUrl}}/api/v1/admin/reports?status=REQUESTED&limit=30
-Authorization: Bearer {{accessToken}}
+Authorization: Bearer {{adminAccessToken}}
 
 # 4~6의 reportId는 목록 항목으로 바꾼다.
 # delete-content 는 게시글·댓글·답글을 소프트 삭제한다. suspend 는 유저 신고만.
 
 ### 4. 신고 글·댓글·답글 삭제
 POST {{baseUrl}}/api/v1/admin/reports/105/delete-content
-Authorization: Bearer {{accessToken}}
+Authorization: Bearer {{adminAccessToken}}
 
 ### 5. 신고 회원 정지
 POST {{baseUrl}}/api/v1/admin/reports/101/suspend
-Authorization: Bearer {{accessToken}}
+Authorization: Bearer {{adminAccessToken}}
 
 ### 6. 신고 거절
 POST {{baseUrl}}/api/v1/admin/reports/1/reject
-Authorization: Bearer {{accessToken}}
+Authorization: Bearer {{adminAccessToken}}
 
 ### 7. 신고 보류
 POST {{baseUrl}}/api/v1/admin/reports/1/hold
-Authorization: Bearer {{accessToken}}
+Authorization: Bearer {{adminAccessToken}}
 
 ### 8. 신고 확인 (신고요청만. 이후 신고자는 취소 불가)
 POST {{baseUrl}}/api/v1/admin/reports/1/confirm
-Authorization: Bearer {{accessToken}}
+Authorization: Bearer {{adminAccessToken}}
+
+### 9. 관리자 로그아웃
+# 이 관리자의 리프레시만 폐기한다. 회원 토큰은 그대로다.
+POST {{baseUrl}}/api/v1/admin/auth/logout
+Authorization: Bearer {{adminAccessToken}}

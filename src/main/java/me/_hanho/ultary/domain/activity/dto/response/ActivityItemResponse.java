@@ -25,6 +25,6 @@ public class ActivityItemResponse {
 	private Long feedReplyId;
 	private Long storyId;
 	private Long neighborId;
-	/** 내가 보낸 이웃 신청 상태. PENDING 일 때만 취소. 이웃이 아니면 null */
+	/** 내가 보낸 팔로우 신청 상태. PENDING 일 때만 취소. 신청이 아니면 null */
 	private String neighborStatus;
 }

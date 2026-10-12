@@ -3,7 +3,7 @@ package me._hanho.ultary.domain.neighbor.model;
 import lombok.Getter;
 import lombok.Setter;
 
-/** 주민/이웃 목록 조회용 조인 행 */
+/** 팔로우/팔로워 목록 조회용 조인 행 */
 @Getter
 @Setter
 public class NeighborListRow {

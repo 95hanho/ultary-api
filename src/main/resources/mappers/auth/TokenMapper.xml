@@ -20,4 +20,13 @@
 	<update id="revokeAllByUserNo"> UPDATE ultary_token SET is_revoked = 1, revoked_at = NOW() WHERE
 		owner_type = 'USER' AND user_no = #{userNo} AND is_revoked = 0 </update>
 
+	<select id="findValidAdminRefreshToken" resultType="me._hanho.ultary.domain.auth.model.Token">
+		SELECT token_id, owner_type, user_no, admin_no, connect_ip, connect_agent, refresh_token,
+		expires_at, is_revoked, revoked_at, created_at, updated_at FROM ultary_token WHERE
+		owner_type = 'ADMIN' AND admin_no = #{adminNo} AND refresh_token = #{refreshToken} AND
+		is_revoked = 0 AND expires_at &gt; NOW() LIMIT 1 </select>
+
+	<update id="revokeAllByAdminNo"> UPDATE ultary_token SET is_revoked = 1, revoked_at = NOW() WHERE
+		owner_type = 'ADMIN' AND admin_no = #{adminNo} AND is_revoked = 0 </update>
+
 </mapper>

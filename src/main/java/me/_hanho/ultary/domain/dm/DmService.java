@@ -65,7 +65,7 @@ public class DmService {
 	public DmRoomListResponse listRooms(UserPrincipal principal, Integer limit) {
 		List<DmRoomRow> rows = dmMapper.findRooms(principal.getUserNo(), resolveLimit(limit));
 		return DmRoomListResponse.builder()
-				.items(toRoomItems(rows))
+				.items(toRoomItems(principal.getUserNo(), rows))
 				.build();
 	}
 
@@ -163,12 +163,15 @@ public class DmService {
 		}
 		Collections.reverse(rows);
 		Long nextCursor = hasMore ? rows.get(0).getDmMessageId() : null;
-		Long peerLastRead = readCursor(room, peerOf(room, me));
+		Long peer = peerOf(room, me);
+		Long peerLastRead = readCursor(room, peer);
 		markReadLatest(room, me);
 		return DmMessageListResponse.builder()
 				.items(toMessages(rows, me))
 				.nextCursorMessageId(nextCursor)
 				.peerLastReadMessageId(peerLastRead)
+				.following(neighborService.viewerFollows(me, peer))
+				.followedBy(neighborService.viewerFollows(peer, me))
 				.build();
 	}
 
@@ -228,7 +231,7 @@ public class DmService {
 		if (row == null) {
 			return null;
 		}
-		return toRoomItems(List.of(row)).get(0);
+		return toRoomItems(userNo, List.of(row)).get(0);
 	}
 
 	private Long resolveFeedMedia(Long feedId, Long feedMediaId, Long viewerUserNo) {
@@ -299,7 +302,7 @@ public class DmService {
 		if (row == null) {
 			throw new BusinessException(ErrorCode.DM_ROOM_NOT_FOUND);
 		}
-		return toRoomItems(List.of(row)).get(0);
+		return toRoomItems(userNo, List.of(row)).get(0);
 	}
 
 	private void assertNeighbor(Long me, Long target) {
@@ -315,14 +318,20 @@ public class DmService {
 		}
 	}
 
-	private List<DmRoomItemResponse> toRoomItems(List<DmRoomRow> rows) {
+	private List<DmRoomItemResponse> toRoomItems(Long viewerUserNo, List<DmRoomRow> rows) {
 		Set<Long> fileIds = new HashSet<>();
+		List<Long> peerUserNos = new ArrayList<>();
 		for (DmRoomRow row : rows) {
 			if (row.getProfileFileId() != null) {
 				fileIds.add(row.getProfileFileId());
 			}
+			if (row.getPeerUserNo() != null) {
+				peerUserNos.add(row.getPeerUserNo());
+			}
 		}
 		var files = fileService.findSummaries(fileIds);
+		Set<Long> following = neighborService.followedUserNos(viewerUserNo, peerUserNos);
+		Set<Long> followedBy = neighborService.followerUserNos(viewerUserNo, peerUserNos);
 		List<DmRoomItemResponse> items = new ArrayList<>();
 		for (DmRoomRow row : rows) {
 			items.add(DmRoomItemResponse.builder()
@@ -333,6 +342,8 @@ public class DmService {
 					.lastMessage(preview(row))
 					.lastMessageAt(row.getLastMessageAt())
 					.unreadCount(row.getUnreadCount() == null ? 0 : row.getUnreadCount().intValue())
+					.following(following.contains(row.getPeerUserNo()))
+					.followedBy(followedBy.contains(row.getPeerUserNo()))
 					.build());
 		}
 		return items;

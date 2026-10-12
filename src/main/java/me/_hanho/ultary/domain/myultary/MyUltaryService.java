@@ -27,6 +27,7 @@ import me._hanho.ultary.domain.myultary.dto.response.MyUltaryProfileResponse;
 import me._hanho.ultary.domain.neighbor.NeighborMapper;
 import me._hanho.ultary.domain.pet.PetMapper;
 import me._hanho.ultary.domain.pet.PetService;
+import me._hanho.ultary.domain.settings.PrivacyService;
 import me._hanho.ultary.domain.story.StoryService;
 import me._hanho.ultary.domain.story.dto.request.CreateStoryRequest;
 import me._hanho.ultary.domain.story.dto.response.StoryResponse;
@@ -44,6 +45,7 @@ public class MyUltaryService {
 
 	private final UserMapper userMapper;
 	private final NeighborMapper neighborMapper;
+	private final PrivacyService privacyService;
 	private final PetMapper petMapper;
 	private final PetService petService;
 	private final FeedMapper feedMapper;
@@ -66,8 +68,8 @@ public class MyUltaryService {
 				.regionSigungu(user.getRegionSigungu())
 				.hasStory(storyService.hasActiveStory(user.getUserNo()))
 				.hasUnviewed(storyService.hasUnviewedStory(user.getUserNo(), principal.getUserNo()))
-				.residentCount(neighborMapper.countAcceptedAsRequester(user.getUserNo()))
-				.neighborCount(neighborMapper.countAcceptedAsReceiver(user.getUserNo()))
+				.followCount(neighborMapper.countAcceptedAsRequester(user.getUserNo()))
+				.followerCount(neighborMapper.countAcceptedAsReceiver(user.getUserNo()))
 				.petCount(petMapper.countActiveByUserNo(user.getUserNo()))
 				.feedCount(feedMapper.countActiveByUserNo(user.getUserNo()))
 				.build();
@@ -83,6 +85,9 @@ public class MyUltaryService {
 	public List<FeedGridItemResponse> getFeedsOf(UserPrincipal principal, Long ownerUserNo, Integer limit) {
 		if (principal.getUserNo().equals(ownerUserNo)) {
 			return getFeeds(principal, limit);
+		}
+		if (hidePrivateGrids(principal.getUserNo(), ownerUserNo)) {
+			return List.of();
 		}
 		return toGridItems(feedMapper.findVisibleByOwner(
 				ownerUserNo, principal.getUserNo(), resolveLimit(limit)));
@@ -120,6 +125,9 @@ public class MyUltaryService {
 		if (principal.getUserNo().equals(ownerUserNo)) {
 			return getPinnedFeeds(principal, limit);
 		}
+		if (hidePrivateGrids(principal.getUserNo(), ownerUserNo)) {
+			return List.of();
+		}
 		return toGridItems(feedMapper.findPinnedVisibleByOwner(
 				ownerUserNo, principal.getUserNo(), resolveLimit(limit)));
 	}
@@ -129,6 +137,9 @@ public class MyUltaryService {
 	public List<FeedGridItemResponse> getTaggedFeedsOf(UserPrincipal principal, Long ownerUserNo, Integer limit) {
 		if (principal.getUserNo().equals(ownerUserNo)) {
 			return getTaggedFeeds(principal, limit);
+		}
+		if (hidePrivateGrids(principal.getUserNo(), ownerUserNo)) {
+			return List.of();
 		}
 		return toGridItems(feedMapper.findTaggedVisibleByOwner(
 				ownerUserNo, principal.getUserNo(), resolveLimit(limit)));
@@ -208,6 +219,12 @@ public class MyUltaryService {
 					.build());
 		}
 		return items;
+	}
+
+	/** 비공개이고 조회자가 그 계정을 팔로우하지 않으면 그리드를 비운다 */
+	private boolean hidePrivateGrids(Long viewerUserNo, Long ownerUserNo) {
+		return privacyService.isPrivateAccount(ownerUserNo)
+				&& neighborMapper.countViewerFollows(viewerUserNo, ownerUserNo) == 0;
 	}
 
 	private User requireUser(Long userNo) {

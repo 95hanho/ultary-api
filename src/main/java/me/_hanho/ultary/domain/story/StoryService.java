@@ -18,6 +18,7 @@ import me._hanho.ultary.common.exception.BusinessException;
 import me._hanho.ultary.common.exception.ErrorCode;
 import me._hanho.ultary.domain.file.FileService;
 import me._hanho.ultary.domain.notification.NotificationService;
+import me._hanho.ultary.domain.neighbor.NeighborMapper;
 import me._hanho.ultary.domain.pet.PetMapper;
 import me._hanho.ultary.domain.settings.PrivacyService;
 import me._hanho.ultary.domain.pet.PetService;
@@ -47,13 +48,14 @@ public class StoryService {
 	private static final Set<String> VIDEO_EXTENSIONS = Set.of("mp4", "webm", "mov");
 	private static final Set<Integer> FONT_SIZES = Set.of(12, 16, 20, 24);
 
+	private final PrivacyService privacyService;
+	private final NeighborMapper neighborMapper;
 	private final StoryMapper storyMapper;
 	private final FileService fileService;
 	private final UserMapper userMapper;
 	private final PetService petService;
 	private final PetMapper petMapper;
 	private final NotificationService notificationService;
-	private final PrivacyService privacyService;
 
 	@Transactional
 	public StoryResponse create(UserPrincipal principal, CreateStoryRequest request) {
@@ -126,7 +128,7 @@ public class StoryService {
 		if ("PUBLIC".equals(audience)) {
 			return true;
 		}
-		return viewerUserNo != null && storyMapper.countAcceptedNeighborPair(viewerUserNo, ownerUserNo) > 0;
+		return canViewNeighborStories(viewerUserNo, ownerUserNo);
 	}
 
 	/** 조회자 기준. 활성 스토리 중 안 읽은 것이 1개라도 있으면 true. 스토리가 없으면 false */
@@ -137,30 +139,45 @@ public class StoryService {
 
 	@Transactional(readOnly = true)
 	public List<StoryOwnerResponse> listResidentOwners(UserPrincipal principal) {
-		List<StoryOwnerRow> rows = storyMapper.findResidentOwnersWithActiveStories(principal.getUserNo());
+		Long me = principal.getUserNo();
+		List<StoryOwnerRow> rows = storyMapper.findResidentOwnersWithActiveStories(me).stream()
+				.filter(row -> !me.equals(row.getUserNo()))
+				.toList();
+		StoryOwnerRow mine = storyMapper.findOwnActiveStoryOwner(me);
 		Set<Long> profileIds = new HashSet<>();
 		for (StoryOwnerRow row : rows) {
 			if (row.getProfileFileId() != null) {
 				profileIds.add(row.getProfileFileId().longValue());
 			}
 		}
+		if (mine != null && mine.getProfileFileId() != null) {
+			profileIds.add(mine.getProfileFileId().longValue());
+		}
 		Map<Long, FileSummaryResponse> files = fileService.findSummaries(profileIds);
 		List<StoryOwnerResponse> result = new ArrayList<>();
 		for (StoryOwnerRow row : rows) {
-			int unviewed = storyMapper.countUnviewedActiveByOwner(row.getUserNo(), principal.getUserNo());
-			Long profileId = row.getProfileFileId() == null ? null : row.getProfileFileId().longValue();
-			result.add(StoryOwnerResponse.builder()
-					.userNo(row.getUserNo())
-					.nickname(row.getNickname())
-					.profileFileId(row.getProfileFileId())
-					.profileFile(profileId == null ? null : files.get(profileId))
-					.storyCount(row.getStoryCount())
-					.hasUnviewed(unviewed > 0)
-					.build());
+			result.add(toOwnerResponse(row, me, files));
 		}
 		// 미열람 링 먼저, 같은 그룹은 최신 스토리 순(SQL ORDER) 유지
 		result.sort(Comparator.comparing(o -> !Boolean.TRUE.equals(o.getHasUnviewed())));
+		if (mine != null) {
+			result.add(0, toOwnerResponse(mine, me, files));
+		}
 		return result;
+	}
+
+	private StoryOwnerResponse toOwnerResponse(
+			StoryOwnerRow row, Long viewerUserNo, Map<Long, FileSummaryResponse> files) {
+		int unviewed = storyMapper.countUnviewedActiveByOwner(row.getUserNo(), viewerUserNo);
+		Long profileId = row.getProfileFileId() == null ? null : row.getProfileFileId().longValue();
+		return StoryOwnerResponse.builder()
+				.userNo(row.getUserNo())
+				.nickname(row.getNickname())
+				.profileFileId(row.getProfileFileId())
+				.profileFile(profileId == null ? null : files.get(profileId))
+				.storyCount(row.getStoryCount())
+				.hasUnviewed(unviewed > 0)
+				.build();
 	}
 
 	@Transactional(readOnly = true)
@@ -235,10 +252,20 @@ public class StoryService {
 		if ("PUBLIC".equals(audience)) {
 			return;
 		}
-		if ("PRIVATE".equals(audience)
-				|| storyMapper.countAcceptedNeighborPair(viewerUserNo, ownerUserNo) == 0) {
+		if ("PRIVATE".equals(audience) || !canViewNeighborStories(viewerUserNo, ownerUserNo)) {
 			throw new BusinessException(ErrorCode.STORY_FORBIDDEN);
 		}
+	}
+
+	/** 비공개 계정은 조회자가 그 계정을 팔로우할 때만. 그 외 NEIGHBORS는 어느 방향이든 ACCEPTED */
+	private boolean canViewNeighborStories(Long viewerUserNo, Long ownerUserNo) {
+		if (viewerUserNo == null) {
+			return false;
+		}
+		if (privacyService.isPrivateAccount(ownerUserNo)) {
+			return neighborMapper.countViewerFollows(viewerUserNo, ownerUserNo) > 0;
+		}
+		return storyMapper.countAcceptedNeighborPair(viewerUserNo, ownerUserNo) > 0;
 	}
 
 	private Story requireActive(Long storyId) {

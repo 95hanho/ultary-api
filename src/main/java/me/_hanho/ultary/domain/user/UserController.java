@@ -108,7 +108,7 @@ public class UserController {
 		log.info("[neighbors] me={} userNo={} type={}", principal.getUserNo(), userNo, type);
 		return ApiResponse.ok(
 				neighborService.listNeighbors(principal, userNo, type, limit),
-				"주민·이웃 목록 조회 성공");
+				"팔로우·팔로워 목록 조회 성공");
 	}
 
 	@PostMapping("/{userNo}/neighbors/request")
@@ -116,7 +116,7 @@ public class UserController {
 			@AuthenticationPrincipal UserPrincipal principal,
 			@PathVariable Long userNo) {
 		log.info("[neighborRequest] me={} userNo={}", principal.getUserNo(), userNo);
-		return ApiResponse.ok(neighborService.request(principal, userNo), "주민 요청 성공");
+		return ApiResponse.ok(neighborService.request(principal, userNo), "팔로우 요청 성공");
 	}
 
 	/** 내가 차단한 사용자. 해제는 DELETE /users/{userNo}/block */

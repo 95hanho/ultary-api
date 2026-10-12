@@ -357,7 +357,7 @@ public class NotificationService {
 	static String message(String type, String nickname, int actorCount, boolean hasComment, boolean hasReply) {
 		String name = nickname == null ? "회원" : nickname;
 		if (NEIGHBOR_REQUEST.equals(type)) {
-			return name + "님이 나와의 이웃을 신청했습니다.";
+			return name + "님이 팔로우를 신청했습니다.";
 		}
 		String who = actorCount > 1
 				? name + "님 외 " + (actorCount - 1) + "명이"

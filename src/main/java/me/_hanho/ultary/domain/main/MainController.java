@@ -39,21 +39,21 @@ public class MainController {
 
 	private final MainService mainService;
 
-	/** 주민(팔로잉) 중 활성 스토리 있는 목록 */
+	/** 내 활성 스토리를 맨 앞에 두고, 이어서 팔로우 중 활성 스토리 있는 목록 */
 	@GetMapping("/stories/owners")
 	public ApiResponse<List<StoryOwnerResponse>> storyOwners(
 			@AuthenticationPrincipal UserPrincipal principal) {
 		log.info("[storyOwners] userNo={}", principal.getUserNo());
-		return ApiResponse.ok(mainService.getStoryOwners(principal), "스토리 있는 주민 목록 조회 성공");
+		return ApiResponse.ok(mainService.getStoryOwners(principal), "스토리 목록 조회 성공");
 	}
 
-	/** 특정 유저 활성 스토리 목록 (본인 또는 ACCEPTED 이웃) */
+	/** 특정 유저 활성 스토리 목록 (본인 또는 팔로우 관계) */
 	@GetMapping("/stories")
 	public ApiResponse<List<StoryResponse>> stories(
 			@AuthenticationPrincipal UserPrincipal principal,
 			@RequestParam Long userNo) {
 		log.info("[stories] userNo={}", userNo);
-		return ApiResponse.ok(mainService.getStories(principal, userNo), "주민 스토리 조회 성공");
+		return ApiResponse.ok(mainService.getStories(principal, userNo), "팔로우 스토리 조회 성공");
 	}
 
 	@GetMapping("/feeds")
@@ -63,7 +63,7 @@ public class MainController {
 			@RequestParam(required = false) Integer limit) {
 		log.info("[feeds] userNo={} cursorFeedId={} limit={}",
 				principal.getUserNo(), cursorFeedId, limit);
-		return ApiResponse.ok(mainService.getFeeds(principal, cursorFeedId, limit), "주민 게시글 조회 성공");
+		return ApiResponse.ok(mainService.getFeeds(principal, cursorFeedId, limit), "팔로우 게시글 조회 성공");
 	}
 
 	/** 나중에 추천 알고리즘 추가해야함. 지금은 조회 가능한 전체 피드를 limit건 */

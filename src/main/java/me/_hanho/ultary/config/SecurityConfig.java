@@ -52,6 +52,8 @@ public class SecurityConfig {
 								"/api/v1/auth/password",
 								"/api/v1/auth/password/token",
 								"/api/v1/auth/social/login",
+								"/api/v1/admin/auth/login",
+								"/api/v1/admin/auth/refresh",
 								"/api/v1/test/**")
 						.permitAll()
 						// 공유 게시글 단건: PUBLIC은 비로그인 허용 (spring-auth-api.md)

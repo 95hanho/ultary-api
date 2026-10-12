@@ -71,7 +71,7 @@ public class PrivacyService {
 		return normalizeVisibility(requested);
 	}
 
-	/** 비공개 계정이면 PUBLIC 게시글도 이웃만 */
+	/** 비공개 계정이면 PUBLIC 게시글도 조회자가 그 계정을 팔로우할 때만 */
 	@Transactional(readOnly = true)
 	public String feedAudience(Long ownerUserNo, String feedVisibility) {
 		if (PRIVATE.equals(feedVisibility)) {
@@ -83,7 +83,7 @@ public class PrivacyService {
 		return PUBLIC;
 	}
 
-	/** 비공개 계정이면 PUBLIC 스토리도 이웃만. 행이 없으면 NEIGHBORS */
+	/** 비공개 계정이면 PUBLIC 스토리도 조회자가 그 계정을 팔로우할 때만. 행이 없으면 NEIGHBORS */
 	@Transactional(readOnly = true)
 	public String storyAudience(Long ownerUserNo) {
 		UserPrivacy privacy = load(ownerUserNo);
