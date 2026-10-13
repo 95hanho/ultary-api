@@ -88,3 +88,7 @@ Content-Type: application/json
 {
   "typing": true
 }
+
+### 10. 피드 공유 대상 (한 달 DM → 내 팔로우 → 팔로워 → 나머지 최신순)
+GET {{baseUrl}}/api/v1/dm/share-targets?limit=30
+Authorization: Bearer {{accessToken}}

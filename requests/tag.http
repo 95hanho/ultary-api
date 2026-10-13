@@ -65,7 +65,8 @@ Authorization: Bearer {{accessToken}}
 GET {{baseUrl}}/api/v1/tags/recommend?q=http&limit=10
 Authorization: Bearer {{accessToken}}
 
-### 5. 태그 수정 — title/content/link (hashtag·handle 제외)
+### 5a. 태그 수정 — 설명은 승인 요청이 된다 (hashtag·handle 제외)
+# 1a가 이미 대기 요청을 만들었으면, 만든 사람은 그 요청 내용이 바뀐다.
 PATCH {{baseUrl}}/api/v1/tags/{{tagId}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
@@ -75,6 +76,23 @@ Content-Type: application/json
   "content": "수정됨",
   "link": "https://example.com/http-tag-updated"
 }
+
+### 5b. 상업 태그 설명 요청
+# 승인 전에는 GET /tags/{tagId} 의 title·content·link·images 가 비어 있다.
+POST {{baseUrl}}/api/v1/tags/{{tagId}}/profile-requests
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "title": "HTTP 상업 태그",
+  "content": "승인 후 노출",
+  "link": "https://example.com/commercial",
+  "imageFileIds": [103]
+}
+
+### 5c. 내 태그 설명 요청
+GET {{baseUrl}}/api/v1/tags/profile-requests?status=PENDING&limit=30
+Authorization: Bearer {{accessToken}}
 
 ### 6. handle 변경 가능 여부
 GET {{baseUrl}}/api/v1/tags/{{tagId}}/handle/change-availability

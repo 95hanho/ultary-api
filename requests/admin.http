@@ -69,6 +69,24 @@ Authorization: Bearer {{adminAccessToken}}
 POST {{baseUrl}}/api/v1/admin/reports/1/confirm
 Authorization: Bearer {{adminAccessToken}}
 
+### 8a. 상업 태그 설명 요청 목록
+GET {{baseUrl}}/api/v1/admin/tags/profile-requests?status=PENDING&limit=30
+Authorization: Bearer {{adminAccessToken}}
+
+### 8b. 상업 태그 설명 승인
+# tagId 는 8a 항목으로 바꾼다. 승인 후 그 태그를 쓰면 설명이 보인다.
+POST {{baseUrl}}/api/v1/admin/tags/102/approve
+Authorization: Bearer {{adminAccessToken}}
+
+### 8c. 상업 태그 설명 거절
+POST {{baseUrl}}/api/v1/admin/tags/102/reject
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+  "rejectMessage": "소개 문구를 다시 적어 주세요"
+}
+
 ### 9. 관리자 로그아웃
 # 이 관리자의 리프레시만 폐기한다. 회원 토큰은 그대로다.
 POST {{baseUrl}}/api/v1/admin/auth/logout

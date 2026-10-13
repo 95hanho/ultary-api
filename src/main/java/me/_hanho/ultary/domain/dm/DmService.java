@@ -1,7 +1,9 @@
 package me._hanho.ultary.domain.dm;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -24,10 +26,13 @@ import me._hanho.ultary.domain.dm.dto.response.DmMessageResponse;
 import me._hanho.ultary.domain.dm.dto.response.DmRoomItemResponse;
 import me._hanho.ultary.domain.dm.dto.response.DmRoomListResponse;
 import me._hanho.ultary.domain.dm.dto.response.DmShareResponse;
+import me._hanho.ultary.domain.dm.dto.response.DmShareTargetItemResponse;
+import me._hanho.ultary.domain.dm.dto.response.DmShareTargetListResponse;
 import me._hanho.ultary.domain.dm.model.DmMessage;
 import me._hanho.ultary.domain.dm.model.DmMessageRow;
 import me._hanho.ultary.domain.dm.model.DmRoom;
 import me._hanho.ultary.domain.dm.model.DmRoomRow;
+import me._hanho.ultary.domain.dm.model.ShareTargetRow;
 import me._hanho.ultary.domain.feed.FeedMapper;
 import me._hanho.ultary.domain.feed.FeedService;
 import me._hanho.ultary.domain.feed.model.FeedMedia;
@@ -475,6 +480,86 @@ public class DmService {
 
 	private java.time.LocalDateTime leftAt(DmRoom room, Long me) {
 		return me.equals(room.getUserLow()) ? room.getLowLeftAt() : room.getHighLeftAt();
+	}
+
+	@Transactional(readOnly = true)
+	public DmShareTargetListResponse shareTargets(UserPrincipal principal, Integer limit) {
+		List<ShareTargetRow> rows = dmMapper.findShareCandidates(principal.getUserNo());
+		LocalDateTime cutoff = LocalDateTime.now().minusMonths(1);
+		List<RankedTarget> ranked = new ArrayList<>();
+		for (ShareTargetRow row : rows) {
+			if (row.getUserNo() == null) {
+				continue;
+			}
+			RankedTarget target = rank(row, cutoff);
+			if (target != null) {
+				ranked.add(target);
+			}
+		}
+		ranked.sort(Comparator
+				.comparingInt(RankedTarget::group)
+				.thenComparing(RankedTarget::activeAt, Comparator.reverseOrder())
+				.thenComparing(target -> target.row().getUserNo(), Comparator.reverseOrder()));
+		int size = Math.min(ranked.size(), resolveLimit(limit));
+		Set<Long> fileIds = new HashSet<>();
+		for (int i = 0; i < size; i++) {
+			Long profileFileId = ranked.get(i).row().getProfileFileId();
+			if (profileFileId != null) {
+				fileIds.add(profileFileId);
+			}
+		}
+		var files = fileService.findSummaries(fileIds);
+		List<DmShareTargetItemResponse> items = new ArrayList<>();
+		for (int i = 0; i < size; i++) {
+			RankedTarget target = ranked.get(i);
+			ShareTargetRow row = target.row();
+			items.add(DmShareTargetItemResponse.builder()
+					.userNo(row.getUserNo())
+					.nickname(row.getNickname())
+					.profileFile(row.getProfileFileId() == null ? null : files.get(row.getProfileFileId()))
+					.dmRoomId(row.getDmRoomId())
+					.following(row.getFollowedAt() != null)
+					.followedBy(row.getFollowerAt() != null)
+					.group(target.group())
+					.activeAt(target.activeAt())
+					.build());
+		}
+		return DmShareTargetListResponse.builder().items(items).build();
+	}
+
+	private RankedTarget rank(ShareTargetRow row, LocalDateTime cutoff) {
+		if (withinMonth(row.getLastMessageAt(), cutoff)) {
+			return new RankedTarget(row, 1, row.getLastMessageAt());
+		}
+		if (withinMonth(row.getFollowedAt(), cutoff)) {
+			return new RankedTarget(row, 2, row.getFollowedAt());
+		}
+		if (withinMonth(row.getFollowerAt(), cutoff)) {
+			return new RankedTarget(row, 3, row.getFollowerAt());
+		}
+		LocalDateTime activeAt = latest(row.getLastMessageAt(), row.getFollowedAt(), row.getFollowerAt());
+		if (activeAt == null) {
+			return null;
+		}
+		return new RankedTarget(row, 4, activeAt);
+	}
+
+	private static boolean withinMonth(LocalDateTime at, LocalDateTime cutoff) {
+		return at != null && !at.isBefore(cutoff);
+	}
+
+	private static LocalDateTime latest(LocalDateTime messageAt, LocalDateTime followedAt, LocalDateTime followerAt) {
+		LocalDateTime best = messageAt;
+		if (followedAt != null && (best == null || followedAt.isAfter(best))) {
+			best = followedAt;
+		}
+		if (followerAt != null && (best == null || followerAt.isAfter(best))) {
+			best = followerAt;
+		}
+		return best;
+	}
+
+	private record RankedTarget(ShareTargetRow row, int group, LocalDateTime activeAt) {
 	}
 
 	private int resolveLimit(Integer limit) {

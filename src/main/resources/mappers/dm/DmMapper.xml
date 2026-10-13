@@ -144,6 +144,99 @@
 		LIMIT #{limit}
 	</select>
 
+	<select id="findShareCandidates" resultType="me._hanho.ultary.domain.dm.model.ShareTargetRow">
+		SELECT
+			u.user_no AS userNo,
+			u.nickname AS nickname,
+			(
+				SELECT rp.profile_file_id
+				FROM ultary_pet rp
+				WHERE rp.user_no = u.user_no
+				  AND rp.is_deleted = 0
+				  AND rp.profile_file_id IS NOT NULL
+				ORDER BY rp.priority ASC, rp.pet_id ASC
+				LIMIT 1
+			) AS profileFileId,
+			dm.dm_room_id AS dmRoomId,
+			dm.last_message_at AS lastMessageAt,
+			mine.followed_at AS followedAt,
+			theirs.follower_at AS followerAt
+		FROM (
+			SELECT IF(r.user_low = #{userNo}, r.user_high, r.user_low) AS peer_user_no
+			FROM ultary_dm_room r
+			INNER JOIN ultary_dm_message m ON m.dm_room_id = r.dm_room_id
+			WHERE r.user_low = #{userNo} OR r.user_high = #{userNo}
+			UNION
+			SELECT receiver_user_no
+			FROM ultary_neighbor
+			WHERE requester_user_no = #{userNo}
+			  AND status = 'ACCEPTED'
+			UNION
+			SELECT requester_user_no
+			FROM ultary_neighbor
+			WHERE receiver_user_no = #{userNo}
+			  AND status = 'ACCEPTED'
+			  AND followed_back = 1
+			UNION
+			SELECT requester_user_no
+			FROM ultary_neighbor
+			WHERE receiver_user_no = #{userNo}
+			  AND status = 'ACCEPTED'
+			UNION
+			SELECT receiver_user_no
+			FROM ultary_neighbor
+			WHERE requester_user_no = #{userNo}
+			  AND status = 'ACCEPTED'
+			  AND followed_back = 1
+		) peers
+		INNER JOIN ultary_user u
+			ON u.user_no = peers.peer_user_no
+			AND u.withdrawal_status = 'ACTIVE'
+		LEFT JOIN (
+			SELECT
+				IF(r.user_low = #{userNo}, r.user_high, r.user_low) AS peer_user_no,
+				r.dm_room_id,
+				MAX(m.created_at) AS last_message_at
+			FROM ultary_dm_room r
+			INNER JOIN ultary_dm_message m ON m.dm_room_id = r.dm_room_id
+			WHERE r.user_low = #{userNo} OR r.user_high = #{userNo}
+			GROUP BY IF(r.user_low = #{userNo}, r.user_high, r.user_low), r.dm_room_id
+		) dm ON dm.peer_user_no = u.user_no
+		LEFT JOIN (
+			SELECT receiver_user_no AS peer_user_no, COALESCE(accepted_at, requested_at) AS followed_at
+			FROM ultary_neighbor
+			WHERE requester_user_no = #{userNo}
+			  AND status = 'ACCEPTED'
+			UNION ALL
+			SELECT requester_user_no, COALESCE(followed_back_at, accepted_at, requested_at)
+			FROM ultary_neighbor
+			WHERE receiver_user_no = #{userNo}
+			  AND status = 'ACCEPTED'
+			  AND followed_back = 1
+		) mine ON mine.peer_user_no = u.user_no
+		LEFT JOIN (
+			SELECT requester_user_no AS peer_user_no, COALESCE(accepted_at, requested_at) AS follower_at
+			FROM ultary_neighbor
+			WHERE receiver_user_no = #{userNo}
+			  AND status = 'ACCEPTED'
+			UNION ALL
+			SELECT receiver_user_no, COALESCE(followed_back_at, accepted_at, requested_at)
+			FROM ultary_neighbor
+			WHERE requester_user_no = #{userNo}
+			  AND status = 'ACCEPTED'
+			  AND followed_back = 1
+		) theirs ON theirs.peer_user_no = u.user_no
+		WHERE NOT EXISTS (
+			SELECT 1
+			FROM ultary_user_block b
+			WHERE b.is_deleted = 0
+			  AND (
+					(b.blocker_user_no = #{userNo} AND b.blocked_user_no = u.user_no)
+					OR (b.blocked_user_no = #{userNo} AND b.blocker_user_no = u.user_no)
+			  )
+		)
+	</select>
+
 	<select id="findRoomRow" resultType="me._hanho.ultary.domain.dm.model.DmRoomRow">
 		SELECT
 		<include refid="roomColumns"/>

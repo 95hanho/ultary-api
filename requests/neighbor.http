@@ -53,7 +53,7 @@ Authorization: Bearer {{accessToken}}
 GET {{baseUrl}}/api/v1/users/101/neighbors?type=FOLLOWER&limit=30
 Authorization: Bearer {{accessToken}}
 
-### 4a. 팔로우 요청 (이미 내가 팔로우한 102는 CONFLICT 예상)
+### 4a. 팔로우 (이미 내가 팔로우한 102는 CONFLICT. 공개 계정이면 첫 신청은 바로 ACCEPTED)
 POST {{baseUrl}}/api/v1/users/102/neighbors/request
 Authorization: Bearer {{accessToken}}
 

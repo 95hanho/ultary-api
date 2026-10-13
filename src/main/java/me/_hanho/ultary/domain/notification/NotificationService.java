@@ -17,6 +17,7 @@ import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
 import me._hanho.ultary.domain.notification.dto.response.NotificationItemResponse;
 import me._hanho.ultary.domain.notification.dto.response.NotificationListResponse;
 import me._hanho.ultary.domain.notification.dto.response.NotificationUnreadCountResponse;
+import me._hanho.ultary.domain.notification.model.NeighborNotice;
 import me._hanho.ultary.domain.notification.model.NotificationDraft;
 import me._hanho.ultary.domain.notification.model.NotificationListRow;
 import me._hanho.ultary.domain.notification.model.NotificationUpsert;
@@ -72,7 +73,7 @@ public class NotificationService {
 		pushUnread(userNo);
 		return NotificationListResponse.builder()
 				.unreadCount(unreadCount)
-				.items(toItems(rows))
+				.items(toItems(userNo, rows))
 				.build();
 	}
 
@@ -86,7 +87,7 @@ public class NotificationService {
 		notificationMapper.markRead(notificationId, userNo);
 		row.setIsRead(true);
 		pushUnread(userNo);
-		return toItems(List.of(row)).get(0);
+		return toItems(userNo, List.of(row)).get(0);
 	}
 
 	@Transactional
@@ -115,14 +116,45 @@ public class NotificationService {
 		applySingle(STORY_LIKE, "STORY_LIKE:" + storyId, notificationMapper.findStoryLike(storyId), markUnread);
 	}
 
-	public void syncNeighborRequest(Long neighborId) {
-		String groupKey = "NEIGHBOR_REQUEST:" + neighborId;
-		NotificationDraft draft = notificationMapper.findNeighborRequest(neighborId);
-		if (draft == null || draft.getActorUserNo() == null) {
-			notificationMapper.deleteByGroupKey(groupKey);
+	/**
+	 * 팔로우·팔로우 요청 알림을 맞춘다. 관계가 있는 동안은 지우지 않는다.
+	 * 받은 사람 알림은 요청자면 한 줄. 맞팔이면 상대에게도 한 줄.
+	 * @param markReceiverUnread 이번에 그 사람을 팔로우·요청한 경우만 true. 수락·맞팔·해제는 기존 줄을 다시 안 읽음으로 돌리지 않는다
+	 */
+	public void syncNeighbor(Long neighborId, boolean markReceiverUnread) {
+		NeighborNotice notice = notificationMapper.findNeighborNotice(neighborId);
+		if (notice == null || notice.getRequesterUserNo() == null || notice.getReceiverUserNo() == null) {
 			return;
 		}
-		save(draft.getReceiverUserNo(), draft, NEIGHBOR_REQUEST, groupKey, true);
+		if (!"PENDING".equals(notice.getStatus()) && !"ACCEPTED".equals(notice.getStatus())) {
+			return;
+		}
+		boolean followedBack = "ACCEPTED".equals(notice.getStatus()) && Boolean.TRUE.equals(notice.getFollowedBack());
+		String requestKey = "NEIGHBOR_REQUEST:" + neighborId;
+		String followKey = "NEIGHBOR_FOLLOW:" + neighborId;
+		List<Long> before = notificationMapper.findReceivers(null, null, null, neighborId, null, null, null);
+		notificationMapper.deleteStaleNeighborNotices(
+				neighborId,
+				notice.getReceiverUserNo(),
+				requestKey,
+				notice.getRequesterUserNo(),
+				followKey,
+				followedBack);
+		pushUnread(before);
+		save(notice.getReceiverUserNo(), neighborDraft(notice.getRequesterUserNo(), neighborId),
+				NEIGHBOR_REQUEST, requestKey, markReceiverUnread);
+		if (followedBack) {
+			save(notice.getRequesterUserNo(), neighborDraft(notice.getReceiverUserNo(), neighborId),
+					NEIGHBOR_REQUEST, followKey, true);
+		}
+	}
+
+	private static NotificationDraft neighborDraft(Long actorUserNo, Long neighborId) {
+		NotificationDraft draft = new NotificationDraft();
+		draft.setActorUserNo(actorUserNo);
+		draft.setActorCount(1);
+		draft.setNeighborId(neighborId);
+		return draft;
 	}
 
 	public void syncCommentMentions(Long commentId) {
@@ -304,7 +336,7 @@ public class NotificationService {
 		}
 	}
 
-	private List<NotificationItemResponse> toItems(List<NotificationListRow> rows) {
+	private List<NotificationItemResponse> toItems(Long viewerUserNo, List<NotificationListRow> rows) {
 		Set<Long> actorUserNos = new HashSet<>();
 		for (NotificationListRow row : rows) {
 			if (row.getActorUserNo() != null) {
@@ -319,10 +351,11 @@ public class NotificationService {
 			}
 		}
 		Map<Long, FileSummaryResponse> files = fileService.findSummaries(fileIds);
-		return rows.stream().map(row -> toItem(row, profileIds, files)).toList();
+		return rows.stream().map(row -> toItem(viewerUserNo, row, profileIds, files)).toList();
 	}
 
 	private NotificationItemResponse toItem(
+			Long viewerUserNo,
 			NotificationListRow row,
 			Map<Long, Integer> profileIds,
 			Map<Long, FileSummaryResponse> files) {
@@ -331,10 +364,12 @@ public class NotificationService {
 		int actorCount = row.getActorCount() == null ? 1 : row.getActorCount();
 		boolean hasComment = Boolean.TRUE.equals(row.getHasComment());
 		boolean hasReply = Boolean.TRUE.equals(row.getHasReply());
+		boolean actorFollows = actorFollowsViewer(viewerUserNo, row);
+		boolean following = viewerFollowsActor(viewerUserNo, row);
 		return NotificationItemResponse.builder()
 				.notificationId(row.getNotificationId())
 				.type(row.getType())
-				.message(message(row.getType(), row.getActorNickname(), actorCount, hasComment, hasReply))
+				.message(message(row.getType(), row.getActorNickname(), actorCount, hasComment, hasReply, actorFollows))
 				.actorUserNo(row.getActorUserNo())
 				.actorNickname(row.getActorNickname())
 				.actorProfileFileId(profileId)
@@ -349,20 +384,51 @@ public class NotificationService {
 				.storyId(row.getStoryId())
 				.neighborId(row.getNeighborId())
 				.neighborStatus(row.getNeighborStatus())
+				.following(following)
 				.read(Boolean.TRUE.equals(row.getIsRead()))
 				.updatedAt(row.getUpdatedAt())
 				.build();
 	}
 
-	static String message(String type, String nickname, int actorCount, boolean hasComment, boolean hasReply) {
+	static String message(
+			String type,
+			String nickname,
+			int actorCount,
+			boolean hasComment,
+			boolean hasReply,
+			boolean actorFollows) {
 		String name = nickname == null ? "회원" : nickname;
 		if (NEIGHBOR_REQUEST.equals(type)) {
-			return name + "님이 팔로우를 신청했습니다.";
+			if (actorFollows) {
+				return name + "님이 팔로우했습니다.";
+			}
+			return name + "님이 팔로우를 요청했습니다.";
 		}
 		String who = actorCount > 1
 				? name + "님 외 " + (actorCount - 1) + "명이"
 				: name + "님이";
 		return who + " " + action(type, hasComment, hasReply);
+	}
+
+	private static boolean actorFollowsViewer(Long viewerUserNo, NotificationListRow row) {
+		return follows(row.getActorUserNo(), viewerUserNo, row);
+	}
+
+	private static boolean viewerFollowsActor(Long viewerUserNo, NotificationListRow row) {
+		return follows(viewerUserNo, row.getActorUserNo(), row);
+	}
+
+	/** fromUserNo가 toUserNo를 팔로우 중이면 true. 요청만 있는 PENDING은 false */
+	private static boolean follows(Long fromUserNo, Long toUserNo, NotificationListRow row) {
+		if (fromUserNo == null || toUserNo == null || !"ACCEPTED".equals(row.getNeighborStatus())) {
+			return false;
+		}
+		if (fromUserNo.equals(row.getNeighborRequesterUserNo()) && toUserNo.equals(row.getNeighborReceiverUserNo())) {
+			return true;
+		}
+		return fromUserNo.equals(row.getNeighborReceiverUserNo())
+				&& toUserNo.equals(row.getNeighborRequesterUserNo())
+				&& Boolean.TRUE.equals(row.getFollowedBack());
 	}
 
 	private static String action(String type, boolean hasComment, boolean hasReply) {

@@ -8,6 +8,8 @@
 	<sql id="tagColumns">
 		tag_id,
 		hashtag,
+		purpose,
+		profile_status,
 		title,
 		handle,
 		handle_changed_at,
@@ -31,6 +33,8 @@
 	<insert id="insert" useGeneratedKeys="true" keyProperty="tagId" keyColumn="tag_id">
 		INSERT INTO ultary_tag (
 			hashtag,
+			purpose,
+			profile_status,
 			title,
 			handle,
 			handle_changed_at,
@@ -39,6 +43,8 @@
 			created_by_user_no
 		) VALUES (
 			#{hashtag},
+			#{purpose},
+			#{profileStatus},
 			#{title},
 			#{handle},
 			<choose>
@@ -84,7 +90,7 @@
 		WHERE is_deleted = 0
 		  AND (
 			hashtag LIKE CONCAT('%', #{q}, '%')
-			OR IFNULL(title, '') LIKE CONCAT('%', #{q}, '%')
+			OR (profile_status = 'APPROVED' AND IFNULL(title, '') LIKE CONCAT('%', #{q}, '%'))
 			OR IFNULL(handle, '') LIKE CONCAT('%', #{q}, '%')
 		  )
 		ORDER BY use_count DESC, tag_id DESC
@@ -119,7 +125,7 @@
 			AND (
 				hashtag LIKE CONCAT(#{q}, '%')
 				OR IFNULL(handle, '') LIKE CONCAT(#{q}, '%')
-				OR IFNULL(title, '') LIKE CONCAT('%', #{q}, '%')
+				OR (profile_status = 'APPROVED' AND IFNULL(title, '') LIKE CONCAT('%', #{q}, '%'))
 			)
 		</if>
 		ORDER BY use_count DESC, tag_id DESC
@@ -173,6 +179,160 @@
 		  AND ft.is_deleted = 0
 		  AND f.is_deleted = 0
 	</select>
+
+	<sql id="profileRequestColumns">
+		r.tag_profile_request_id,
+		r.tag_id,
+		t.hashtag,
+		r.requester_user_no,
+		r.title,
+		r.content,
+		r.link,
+		r.status,
+		r.reject_message,
+		r.reviewed_by_admin_id,
+		r.reviewed_at,
+		r.created_at,
+		r.updated_at
+	</sql>
+
+	<insert id="insertProfileRequest" useGeneratedKeys="true" keyProperty="tagProfileRequestId" keyColumn="tag_profile_request_id">
+		INSERT INTO ultary_tag_profile_request (
+			tag_id,
+			requester_user_no,
+			title,
+			content,
+			link,
+			status
+		) VALUES (
+			#{tagId},
+			#{requesterUserNo},
+			#{title},
+			#{content},
+			#{link},
+			'PENDING'
+		)
+	</insert>
+
+	<update id="updatePendingProfileRequest">
+		UPDATE ultary_tag_profile_request
+		SET title = #{title},
+			content = #{content},
+			link = #{link},
+			updated_at = NOW()
+		WHERE tag_profile_request_id = #{tagProfileRequestId}
+		  AND status = 'PENDING'
+	</update>
+
+	<update id="reviewProfileRequest">
+		UPDATE ultary_tag_profile_request
+		SET status = #{status},
+			reject_message = #{rejectMessage},
+			reviewed_by_admin_id = #{adminNo},
+			reviewed_at = NOW()
+		WHERE tag_profile_request_id = #{tagProfileRequestId}
+		  AND status = 'PENDING'
+	</update>
+
+	<select id="findProfileRequestById" resultType="me._hanho.ultary.domain.tag.model.TagProfileRequest">
+		SELECT <include refid="profileRequestColumns"/>
+		FROM ultary_tag_profile_request r
+		JOIN ultary_tag t ON t.tag_id = r.tag_id
+		WHERE r.tag_profile_request_id = #{tagProfileRequestId}
+	</select>
+
+	<select id="findPendingByTagId" resultType="me._hanho.ultary.domain.tag.model.TagProfileRequest">
+		SELECT <include refid="profileRequestColumns"/>
+		FROM ultary_tag_profile_request r
+		JOIN ultary_tag t ON t.tag_id = r.tag_id
+		WHERE r.tag_id = #{tagId}
+		  AND r.status = 'PENDING'
+		ORDER BY r.tag_profile_request_id DESC
+		LIMIT 1
+	</select>
+
+	<select id="findLatestByTagAndRequester" resultType="me._hanho.ultary.domain.tag.model.TagProfileRequest">
+		SELECT <include refid="profileRequestColumns"/>
+		FROM ultary_tag_profile_request r
+		JOIN ultary_tag t ON t.tag_id = r.tag_id
+		WHERE r.tag_id = #{tagId}
+		  AND r.requester_user_no = #{requesterUserNo}
+		ORDER BY r.tag_profile_request_id DESC
+		LIMIT 1
+	</select>
+
+	<select id="findProfileRequests" resultType="me._hanho.ultary.domain.tag.model.TagProfileRequest">
+		SELECT <include refid="profileRequestColumns"/>
+		FROM ultary_tag_profile_request r
+		JOIN ultary_tag t ON t.tag_id = r.tag_id
+		WHERE 1 = 1
+		<if test="requesterUserNo != null">
+			AND r.requester_user_no = #{requesterUserNo}
+		</if>
+		<if test="status != null and status != ''">
+			AND r.status = #{status}
+		</if>
+		ORDER BY r.tag_profile_request_id DESC
+		LIMIT #{limit}
+	</select>
+
+	<insert id="insertRequestImage">
+		INSERT INTO ultary_tag_profile_request_image (
+			tag_profile_request_id,
+			file_id,
+			sort_order
+		) VALUES (
+			#{tagProfileRequestId},
+			#{fileId},
+			#{sortOrder}
+		)
+	</insert>
+
+	<delete id="deleteRequestImages">
+		DELETE FROM ultary_tag_profile_request_image
+		WHERE tag_profile_request_id = #{tagProfileRequestId}
+	</delete>
+
+	<select id="findRequestImageFileIds" resultType="long">
+		SELECT file_id
+		FROM ultary_tag_profile_request_image
+		WHERE tag_profile_request_id = #{tagProfileRequestId}
+		ORDER BY sort_order ASC, tag_profile_request_image_id ASC
+	</select>
+
+	<delete id="deleteImagesByTagId">
+		DELETE FROM ultary_tag_image
+		WHERE tag_id = #{tagId}
+	</delete>
+
+	<update id="markCommercialRequested">
+		UPDATE ultary_tag
+		SET purpose = 'COMMERCIAL',
+			profile_status = IF(profile_status = 'APPROVED', 'APPROVED', 'PENDING'),
+			updated_at = NOW()
+		WHERE tag_id = #{tagId}
+		  AND is_deleted = 0
+	</update>
+
+	<update id="applyApprovedProfile">
+		UPDATE ultary_tag
+		SET title = #{title},
+			content = #{content},
+			link = #{link},
+			purpose = 'COMMERCIAL',
+			profile_status = 'APPROVED',
+			updated_at = NOW()
+		WHERE tag_id = #{tagId}
+		  AND is_deleted = 0
+	</update>
+
+	<update id="markProfileRejected">
+		UPDATE ultary_tag
+		SET profile_status = IF(profile_status = 'APPROVED', 'APPROVED', 'REJECTED'),
+			updated_at = NOW()
+		WHERE tag_id = #{tagId}
+		  AND is_deleted = 0
+	</update>
 
 	<update id="incrementUseCount">
 		UPDATE ultary_tag

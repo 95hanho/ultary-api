@@ -22,6 +22,9 @@ public class NotificationListRow {
 	private Long feedReplyId;
 	private Long storyId;
 	private Long neighborId;
+	private Long neighborRequesterUserNo;
+	private Long neighborReceiverUserNo;
+	private Boolean followedBack;
 	private String neighborStatus;
 	private Boolean isRead;
 	private LocalDateTime updatedAt;

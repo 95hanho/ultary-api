@@ -13,6 +13,10 @@ public class TagResponse {
 
 	private Long tagId;
 	private String hashtag;
+	/** USER 또는 COMMERCIAL */
+	private String purpose;
+	/** NONE, PENDING, APPROVED, REJECTED. 설명 필드는 APPROVED일 때만 채워진다 */
+	private String profileStatus;
 	private String title;
 	private String handle;
 	private LocalDateTime handleChangedAt;
@@ -24,6 +28,8 @@ public class TagResponse {
 	private Long createdByUserNo;
 	private List<Long> imageFileIds;
 	private List<FileSummaryResponse> images;
+	/** 이 조회자가 넣은 최신 설명 요청. 다른 사람에게는 null */
+	private TagProfileRequestResponse profileRequest;
 	private LocalDateTime createdAt;
 	private LocalDateTime updatedAt;
 }

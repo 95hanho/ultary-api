@@ -2,18 +2,24 @@ package me._hanho.ultary.domain.admin;
 
 import java.util.List;
 
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.response.ApiResponse;
+import me._hanho.ultary.domain.admin.dto.request.RejectTagProfileRequest;
 import me._hanho.ultary.domain.admin.dto.response.UserSuspendResponse;
 import me._hanho.ultary.domain.report.dto.response.ReportResponse;
+import me._hanho.ultary.domain.tag.dto.response.TagProfileRequestResponse;
+import me._hanho.ultary.security.principal.AdminPrincipal;
 
 /** 경로 원본: springEndpoints.admin / api-memo.md §12 */
 @Slf4j
@@ -24,18 +30,32 @@ public class AdminController {
 
 	private final AdminService adminService;
 
+	@GetMapping("/tags/profile-requests")
+	public ApiResponse<List<TagProfileRequestResponse>> tagProfileRequests(
+			@RequestParam(required = false) String status,
+			@RequestParam(defaultValue = "30") int limit) {
+		log.info("[tagProfileRequests] status={} limit={}", status, limit);
+		return ApiResponse.ok(adminService.listTagProfileRequests(status, limit), "태그 설명 요청 조회 성공");
+	}
+
 	@PostMapping("/tags/{tagId}/approve")
-	public ApiResponse<Void> approveTag(@PathVariable Long tagId) {
+	public ApiResponse<TagProfileRequestResponse> approveTag(
+			@AuthenticationPrincipal AdminPrincipal principal,
+			@PathVariable Long tagId) {
 		log.info("[approveTag] tagId={}", tagId);
-		adminService.approveTag(tagId);
-		return ApiResponse.okEmpty("태그 승인 성공");
+		return ApiResponse.ok(adminService.approveTag(principal.getAdminNo(), tagId), "태그 설명 승인 성공");
 	}
 
 	@PostMapping("/tags/{tagId}/reject")
-	public ApiResponse<Void> rejectTag(@PathVariable Long tagId) {
+	public ApiResponse<TagProfileRequestResponse> rejectTag(
+			@AuthenticationPrincipal AdminPrincipal principal,
+			@PathVariable Long tagId,
+			@Valid @RequestBody(required = false) RejectTagProfileRequest request) {
 		log.info("[rejectTag] tagId={}", tagId);
-		adminService.rejectTag(tagId);
-		return ApiResponse.okEmpty("태그 거절 성공");
+		String rejectMessage = request == null ? null : request.getRejectMessage();
+		return ApiResponse.ok(
+				adminService.rejectTag(principal.getAdminNo(), tagId, rejectMessage),
+				"태그 설명 거절 성공");
 	}
 
 	@PostMapping("/users/{userNo}/suspend")

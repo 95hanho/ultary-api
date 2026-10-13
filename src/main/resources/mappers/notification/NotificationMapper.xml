@@ -484,17 +484,32 @@
 		  AND s.is_deleted = 0
 	</select>
 
-	<select id="findNeighborRequest" resultType="me._hanho.ultary.domain.notification.model.NotificationDraft">
+	<select id="findNeighborNotice" resultType="me._hanho.ultary.domain.notification.model.NeighborNotice">
 		SELECT
-			n.receiver_user_no AS receiver_user_no,
-			n.requester_user_no AS actor_user_no,
-			1 AS actor_count,
-			n.neighbor_id AS neighbor_id
+			n.neighbor_id,
+			n.requester_user_no,
+			n.receiver_user_no,
+			n.status,
+			n.followed_back
 		FROM ultary_neighbor n
-		INNER JOIN ultary_user u ON u.user_no = n.requester_user_no AND u.withdrawal_status = 'ACTIVE'
 		WHERE n.neighbor_id = #{neighborId}
-		  AND n.status = 'PENDING'
 	</select>
+
+	<delete id="deleteStaleNeighborNotices">
+		DELETE FROM ultary_notification
+		WHERE neighbor_id = #{neighborId}
+		  AND type = 'NEIGHBOR_REQUEST'
+		  AND NOT (
+			receiver_user_no = #{receiverUserNo}
+			AND group_key = #{requestGroupKey}
+		  )
+		<if test="keepFollowNotice">
+		  AND NOT (
+			receiver_user_no = #{requesterUserNo}
+			AND group_key = #{followGroupKey}
+		  )
+		</if>
+	</delete>
 
 	<select id="findFeedTagReceivers" resultType="long">
 		SELECT DISTINCT p.user_no
@@ -587,6 +602,9 @@
 			n.feed_reply_id,
 			n.story_id,
 			n.neighbor_id,
+			nb.requester_user_no AS neighbor_requester_user_no,
+			nb.receiver_user_no AS neighbor_receiver_user_no,
+			nb.followed_back,
 			nb.status AS neighbor_status,
 			n.is_read,
 			n.updated_at
@@ -627,6 +645,9 @@
 			n.feed_reply_id,
 			n.story_id,
 			n.neighbor_id,
+			nb.requester_user_no AS neighbor_requester_user_no,
+			nb.receiver_user_no AS neighbor_receiver_user_no,
+			nb.followed_back,
 			nb.status AS neighbor_status,
 			n.is_read,
 			n.updated_at

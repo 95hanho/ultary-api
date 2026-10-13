@@ -177,16 +177,18 @@ public class NeighborService {
 
 		String key = pairKey(me, targetUserNo);
 		Neighbor existing = neighborMapper.findByPairKey(key);
+		boolean instant = !privacyService.isPrivateAccount(targetUserNo);
 		if (existing == null) {
 			Neighbor created = new Neighbor();
 			created.setRequesterUserNo(me);
 			created.setReceiverUserNo(targetUserNo);
 			created.setPairKey(key);
-			created.setStatus("PENDING");
+			created.setStatus(instant ? "ACCEPTED" : "PENDING");
 			neighborMapper.insert(created);
-			notificationService.syncNeighborRequest(created.getNeighborId());
-			log.info("[request] me={} target={} neighborId={}", me, targetUserNo, created.getNeighborId());
-			return toRelation(created);
+			notificationService.syncNeighbor(created.getNeighborId(), true);
+			log.info("[request] me={} target={} neighborId={} status={}",
+					me, targetUserNo, created.getNeighborId(), created.getStatus());
+			return toRelation(neighborMapper.findByNeighborId(created.getNeighborId()));
 		}
 
 		if ("ACCEPTED".equals(existing.getStatus())) {
@@ -197,6 +199,7 @@ public class NeighborService {
 			if (updated == 0) {
 				throw new BusinessException(ErrorCode.NEIGHBOR_ALREADY_EXISTS);
 			}
+			notificationService.syncNeighbor(existing.getNeighborId(), false);
 			log.info("[request:followBack] me={} target={} neighborId={}", me, targetUserNo, existing.getNeighborId());
 			return toRelation(neighborMapper.findByNeighborId(existing.getNeighborId()));
 		}
@@ -209,13 +212,14 @@ public class NeighborService {
 		if ("BLOCKED".equals(existing.getStatus())) {
 			throw new BusinessException(ErrorCode.NEIGHBOR_BLOCKED);
 		}
-		// REJECTED → 재요청 (요청자/수신자 갱신)
+		// REJECTED → 재요청. 공개 계정은 바로 ACCEPTED, 비공개 계정은 PENDING
 		existing.setRequesterUserNo(me);
 		existing.setReceiverUserNo(targetUserNo);
-		existing.setStatus("PENDING");
+		existing.setStatus(instant ? "ACCEPTED" : "PENDING");
 		neighborMapper.updateReRequest(existing);
-		notificationService.syncNeighborRequest(existing.getNeighborId());
-		log.info("[request:re] me={} target={} neighborId={}", me, targetUserNo, existing.getNeighborId());
+		notificationService.syncNeighbor(existing.getNeighborId(), true);
+		log.info("[request:re] me={} target={} neighborId={} status={}",
+				me, targetUserNo, existing.getNeighborId(), existing.getStatus());
 		return toRelation(neighborMapper.findByNeighborId(existing.getNeighborId()));
 	}
 
@@ -233,6 +237,7 @@ public class NeighborService {
 		if (updated == 0) {
 			throw new BusinessException(ErrorCode.NEIGHBOR_NOT_FOUND);
 		}
+		notificationService.syncNeighbor(neighborId, false);
 		log.info("[accept] neighborId={} receiver={}", neighborId, principal.getUserNo());
 		return toRelation(neighborMapper.findByNeighborId(neighborId));
 	}
@@ -275,6 +280,7 @@ public class NeighborService {
 				if (updated == 0) {
 					throw new BusinessException(ErrorCode.NEIGHBOR_NOT_FOUND);
 				}
+				notificationService.syncNeighbor(neighborId, false);
 				log.info("[unfollow:keepIncoming] neighborId={} by={}", neighborId, me);
 				return;
 			}
@@ -282,6 +288,7 @@ public class NeighborService {
 			if (updated == 0) {
 				throw new BusinessException(ErrorCode.NEIGHBOR_NOT_FOUND);
 			}
+			notificationService.syncNeighbor(neighborId, false);
 			log.info("[unfollow:clearBack] neighborId={} by={}", neighborId, me);
 			return;
 		}

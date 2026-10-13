@@ -8,13 +8,14 @@ import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import me._hanho.ultary.common.exception.BusinessException;
 import me._hanho.ultary.common.exception.ErrorCode;
-import me._hanho.ultary.common.exception.NotImplemented;
 import me._hanho.ultary.domain.admin.dto.response.UserSuspendResponse;
 import me._hanho.ultary.domain.auth.TokenMapper;
 import me._hanho.ultary.domain.feed.FeedService;
 import me._hanho.ultary.domain.report.ReportService;
 import me._hanho.ultary.domain.report.dto.response.ReportResponse;
 import me._hanho.ultary.domain.report.model.Report;
+import me._hanho.ultary.domain.tag.TagService;
+import me._hanho.ultary.domain.tag.dto.response.TagProfileRequestResponse;
 import me._hanho.ultary.domain.user.UserMapper;
 import me._hanho.ultary.domain.user.model.User;
 
@@ -26,13 +27,18 @@ public class AdminService {
 	private final TokenMapper tokenMapper;
 	private final ReportService reportService;
 	private final FeedService feedService;
+	private final TagService tagService;
 
-	public void approveTag(Long tagId) {
-		NotImplemented.yet();
+	public List<TagProfileRequestResponse> listTagProfileRequests(String status, int limit) {
+		return tagService.listProfileRequestsForAdmin(status, limit);
 	}
 
-	public void rejectTag(Long tagId) {
-		NotImplemented.yet();
+	public TagProfileRequestResponse approveTag(Long adminNo, Long tagId) {
+		return tagService.approveProfile(adminNo, tagId);
+	}
+
+	public TagProfileRequestResponse rejectTag(Long adminNo, Long tagId, String rejectMessage) {
+		return tagService.rejectProfile(adminNo, tagId, rejectMessage);
 	}
 
 	@Transactional

@@ -20,7 +20,9 @@ import me._hanho.ultary.common.response.ApiResponse;
 import me._hanho.ultary.common.response.ChangeAvailabilityResponse;
 import me._hanho.ultary.domain.tag.dto.request.ChangeTagHandleRequest;
 import me._hanho.ultary.domain.tag.dto.request.CreateTagRequest;
+import me._hanho.ultary.domain.tag.dto.request.SubmitTagProfileRequest;
 import me._hanho.ultary.domain.tag.dto.request.UpdateTagRequest;
+import me._hanho.ultary.domain.tag.dto.response.TagProfileRequestResponse;
 import me._hanho.ultary.domain.tag.dto.response.TagResponse;
 import me._hanho.ultary.security.principal.UserPrincipal;
 
@@ -48,6 +50,26 @@ public class TagController {
 			@RequestParam(required = false) Integer limit) {
 		log.info("[search] q={} limit={}", q, limit);
 		return ApiResponse.ok(tagService.search(q, limit), "태그 검색 성공");
+	}
+
+	@GetMapping("/profile-requests")
+	public ApiResponse<List<TagProfileRequestResponse>> myProfileRequests(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@RequestParam(required = false) String status,
+			@RequestParam(defaultValue = "30") int limit) {
+		log.info("[myProfileRequests] status={} limit={}", status, limit);
+		return ApiResponse.ok(
+				tagService.listMyProfileRequests(principal.getUserNo(), status, limit),
+				"태그 설명 요청 조회 성공");
+	}
+
+	@PostMapping("/{tagId}/profile-requests")
+	public ApiResponse<TagProfileRequestResponse> submitProfile(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@PathVariable Long tagId,
+			@Valid @RequestBody SubmitTagProfileRequest request) {
+		log.info("[submitProfile] tagId={}", tagId);
+		return ApiResponse.ok(tagService.submitProfile(principal, tagId, request), "태그 설명 요청 성공");
 	}
 
 	@GetMapping("/recommend")
@@ -85,8 +107,11 @@ public class TagController {
 	}
 
 	@GetMapping("/{tagId}")
-	public ApiResponse<TagResponse> detail(@PathVariable Long tagId) {
+	public ApiResponse<TagResponse> detail(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@PathVariable Long tagId) {
 		log.info("[detail] tagId={}", tagId);
-		return ApiResponse.ok(tagService.getDetail(tagId), "태그 조회 성공");
+		Long viewerUserNo = principal != null ? principal.getUserNo() : null;
+		return ApiResponse.ok(tagService.getDetail(tagId, viewerUserNo), "태그 조회 성공");
 	}
 }

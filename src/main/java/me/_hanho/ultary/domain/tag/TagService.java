@@ -2,6 +2,7 @@ package me._hanho.ultary.domain.tag;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,9 +18,12 @@ import me._hanho.ultary.domain.file.FileService;
 import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
 import me._hanho.ultary.domain.tag.dto.request.ChangeTagHandleRequest;
 import me._hanho.ultary.domain.tag.dto.request.CreateTagRequest;
+import me._hanho.ultary.domain.tag.dto.request.SubmitTagProfileRequest;
 import me._hanho.ultary.domain.tag.dto.request.UpdateTagRequest;
+import me._hanho.ultary.domain.tag.dto.response.TagProfileRequestResponse;
 import me._hanho.ultary.domain.tag.dto.response.TagResponse;
 import me._hanho.ultary.domain.tag.model.Tag;
+import me._hanho.ultary.domain.tag.model.TagProfileRequest;
 import me._hanho.ultary.domain.tag.model.TagSearchHit;
 import me._hanho.ultary.domain.tag.model.TagImage;
 import me._hanho.ultary.security.principal.UserPrincipal;
@@ -31,6 +35,8 @@ public class TagService {
 
 	private static final int DEFAULT_LIMIT = 20;
 	private static final int MAX_LIMIT = 50;
+	private static final int REQUEST_DEFAULT_LIMIT = 30;
+	private static final Set<String> REQUEST_STATUSES = Set.of("PENDING", "APPROVED", "REJECTED");
 
 	private final TagMapper tagMapper;
 	private final FileService fileService;
@@ -41,32 +47,57 @@ public class TagService {
 		if (handle != null) {
 			ensureHandleAvailable(handle, null);
 		}
-		validateImageFiles(request.getImageFileIds());
+		String title = blankToNull(request.getTitle());
+		String content = blankToNull(request.getContent());
+		String link = blankToNull(request.getLink());
+		List<Long> imageFileIds = cleanIds(request.getImageFileIds());
+		boolean commercial = title != null || content != null || link != null || !imageFileIds.isEmpty();
+		if (commercial) {
+			validateImageFiles(imageFileIds);
+		}
 
 		Tag tag = new Tag();
 		tag.setHashtag(request.getHashtag());
-		tag.setTitle(blankToNull(request.getTitle()));
+		tag.setPurpose(commercial ? "COMMERCIAL" : "USER");
+		tag.setProfileStatus(commercial ? "PENDING" : "NONE");
 		tag.setHandle(handle);
-		tag.setContent(blankToNull(request.getContent()));
-		tag.setLink(blankToNull(request.getLink()));
 		tag.setCreatedByUserNo(principal.getUserNo());
 
 		tagMapper.insert(tag);
-		insertImages(tag.getTagId(), request.getImageFileIds());
-		log.info("[create] tagId={} hashtag={} handle={} userNo={}",
-				tag.getTagId(), tag.getHashtag(), handle, principal.getUserNo());
-		return toResponse(requireActive(tag.getTagId()));
+		if (commercial) {
+			saveProfileRequest(tag.getTagId(), principal.getUserNo(), title, content, link, imageFileIds, null);
+			tagMapper.markCommercialRequested(tag.getTagId());
+		}
+		log.info("[create] tagId={} hashtag={} purpose={} userNo={}",
+				tag.getTagId(), tag.getHashtag(), tag.getPurpose(), principal.getUserNo());
+		return toResponse(requireActive(tag.getTagId()), null, principal.getUserNo());
 	}
 
 	@Transactional(readOnly = true)
-	public TagResponse getDetail(Long tagId) {
+	public TagResponse getDetail(Long tagId, Long viewerUserNo) {
 		Tag tag = requireActive(tagId);
-		return toResponse(tag, tagMapper.countActiveFeeds(tag.getTagId()));
+		return toResponse(tag, tagMapper.countActiveFeeds(tag.getTagId()), viewerUserNo);
 	}
 
 	@Transactional
 	public TagResponse update(UserPrincipal principal, Long tagId, UpdateTagRequest request) {
-		requireOwned(tagId, principal.getUserNo());
+		Tag owned = requireOwned(tagId, principal.getUserNo());
+		boolean submitting = request.getTitle() != null || request.getContent() != null || request.getLink() != null;
+		if (submitting) {
+			SubmitTagProfileRequest body = new SubmitTagProfileRequest();
+			body.setTitle(request.getTitle() != null
+					? request.getTitle()
+					: (Boolean.TRUE.equals(request.getClearTitle()) ? "" : owned.getTitle()));
+			body.setContent(request.getContent() != null
+					? request.getContent()
+					: (Boolean.TRUE.equals(request.getClearContent()) ? "" : owned.getContent()));
+			body.setLink(request.getLink() != null
+					? request.getLink()
+					: (Boolean.TRUE.equals(request.getClearLink()) ? "" : owned.getLink()));
+			body.setImageFileIds(tagMapper.findImageFileIdsByTagId(tagId));
+			submitProfile(principal, tagId, body);
+			return toResponse(requireActive(tagId), null, principal.getUserNo());
+		}
 
 		Tag patch = new Tag();
 		patch.setTagId(tagId);
@@ -89,7 +120,71 @@ public class TagService {
 			throw new BusinessException(ErrorCode.TAG_NOT_FOUND);
 		}
 		log.info("[update] tagId={} userNo={}", tagId, principal.getUserNo());
-		return toResponse(requireOwned(tagId, principal.getUserNo()));
+		return toResponse(requireOwned(tagId, principal.getUserNo()), null, principal.getUserNo());
+	}
+
+	/** 상업 태그에 보일 제목·소개·링크·이미지. 승인 전에는 태그 조회에 안 나온다. */
+	@Transactional
+	public TagProfileRequestResponse submitProfile(UserPrincipal principal, Long tagId, SubmitTagProfileRequest request) {
+		requireActive(tagId);
+		String title = blankToNull(request.getTitle());
+		String content = blankToNull(request.getContent());
+		String link = blankToNull(request.getLink());
+		List<Long> imageFileIds = cleanIds(request.getImageFileIds());
+		if (title == null && content == null && link == null && imageFileIds.isEmpty()) {
+			throw new BusinessException(ErrorCode.TAG_PROFILE_REQUEST_EMPTY);
+		}
+		validateImageFiles(imageFileIds);
+		TagProfileRequest saved = saveProfileRequest(
+				tagId, principal.getUserNo(), title, content, link, imageFileIds,
+				tagMapper.findPendingByTagId(tagId));
+		tagMapper.markCommercialRequested(tagId);
+		log.info("[submitProfile] tagId={} requestId={} userNo={}",
+				tagId, saved.getTagProfileRequestId(), principal.getUserNo());
+		return toRequestResponse(tagMapper.findPendingByTagId(tagId));
+	}
+
+	@Transactional(readOnly = true)
+	public List<TagProfileRequestResponse> listMyProfileRequests(Long userNo, String status, int limit) {
+		return tagMapper.findProfileRequests(userNo, normalizeRequestStatus(status, false), resolveRequestLimit(limit))
+				.stream()
+				.map(this::toRequestResponse)
+				.toList();
+	}
+
+	@Transactional(readOnly = true)
+	public List<TagProfileRequestResponse> listProfileRequestsForAdmin(String status, int limit) {
+		return tagMapper.findProfileRequests(null, normalizeRequestStatus(status, true), resolveRequestLimit(limit))
+				.stream()
+				.map(this::toRequestResponse)
+				.toList();
+	}
+
+	@Transactional
+	public TagProfileRequestResponse approveProfile(Long adminNo, Long tagId) {
+		TagProfileRequest pending = requirePending(tagId);
+		if (tagMapper.reviewProfileRequest(pending.getTagProfileRequestId(), "APPROVED", adminNo, null) == 0) {
+			throw new BusinessException(ErrorCode.TAG_PROFILE_REQUEST_NOT_FOUND);
+		}
+		tagMapper.applyApprovedProfile(pending);
+		tagMapper.deleteImagesByTagId(tagId);
+		insertImages(tagId, tagMapper.findRequestImageFileIds(pending.getTagProfileRequestId()));
+		log.info("[approveProfile] tagId={} requestId={} adminNo={}",
+				tagId, pending.getTagProfileRequestId(), adminNo);
+		return toRequestResponse(reloadRequest(pending.getTagProfileRequestId()));
+	}
+
+	@Transactional
+	public TagProfileRequestResponse rejectProfile(Long adminNo, Long tagId, String rejectMessage) {
+		TagProfileRequest pending = requirePending(tagId);
+		String message = blankToNull(rejectMessage);
+		if (tagMapper.reviewProfileRequest(pending.getTagProfileRequestId(), "REJECTED", adminNo, message) == 0) {
+			throw new BusinessException(ErrorCode.TAG_PROFILE_REQUEST_NOT_FOUND);
+		}
+		tagMapper.markProfileRejected(tagId);
+		log.info("[rejectProfile] tagId={} requestId={} adminNo={}",
+				tagId, pending.getTagProfileRequestId(), adminNo);
+		return toRequestResponse(reloadRequest(pending.getTagProfileRequestId()));
 	}
 
 	@Transactional(readOnly = true)
@@ -132,7 +227,7 @@ public class TagService {
 			throw new BusinessException(ErrorCode.TAG_HANDLE_REQUIRED);
 		}
 		if (handle.equalsIgnoreCase(tag.getHandle() != null ? tag.getHandle() : "")) {
-			return toResponse(tag);
+			return toResponse(tag, null, principal.getUserNo());
 		}
 
 		IdentityChangeCooldown.requireChangeable(
@@ -147,7 +242,87 @@ public class TagService {
 			throw new BusinessException(ErrorCode.TAG_NOT_FOUND);
 		}
 		log.info("[changeHandle] tagId={} handle={}", tagId, handle);
-		return toResponse(requireOwned(tagId, principal.getUserNo()));
+		return toResponse(requireOwned(tagId, principal.getUserNo()), null, principal.getUserNo());
+	}
+
+	private TagProfileRequest saveProfileRequest(
+			Long tagId,
+			Long userNo,
+			String title,
+			String content,
+			String link,
+			List<Long> imageFileIds,
+			TagProfileRequest pending) {
+		if (pending != null && !userNo.equals(pending.getRequesterUserNo())) {
+			throw new BusinessException(ErrorCode.TAG_PROFILE_REQUEST_OPEN);
+		}
+		if (pending != null) {
+			pending.setTitle(title);
+			pending.setContent(content);
+			pending.setLink(link);
+			tagMapper.updatePendingProfileRequest(pending);
+			tagMapper.deleteRequestImages(pending.getTagProfileRequestId());
+			insertRequestImages(pending.getTagProfileRequestId(), imageFileIds);
+			return pending;
+		}
+		TagProfileRequest created = new TagProfileRequest();
+		created.setTagId(tagId);
+		created.setRequesterUserNo(userNo);
+		created.setTitle(title);
+		created.setContent(content);
+		created.setLink(link);
+		tagMapper.insertProfileRequest(created);
+		insertRequestImages(created.getTagProfileRequestId(), imageFileIds);
+		return created;
+	}
+
+	private void insertRequestImages(Long requestId, List<Long> imageFileIds) {
+		int order = 0;
+		for (Long fileId : imageFileIds) {
+			tagMapper.insertRequestImage(requestId, fileId, order++);
+		}
+	}
+
+	private TagProfileRequest requirePending(Long tagId) {
+		requireActive(tagId);
+		TagProfileRequest pending = tagMapper.findPendingByTagId(tagId);
+		if (pending == null) {
+			throw new BusinessException(ErrorCode.TAG_PROFILE_REQUEST_NOT_FOUND);
+		}
+		return pending;
+	}
+
+	private TagProfileRequest reloadRequest(Long requestId) {
+		TagProfileRequest row = tagMapper.findProfileRequestById(requestId);
+		if (row == null) {
+			throw new BusinessException(ErrorCode.TAG_PROFILE_REQUEST_NOT_FOUND);
+		}
+		return row;
+	}
+
+	private String normalizeRequestStatus(String status, boolean defaultPending) {
+		if (status == null || status.isBlank()) {
+			return defaultPending ? "PENDING" : null;
+		}
+		String normalized = status.trim().toUpperCase();
+		if (!REQUEST_STATUSES.contains(normalized)) {
+			throw new BusinessException(ErrorCode.INVALID_INPUT, "태그 설명 요청 상태가 올바르지 않습니다.");
+		}
+		return normalized;
+	}
+
+	private int resolveRequestLimit(int limit) {
+		if (limit < 1) {
+			return REQUEST_DEFAULT_LIMIT;
+		}
+		return Math.min(limit, MAX_LIMIT);
+	}
+
+	private List<Long> cleanIds(List<Long> imageFileIds) {
+		if (imageFileIds == null || imageFileIds.isEmpty()) {
+			return List.of();
+		}
+		return imageFileIds.stream().filter(id -> id != null).toList();
 	}
 
 	private void insertImages(Long tagId, List<Long> imageFileIds) {
@@ -205,33 +380,71 @@ public class TagService {
 	}
 
 	private TagResponse toResponse(Tag tag) {
-		return toResponse(tag, null);
+		return toResponse(tag, null, null);
 	}
 
-	private TagResponse toResponse(Tag tag, Integer feedCount) {
-		List<Long> imageFileIds = tagMapper.findImageFileIdsByTagId(tag.getTagId());
-		List<Long> ids = imageFileIds != null ? imageFileIds : List.of();
-		Map<Long, FileSummaryResponse> files = fileService.findSummaries(ids);
-		List<FileSummaryResponse> images = ids.stream()
-				.map(files::get)
-				.filter(f -> f != null)
-				.toList();
+	private TagResponse toResponse(Tag tag, Integer feedCount, Long viewerUserNo) {
+		boolean published = "APPROVED".equals(tag.getProfileStatus());
+		List<Long> ids = List.of();
+		List<FileSummaryResponse> images = List.of();
+		if (published) {
+			List<Long> imageFileIds = tagMapper.findImageFileIdsByTagId(tag.getTagId());
+			ids = imageFileIds != null ? imageFileIds : List.of();
+			images = summaries(ids);
+		}
+		TagProfileRequestResponse mine = null;
+		if (viewerUserNo != null) {
+			TagProfileRequest latest = tagMapper.findLatestByTagAndRequester(tag.getTagId(), viewerUserNo);
+			if (latest != null) {
+				mine = toRequestResponse(latest);
+			}
+		}
 		return TagResponse.builder()
 				.tagId(tag.getTagId())
 				.hashtag(tag.getHashtag())
-				.title(tag.getTitle())
+				.purpose(tag.getPurpose())
+				.profileStatus(tag.getProfileStatus())
+				.title(published ? tag.getTitle() : null)
 				.handle(tag.getHandle())
 				.handleChangedAt(tag.getHandleChangedAt())
-				.content(tag.getContent())
-				.link(tag.getLink())
+				.content(published ? tag.getContent() : null)
+				.link(published ? tag.getLink() : null)
 				.useCount(tag.getUseCount())
 				.feedCount(feedCount)
 				.createdByUserNo(tag.getCreatedByUserNo())
 				.imageFileIds(ids)
 				.images(images)
+				.profileRequest(mine)
 				.createdAt(tag.getCreatedAt())
 				.updatedAt(tag.getUpdatedAt())
 				.build();
+	}
+
+	private TagProfileRequestResponse toRequestResponse(TagProfileRequest row) {
+		List<Long> ids = tagMapper.findRequestImageFileIds(row.getTagProfileRequestId());
+		if (ids == null) {
+			ids = List.of();
+		}
+		return TagProfileRequestResponse.builder()
+				.requestId(row.getTagProfileRequestId())
+				.tagId(row.getTagId())
+				.hashtag(row.getHashtag())
+				.requesterUserNo(row.getRequesterUserNo())
+				.title(row.getTitle())
+				.content(row.getContent())
+				.link(row.getLink())
+				.imageFileIds(ids)
+				.images(summaries(ids))
+				.status(row.getStatus())
+				.rejectMessage(row.getRejectMessage())
+				.createdAt(row.getCreatedAt())
+				.reviewedAt(row.getReviewedAt())
+				.build();
+	}
+
+	private List<FileSummaryResponse> summaries(List<Long> ids) {
+		Map<Long, FileSummaryResponse> files = fileService.findSummaries(ids);
+		return ids.stream().map(files::get).filter(file -> file != null).toList();
 	}
 
 	private int resolveLimit(Integer limit) {

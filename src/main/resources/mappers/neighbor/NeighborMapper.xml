@@ -83,13 +83,18 @@
 			receiver_user_no,
 			pair_key,
 			status,
-			requested_at
+			requested_at,
+			accepted_at
 		) VALUES (
 			#{requesterUserNo},
 			#{receiverUserNo},
 			#{pairKey},
 			#{status},
-			NOW()
+			NOW(),
+			<choose>
+				<when test="status == 'ACCEPTED'">NOW()</when>
+				<otherwise>NULL</otherwise>
+			</choose>
 		)
 	</insert>
 
@@ -97,6 +102,8 @@
 		UPDATE ultary_neighbor
 		SET status = 'ACCEPTED',
 			accepted_at = NOW(),
+			followed_back = 1,
+			followed_back_at = NOW(),
 			rejected_at = NULL,
 			blocked_at = NULL
 		WHERE neighbor_id = #{neighborId}
@@ -116,11 +123,14 @@
 		UPDATE ultary_neighbor
 		SET requester_user_no = #{requesterUserNo},
 			receiver_user_no = #{receiverUserNo},
-			status = 'PENDING',
+			status = #{status},
 			followed_back = 0,
 			followed_back_at = NULL,
 			requested_at = NOW(),
-			accepted_at = NULL,
+			accepted_at = <choose>
+				<when test="status == 'ACCEPTED'">NOW()</when>
+				<otherwise>NULL</otherwise>
+			</choose>,
 			rejected_at = NULL,
 			blocked_at = NULL
 		WHERE neighbor_id = #{neighborId}

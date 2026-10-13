@@ -5,6 +5,7 @@ import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import me._hanho.ultary.domain.notification.model.NeighborNotice;
 import me._hanho.ultary.domain.notification.model.NotificationDraft;
 import me._hanho.ultary.domain.notification.model.NotificationListRow;
 import me._hanho.ultary.domain.notification.model.NotificationUpsert;
@@ -72,7 +73,15 @@ public interface NotificationMapper {
 
 	NotificationDraft findStoryLike(@Param("storyId") Long storyId);
 
-	NotificationDraft findNeighborRequest(@Param("neighborId") Long neighborId);
+	NeighborNotice findNeighborNotice(@Param("neighborId") Long neighborId);
+
+	int deleteStaleNeighborNotices(
+			@Param("neighborId") Long neighborId,
+			@Param("receiverUserNo") Long receiverUserNo,
+			@Param("requestGroupKey") String requestGroupKey,
+			@Param("requesterUserNo") Long requesterUserNo,
+			@Param("followGroupKey") String followGroupKey,
+			@Param("keepFollowNotice") boolean keepFollowNotice);
 
 	List<Long> findFeedTagReceivers(@Param("feedId") Long feedId);
 

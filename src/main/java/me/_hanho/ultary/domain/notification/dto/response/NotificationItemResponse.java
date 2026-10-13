@@ -28,8 +28,10 @@ public class NotificationItemResponse {
 	private Long feedReplyId;
 	private Long storyId;
 	private Long neighborId;
-	/** PENDING 일 때만 수락 버튼. 팔로우 신청이 아니면 null */
+	/** PENDING | ACCEPTED | REJECTED. 팔로우 알림이 아니면 null */
 	private String neighborStatus;
+	/** 이 알림을 받은 내가 행위자를 팔로우 중이면 true. 팔로우 알림이 아니면 false */
+	private boolean following;
 	private boolean read;
 	private LocalDateTime updatedAt;
 }

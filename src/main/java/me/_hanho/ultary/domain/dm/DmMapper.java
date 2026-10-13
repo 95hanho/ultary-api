@@ -9,6 +9,7 @@ import me._hanho.ultary.domain.dm.model.DmMessage;
 import me._hanho.ultary.domain.dm.model.DmMessageRow;
 import me._hanho.ultary.domain.dm.model.DmRoom;
 import me._hanho.ultary.domain.dm.model.DmRoomRow;
+import me._hanho.ultary.domain.dm.model.ShareTargetRow;
 
 @Mapper
 public interface DmMapper {
@@ -35,6 +36,8 @@ public interface DmMapper {
 	Long findLatestMessageId(@Param("dmRoomId") Long dmRoomId);
 
 	List<DmRoomRow> findRooms(@Param("userNo") Long userNo, @Param("limit") int limit);
+
+	List<ShareTargetRow> findShareCandidates(@Param("userNo") Long userNo);
 
 	DmRoomRow findRoomRow(@Param("userNo") Long userNo, @Param("dmRoomId") Long dmRoomId);
 

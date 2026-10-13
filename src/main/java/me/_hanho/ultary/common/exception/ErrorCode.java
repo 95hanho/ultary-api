@@ -109,6 +109,9 @@ public enum ErrorCode {
 	TAG_HANDLE_DUPLICATED("TAG_HANDLE_DUPLICATED", "이미 사용 중인 태그 핸들입니다.", HttpStatus.CONFLICT),
 	TAG_HANDLE_CHANGE_COOLDOWN("TAG_HANDLE_CHANGE_COOLDOWN", "태그 핸들은 변경 후 30일간 다시 변경할 수 없습니다.", HttpStatus.BAD_REQUEST),
 	TAG_HANDLE_REQUIRED("TAG_HANDLE_REQUIRED", "핸들은 비울 수 없습니다.", HttpStatus.BAD_REQUEST),
+	TAG_PROFILE_REQUEST_OPEN("TAG_PROFILE_REQUEST_OPEN", "이미 승인 대기 중인 태그 설명이 있습니다.", HttpStatus.CONFLICT),
+	TAG_PROFILE_REQUEST_EMPTY("TAG_PROFILE_REQUEST_EMPTY", "태그에 넣을 제목, 소개, 링크, 이미지 중 하나는 필요합니다.", HttpStatus.BAD_REQUEST),
+	TAG_PROFILE_REQUEST_NOT_FOUND("TAG_PROFILE_REQUEST_NOT_FOUND", "승인 대기 중인 태그 설명이 없습니다.", HttpStatus.NOT_FOUND),
 
 	// ==============================
 	// 알림 (notification)
