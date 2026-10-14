@@ -148,6 +148,8 @@
 			is_default_nickname,
 			email,
 			phone,
+			region_sido,
+			region_sigungu,
 			withdrawal_status
 		) VALUES (
 			#{password},
@@ -156,6 +158,8 @@
 			#{isDefaultNickname},
 			#{email},
 			#{phone},
+			#{regionSido},
+			#{regionSigungu},
 			'ACTIVE'
 		)
 	</insert>

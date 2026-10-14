@@ -357,6 +357,9 @@ public class AuthService {
 		user.setName(StringUtils.hasText(request.getName()) ? request.getName() : null);
 		user.setEmail(email);
 		user.setPhone(phone);
+		user.setRegionSido(StringUtils.hasText(request.getRegionSido()) ? request.getRegionSido().trim() : null);
+		user.setRegionSigungu(
+				StringUtils.hasText(request.getRegionSigungu()) ? request.getRegionSigungu().trim() : null);
 		userMapper.insert(user);
 	}
 

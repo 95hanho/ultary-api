@@ -1,7 +1,5 @@
 package me._hanho.ultary.domain.admin;
 
-import java.util.List;
-
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -17,7 +15,9 @@ import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.response.ApiResponse;
 import me._hanho.ultary.domain.admin.dto.request.RejectTagProfileRequest;
 import me._hanho.ultary.domain.admin.dto.response.UserSuspendResponse;
+import me._hanho.ultary.domain.report.dto.response.ReportPageResponse;
 import me._hanho.ultary.domain.report.dto.response.ReportResponse;
+import me._hanho.ultary.domain.tag.dto.response.TagProfileRequestPageResponse;
 import me._hanho.ultary.domain.tag.dto.response.TagProfileRequestResponse;
 import me._hanho.ultary.security.principal.AdminPrincipal;
 
@@ -31,11 +31,14 @@ public class AdminController {
 	private final AdminService adminService;
 
 	@GetMapping("/tags/profile-requests")
-	public ApiResponse<List<TagProfileRequestResponse>> tagProfileRequests(
+	public ApiResponse<TagProfileRequestPageResponse> tagProfileRequests(
 			@RequestParam(required = false) String status,
+			@RequestParam(required = false) Long cursorRequestId,
 			@RequestParam(defaultValue = "30") int limit) {
-		log.info("[tagProfileRequests] status={} limit={}", status, limit);
-		return ApiResponse.ok(adminService.listTagProfileRequests(status, limit), "태그 설명 요청 조회 성공");
+		log.info("[tagProfileRequests] status={} cursorRequestId={} limit={}", status, cursorRequestId, limit);
+		return ApiResponse.ok(
+				adminService.listTagProfileRequests(status, cursorRequestId, limit),
+				"태그 설명 요청 조회 성공");
 	}
 
 	@PostMapping("/tags/{tagId}/approve")
@@ -71,10 +74,11 @@ public class AdminController {
 	}
 
 	@GetMapping("/reports")
-	public ApiResponse<List<ReportResponse>> reports(
+	public ApiResponse<ReportPageResponse> reports(
 			@RequestParam(required = false) String status,
+			@RequestParam(required = false) Long cursorReportId,
 			@RequestParam(defaultValue = "30") int limit) {
-		return ApiResponse.ok(adminService.listReports(status, limit));
+		return ApiResponse.ok(adminService.listReports(status, cursorReportId, limit));
 	}
 
 	@PostMapping("/reports/{reportId}/delete-content")

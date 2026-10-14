@@ -185,6 +185,7 @@
 		r.tag_id,
 		t.hashtag,
 		r.requester_user_no,
+		u.nickname AS requester_nickname,
 		r.title,
 		r.content,
 		r.link,
@@ -238,6 +239,7 @@
 		SELECT <include refid="profileRequestColumns"/>
 		FROM ultary_tag_profile_request r
 		JOIN ultary_tag t ON t.tag_id = r.tag_id
+		LEFT JOIN ultary_user u ON u.user_no = r.requester_user_no
 		WHERE r.tag_profile_request_id = #{tagProfileRequestId}
 	</select>
 
@@ -245,6 +247,7 @@
 		SELECT <include refid="profileRequestColumns"/>
 		FROM ultary_tag_profile_request r
 		JOIN ultary_tag t ON t.tag_id = r.tag_id
+		LEFT JOIN ultary_user u ON u.user_no = r.requester_user_no
 		WHERE r.tag_id = #{tagId}
 		  AND r.status = 'PENDING'
 		ORDER BY r.tag_profile_request_id DESC
@@ -255,6 +258,7 @@
 		SELECT <include refid="profileRequestColumns"/>
 		FROM ultary_tag_profile_request r
 		JOIN ultary_tag t ON t.tag_id = r.tag_id
+		LEFT JOIN ultary_user u ON u.user_no = r.requester_user_no
 		WHERE r.tag_id = #{tagId}
 		  AND r.requester_user_no = #{requesterUserNo}
 		ORDER BY r.tag_profile_request_id DESC
@@ -265,6 +269,7 @@
 		SELECT <include refid="profileRequestColumns"/>
 		FROM ultary_tag_profile_request r
 		JOIN ultary_tag t ON t.tag_id = r.tag_id
+		LEFT JOIN ultary_user u ON u.user_no = r.requester_user_no
 		WHERE 1 = 1
 		<if test="requesterUserNo != null">
 			AND r.requester_user_no = #{requesterUserNo}
@@ -272,7 +277,22 @@
 		<if test="status != null and status != ''">
 			AND r.status = #{status}
 		</if>
-		ORDER BY r.tag_profile_request_id DESC
+		<if test="cursorRequestId != null">
+			AND (
+				r.created_at &lt; (
+					SELECT c.created_at FROM ultary_tag_profile_request c
+					WHERE c.tag_profile_request_id = #{cursorRequestId}
+				)
+				OR (
+					r.created_at = (
+						SELECT c.created_at FROM ultary_tag_profile_request c
+						WHERE c.tag_profile_request_id = #{cursorRequestId}
+					)
+					AND r.tag_profile_request_id &lt; #{cursorRequestId}
+				)
+			)
+		</if>
+		ORDER BY r.created_at DESC, r.tag_profile_request_id DESC
 		LIMIT #{limit}
 	</select>
 

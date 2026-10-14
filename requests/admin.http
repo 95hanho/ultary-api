@@ -43,7 +43,8 @@ POST {{baseUrl}}/api/v1/admin/users/104/unsuspend
 Authorization: Bearer {{adminAccessToken}}
 
 ### 3. 신고 목록
-GET {{baseUrl}}/api/v1/admin/reports?status=REQUESTED&limit=30
+# status 를 빼면 전체 최신순. 다음 페이지는 cursorReportId=직전 nextCursorReportId
+GET {{baseUrl}}/api/v1/admin/reports?limit=30
 Authorization: Bearer {{adminAccessToken}}
 
 # 4~6의 reportId는 목록 항목으로 바꾼다.
@@ -70,7 +71,8 @@ POST {{baseUrl}}/api/v1/admin/reports/1/confirm
 Authorization: Bearer {{adminAccessToken}}
 
 ### 8a. 상업 태그 설명 요청 목록
-GET {{baseUrl}}/api/v1/admin/tags/profile-requests?status=PENDING&limit=30
+# status 를 빼면 전체 최신순. 다음 페이지는 cursorRequestId=직전 nextCursorRequestId
+GET {{baseUrl}}/api/v1/admin/tags/profile-requests?limit=30
 Authorization: Bearer {{adminAccessToken}}
 
 ### 8b. 상업 태그 설명 승인

@@ -12,9 +12,11 @@ import me._hanho.ultary.domain.admin.dto.response.UserSuspendResponse;
 import me._hanho.ultary.domain.auth.TokenMapper;
 import me._hanho.ultary.domain.feed.FeedService;
 import me._hanho.ultary.domain.report.ReportService;
+import me._hanho.ultary.domain.report.dto.response.ReportPageResponse;
 import me._hanho.ultary.domain.report.dto.response.ReportResponse;
 import me._hanho.ultary.domain.report.model.Report;
 import me._hanho.ultary.domain.tag.TagService;
+import me._hanho.ultary.domain.tag.dto.response.TagProfileRequestPageResponse;
 import me._hanho.ultary.domain.tag.dto.response.TagProfileRequestResponse;
 import me._hanho.ultary.domain.user.UserMapper;
 import me._hanho.ultary.domain.user.model.User;
@@ -29,8 +31,8 @@ public class AdminService {
 	private final FeedService feedService;
 	private final TagService tagService;
 
-	public List<TagProfileRequestResponse> listTagProfileRequests(String status, int limit) {
-		return tagService.listProfileRequestsForAdmin(status, limit);
+	public TagProfileRequestPageResponse listTagProfileRequests(String status, Long cursorRequestId, int limit) {
+		return tagService.listProfileRequestsForAdmin(status, cursorRequestId, limit);
 	}
 
 	public TagProfileRequestResponse approveTag(Long adminNo, Long tagId) {
@@ -69,8 +71,8 @@ public class AdminService {
 		return toResponse(userMapper.findByUserNo(userNo));
 	}
 
-	public List<ReportResponse> listReports(String status, int limit) {
-		return reportService.list(status, limit);
+	public ReportPageResponse listReports(String status, Long cursorReportId, int limit) {
+		return reportService.list(status, cursorReportId, limit);
 	}
 
 	@Transactional

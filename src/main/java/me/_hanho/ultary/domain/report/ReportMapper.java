@@ -25,6 +25,7 @@ public interface ReportMapper {
 
 	List<Report> findList(
 			@Param("status") String status,
+			@Param("cursorReportId") Long cursorReportId,
 			@Param("limit") int limit);
 
 	int close(

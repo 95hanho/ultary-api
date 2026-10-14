@@ -15,6 +15,7 @@ public class TagProfileRequestResponse {
 	private Long tagId;
 	private String hashtag;
 	private Long requesterUserNo;
+	private String requesterNickname;
 	private String title;
 	private String content;
 	private String link;

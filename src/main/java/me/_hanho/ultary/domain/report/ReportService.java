@@ -20,6 +20,7 @@ import me._hanho.ultary.domain.feed.model.FeedComment;
 import me._hanho.ultary.domain.feed.model.FeedReply;
 import me._hanho.ultary.domain.report.dto.request.CreateReportRequest;
 import me._hanho.ultary.domain.report.dto.response.MyReportResponse;
+import me._hanho.ultary.domain.report.dto.response.ReportPageResponse;
 import me._hanho.ultary.domain.report.dto.response.ReportResponse;
 import me._hanho.ultary.domain.report.model.Report;
 import me._hanho.ultary.domain.user.UserMapper;
@@ -94,13 +95,25 @@ public class ReportService {
 		return toResponse(reportMapper.findById(report.getReportId()));
 	}
 
-	public List<ReportResponse> list(String status, int limit) {
-		String normalized = status == null || status.isBlank() ? REQUESTED : status.trim().toUpperCase();
-		if (!STATUSES.contains(normalized)) {
-			throw new BusinessException(ErrorCode.INVALID_INPUT, "신고 상태가 올바르지 않습니다.");
+	public ReportPageResponse list(String status, Long cursorReportId, int limit) {
+		String normalized = null;
+		if (status != null && !status.isBlank()) {
+			normalized = status.trim().toUpperCase();
+			if (!STATUSES.contains(normalized)) {
+				throw new BusinessException(ErrorCode.INVALID_INPUT, "신고 상태가 올바르지 않습니다.");
+			}
 		}
 		int size = Math.min(Math.max(limit, 1), 50);
-		return reportMapper.findList(normalized, size).stream().map(this::toResponse).toList();
+		List<Report> rows = reportMapper.findList(normalized, cursorReportId, size + 1);
+		Long nextCursorReportId = null;
+		if (rows.size() > size) {
+			rows = rows.subList(0, size);
+			nextCursorReportId = rows.get(rows.size() - 1).getReportId();
+		}
+		return ReportPageResponse.builder()
+				.items(rows.stream().map(this::toResponse).toList())
+				.nextCursorReportId(nextCursorReportId)
+				.build();
 	}
 
 	public Report requireOpen(Long reportId) {
@@ -297,10 +310,23 @@ public class ReportService {
 				.targetCommentId(report.getTargetCommentId())
 				.targetReplyId(report.getTargetReplyId())
 				.reason(report.getReason())
+				.targetNickname(report.getTargetNickname())
+				.targetContent(preview(report.getTargetContent()))
 				.status(report.getStatus())
 				.createdAt(report.getCreatedAt())
 				.processedAt(report.getProcessedAt())
 				.build();
+	}
+
+	private String preview(String content) {
+		if (content == null) {
+			return null;
+		}
+		int count = content.codePointCount(0, content.length());
+		if (count <= 10) {
+			return content;
+		}
+		return content.substring(0, content.offsetByCodePoints(0, 10)) + "...";
 	}
 
 	private String normalize(String value) {

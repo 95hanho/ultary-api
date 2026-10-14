@@ -72,6 +72,7 @@ public interface TagMapper {
 	List<TagProfileRequest> findProfileRequests(
 			@Param("requesterUserNo") Long requesterUserNo,
 			@Param("status") String status,
+			@Param("cursorRequestId") Long cursorRequestId,
 			@Param("limit") int limit);
 
 	int insertRequestImage(

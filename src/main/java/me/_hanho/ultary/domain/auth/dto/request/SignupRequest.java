@@ -29,4 +29,10 @@ public class SignupRequest {
 
 	@Size(max = 50, message = "이메일은 50자 이하여야 합니다.")
 	private String email;
+
+	@Size(max = 30, message = "시/도는 30자 이하여야 합니다.")
+	private String regionSido;
+
+	@Size(max = 30, message = "시/군/구는 30자 이하여야 합니다.")
+	private String regionSigungu;
 }

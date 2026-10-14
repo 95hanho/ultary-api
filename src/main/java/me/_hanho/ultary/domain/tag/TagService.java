@@ -20,6 +20,7 @@ import me._hanho.ultary.domain.tag.dto.request.ChangeTagHandleRequest;
 import me._hanho.ultary.domain.tag.dto.request.CreateTagRequest;
 import me._hanho.ultary.domain.tag.dto.request.SubmitTagProfileRequest;
 import me._hanho.ultary.domain.tag.dto.request.UpdateTagRequest;
+import me._hanho.ultary.domain.tag.dto.response.TagProfileRequestPageResponse;
 import me._hanho.ultary.domain.tag.dto.response.TagProfileRequestResponse;
 import me._hanho.ultary.domain.tag.dto.response.TagResponse;
 import me._hanho.ultary.domain.tag.model.Tag;
@@ -146,18 +147,27 @@ public class TagService {
 
 	@Transactional(readOnly = true)
 	public List<TagProfileRequestResponse> listMyProfileRequests(Long userNo, String status, int limit) {
-		return tagMapper.findProfileRequests(userNo, normalizeRequestStatus(status, false), resolveRequestLimit(limit))
+		return tagMapper.findProfileRequests(
+						userNo, normalizeRequestStatus(status), null, resolveRequestLimit(limit))
 				.stream()
 				.map(this::toRequestResponse)
 				.toList();
 	}
 
 	@Transactional(readOnly = true)
-	public List<TagProfileRequestResponse> listProfileRequestsForAdmin(String status, int limit) {
-		return tagMapper.findProfileRequests(null, normalizeRequestStatus(status, true), resolveRequestLimit(limit))
-				.stream()
-				.map(this::toRequestResponse)
-				.toList();
+	public TagProfileRequestPageResponse listProfileRequestsForAdmin(String status, Long cursorRequestId, int limit) {
+		int size = resolveRequestLimit(limit);
+		List<TagProfileRequest> rows = tagMapper.findProfileRequests(
+				null, normalizeRequestStatus(status), cursorRequestId, size + 1);
+		Long nextCursorRequestId = null;
+		if (rows.size() > size) {
+			rows = rows.subList(0, size);
+			nextCursorRequestId = rows.get(rows.size() - 1).getTagProfileRequestId();
+		}
+		return TagProfileRequestPageResponse.builder()
+				.items(rows.stream().map(this::toRequestResponse).toList())
+				.nextCursorRequestId(nextCursorRequestId)
+				.build();
 	}
 
 	@Transactional
@@ -300,9 +310,9 @@ public class TagService {
 		return row;
 	}
 
-	private String normalizeRequestStatus(String status, boolean defaultPending) {
+	private String normalizeRequestStatus(String status) {
 		if (status == null || status.isBlank()) {
-			return defaultPending ? "PENDING" : null;
+			return null;
 		}
 		String normalized = status.trim().toUpperCase();
 		if (!REQUEST_STATUSES.contains(normalized)) {
@@ -430,6 +440,7 @@ public class TagService {
 				.tagId(row.getTagId())
 				.hashtag(row.getHashtag())
 				.requesterUserNo(row.getRequesterUserNo())
+				.requesterNickname(row.getRequesterNickname())
 				.title(row.getTitle())
 				.content(row.getContent())
 				.link(row.getLink())

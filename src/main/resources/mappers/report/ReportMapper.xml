@@ -69,14 +69,56 @@
 	</select>
 
 	<select id="findList" resultType="me._hanho.ultary.domain.report.model.Report">
-		SELECT <include refid="reportColumns" />
-		FROM ultary_report
+		SELECT
+			r.report_id,
+			r.reporter_user_no,
+			r.target_type,
+			r.target_user_no,
+			r.target_pet_id,
+			r.target_feed_id,
+			r.target_comment_id,
+			r.target_reply_id,
+			r.reason,
+			r.status,
+			r.admin_no,
+			r.processed_at,
+			r.created_at,
+			r.updated_at,
+			u.nickname AS target_nickname,
+			CASE r.target_type
+				WHEN 'FEED' THEN f.content
+				WHEN 'COMMENT' THEN c.content
+				WHEN 'REPLY' THEN rp.content
+				ELSE NULL
+			END AS target_content
+		FROM ultary_report r
+		LEFT JOIN ultary_user u
+			ON r.target_type = 'USER' AND u.user_no = r.target_user_no
+		LEFT JOIN ultary_feed f
+			ON r.target_type = 'FEED' AND f.feed_id = r.target_feed_id
+		LEFT JOIN ultary_feed_comment c
+			ON r.target_type = 'COMMENT' AND c.feed_comment_id = r.target_comment_id
+		LEFT JOIN ultary_feed_reply rp
+			ON r.target_type = 'REPLY' AND rp.feed_reply_id = r.target_reply_id
 		<where>
 			<if test="status != null and status != ''">
-				status = #{status}
+				r.status = #{status}
+			</if>
+			<if test="cursorReportId != null">
+				AND (
+					r.created_at &lt; (
+						SELECT c2.created_at FROM ultary_report c2 WHERE c2.report_id = #{cursorReportId}
+					)
+					OR (
+						r.created_at = (
+							SELECT c2.created_at FROM ultary_report c2 WHERE c2.report_id = #{cursorReportId}
+						)
+						AND r.report_id &lt; #{cursorReportId}
+					)
+				)
 			</if>
 		</where>
-		ORDER BY created_at DESC, report_id DESC
+		ORDER BY r.created_at DESC, r.report_id DESC
 		LIMIT #{limit}
 	</select>
 
