@@ -774,19 +774,20 @@
 
 	<select id="findActiveComment" resultType="me._hanho.ultary.domain.feed.model.FeedComment">
 		SELECT
-			feed_comment_id,
-			feed_id,
-			user_no,
-			content,
-			like_count,
-			created_at,
-			updated_at,
-			is_deleted,
-			deleted_at
-		FROM ultary_feed_comment
-		WHERE feed_comment_id = #{commentId}
-		  AND feed_id = #{feedId}
-		  AND is_deleted = 0
+			c.feed_comment_id,
+			c.feed_id,
+			c.user_no,
+			c.content,
+			c.like_count,
+			c.created_at,
+			c.updated_at,
+			c.is_deleted,
+			c.deleted_at
+		FROM ultary_feed_comment c
+		INNER JOIN ultary_user u ON u.user_no = c.user_no AND u.withdrawal_status = 'ACTIVE'
+		WHERE c.feed_comment_id = #{commentId}
+		  AND c.feed_id = #{feedId}
+		  AND c.is_deleted = 0
 	</select>
 
 	<select id="findActiveComments" resultType="me._hanho.ultary.domain.feed.model.FeedComment">
@@ -811,7 +812,7 @@
 				LIMIT 1
 			) AS authorProfileFileId
 		FROM ultary_feed_comment c
-		INNER JOIN ultary_user u ON u.user_no = c.user_no
+		INNER JOIN ultary_user u ON u.user_no = c.user_no AND u.withdrawal_status = 'ACTIVE'
 		WHERE c.feed_id = #{feedId}
 		  AND c.is_deleted = 0
 		ORDER BY c.created_at ASC
@@ -822,15 +823,17 @@
 		SELECT
 			(
 				SELECT COUNT(1)
-				FROM ultary_feed_comment
-				WHERE feed_id = #{feedId}
-				  AND is_deleted = 0
+				FROM ultary_feed_comment c
+				INNER JOIN ultary_user u ON u.user_no = c.user_no AND u.withdrawal_status = 'ACTIVE'
+				WHERE c.feed_id = #{feedId}
+				  AND c.is_deleted = 0
 			)
 			+
 			(
 				SELECT COUNT(1)
 				FROM ultary_feed_reply r
 				INNER JOIN ultary_feed_comment c ON c.feed_comment_id = r.feed_comment_id
+				INNER JOIN ultary_user u ON u.user_no = r.user_no AND u.withdrawal_status = 'ACTIVE'
 				WHERE c.feed_id = #{feedId}
 				  AND c.is_deleted = 0
 				  AND r.is_deleted = 0
@@ -839,9 +842,10 @@
 
 	<select id="countActiveRepliesByCommentId" resultType="int">
 		SELECT COUNT(1)
-		FROM ultary_feed_reply
-		WHERE feed_comment_id = #{commentId}
-		  AND is_deleted = 0
+		FROM ultary_feed_reply r
+		INNER JOIN ultary_user u ON u.user_no = r.user_no AND u.withdrawal_status = 'ACTIVE'
+		WHERE r.feed_comment_id = #{commentId}
+		  AND r.is_deleted = 0
 	</select>
 
 	<update id="updateCommentContent">
@@ -925,19 +929,20 @@
 
 	<select id="findActiveReply" resultType="me._hanho.ultary.domain.feed.model.FeedReply">
 		SELECT
-			feed_reply_id,
-			feed_comment_id,
-			user_no,
-			content,
-			like_count,
-			created_at,
-			updated_at,
-			is_deleted,
-			deleted_at
-		FROM ultary_feed_reply
-		WHERE feed_reply_id = #{replyId}
-		  AND feed_comment_id = #{commentId}
-		  AND is_deleted = 0
+			r.feed_reply_id,
+			r.feed_comment_id,
+			r.user_no,
+			r.content,
+			r.like_count,
+			r.created_at,
+			r.updated_at,
+			r.is_deleted,
+			r.deleted_at
+		FROM ultary_feed_reply r
+		INNER JOIN ultary_user u ON u.user_no = r.user_no AND u.withdrawal_status = 'ACTIVE'
+		WHERE r.feed_reply_id = #{replyId}
+		  AND r.feed_comment_id = #{commentId}
+		  AND r.is_deleted = 0
 	</select>
 
 	<select id="findActiveReplies" resultType="me._hanho.ultary.domain.feed.model.FeedReply">
@@ -962,7 +967,7 @@
 				LIMIT 1
 			) AS authorProfileFileId
 		FROM ultary_feed_reply r
-		INNER JOIN ultary_user u ON u.user_no = r.user_no
+		INNER JOIN ultary_user u ON u.user_no = r.user_no AND u.withdrawal_status = 'ACTIVE'
 		WHERE r.feed_comment_id = #{commentId}
 		  AND r.is_deleted = 0
 		ORDER BY r.created_at ASC

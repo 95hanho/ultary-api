@@ -61,7 +61,13 @@ public interface TagMapper {
 			@Param("adminNo") Long adminNo,
 			@Param("rejectMessage") String rejectMessage);
 
+	/** 최신 요청을 대기로. 거절 멘트와 검토 시각을 비운다 */
+	int reopenProfileRequest(@Param("tagProfileRequestId") Long tagProfileRequestId);
+
 	TagProfileRequest findPendingByTagId(@Param("tagId") Long tagId);
+
+	/** 그 태그의 최신 설명 요청. 없으면 null */
+	TagProfileRequest findLatestByTagId(@Param("tagId") Long tagId);
 
 	TagProfileRequest findProfileRequestById(@Param("tagProfileRequestId") Long tagProfileRequestId);
 
@@ -74,6 +80,9 @@ public interface TagMapper {
 			@Param("status") String status,
 			@Param("cursorRequestId") Long cursorRequestId,
 			@Param("limit") int limit);
+
+	/** 관리자 목록. status가 없으면 전부. 커서와 limit는 세지 않는다 */
+	int countProfileRequests(@Param("status") String status);
 
 	int insertRequestImage(
 			@Param("tagProfileRequestId") Long tagProfileRequestId,
@@ -91,4 +100,7 @@ public interface TagMapper {
 	int applyApprovedProfile(TagProfileRequest request);
 
 	int markProfileRejected(@Param("tagId") Long tagId);
+
+	/** 공개 중인 설명을 숨긴다. 제목·소개·링크·이미지는 지우지 않는다 */
+	int hidePublishedProfile(@Param("tagId") Long tagId);
 }

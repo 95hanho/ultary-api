@@ -19,7 +19,7 @@ Spring Boot 3.4 / MyBatis / MariaDB 10.1 / 패키지 `me._hanho.ultary` / API pr
 
 ## 진행 상태 (커밋 메시지와 함께 갱신)
 
-- 스키마: **v27** (상업 태그 거절 멘트 `reject_message`. 태그 `purpose`는 v26)
+- 스키마: **v28** (신고 대상에서 `PET`·`target_pet_id` 제거. 거절 멘트는 v27, 태그 `purpose`는 v26)
 - 완료(스모크): auth, file, pet, tag, feed, myultary, story, neighbor(block 포함), **main**(feeds/search/recommended/최근검색), **notification**(목록·읽음, 배지는 소켓 `NOTIFICATION_UNREAD`), **dm**(방·메시지·게시글/스토리 공유. 공유 대상은 `GET /dm/share-targets`. 새 메시지는 `DM_MESSAGE`의 `room.following`·`followedBy`, 읽음은 `DM_READ`, 입력 중은 `DM_TYPING`), **report**(게시글·댓글·답글·유저. 사유 ENUM. 관리자 삭제·정지)
 - 로컬 시드(선택): `share/database/seed/mariadb_10_1/001_dev_sample_data.sql` — 재실행 가능, 운영에서는 제외. user **101~105**, pet 유저당 1~2. HTTP는 user 101 / `google-myultary-test-001`
 - HTTP: `requests/my-ultary.http`, `requests/story.http`, `requests/neighbor.http`, `requests/main.http`, `requests/notification.http`, `requests/dm.http`, `requests/ws.http` 등

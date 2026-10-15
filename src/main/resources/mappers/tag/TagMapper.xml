@@ -28,6 +28,7 @@
 		FROM ultary_tag
 		WHERE tag_id = #{tagId}
 		  AND is_deleted = 0
+		  AND <include refid="creatorNotSuspended"/>
 	</select>
 
 	<insert id="insert" useGeneratedKeys="true" keyProperty="tagId" keyColumn="tag_id">
@@ -88,6 +89,7 @@
 		SELECT <include refid="tagColumns"/>
 		FROM ultary_tag
 		WHERE is_deleted = 0
+		  AND <include refid="creatorNotSuspended"/>
 		  AND (
 			hashtag LIKE CONCAT('%', #{q}, '%')
 			OR (profile_status = 'APPROVED' AND IFNULL(title, '') LIKE CONCAT('%', #{q}, '%'))
@@ -112,6 +114,7 @@
 			) AS feedCount
 		FROM ultary_tag t
 		WHERE t.is_deleted = 0
+		  AND <include refid="creatorNotSuspended"/>
 		  AND t.hashtag LIKE CONCAT('%', #{q}, '%')
 		ORDER BY feedCount DESC, t.tag_id DESC
 		LIMIT #{limit}
@@ -121,6 +124,7 @@
 		SELECT <include refid="tagColumns"/>
 		FROM ultary_tag
 		WHERE is_deleted = 0
+		  AND <include refid="creatorNotSuspended"/>
 		<if test="q != null and q != ''">
 			AND (
 				hashtag LIKE CONCAT(#{q}, '%')
@@ -232,7 +236,16 @@
 			reviewed_by_admin_id = #{adminNo},
 			reviewed_at = NOW()
 		WHERE tag_profile_request_id = #{tagProfileRequestId}
-		  AND status = 'PENDING'
+	</update>
+
+	<update id="reopenProfileRequest">
+		UPDATE ultary_tag_profile_request
+		SET status = 'PENDING',
+			reject_message = NULL,
+			reviewed_by_admin_id = NULL,
+			reviewed_at = NULL,
+			updated_at = NOW()
+		WHERE tag_profile_request_id = #{tagProfileRequestId}
 	</update>
 
 	<select id="findProfileRequestById" resultType="me._hanho.ultary.domain.tag.model.TagProfileRequest">
@@ -251,6 +264,16 @@
 		WHERE r.tag_id = #{tagId}
 		  AND r.status = 'PENDING'
 		ORDER BY r.tag_profile_request_id DESC
+		LIMIT 1
+	</select>
+
+	<select id="findLatestByTagId" resultType="me._hanho.ultary.domain.tag.model.TagProfileRequest">
+		SELECT <include refid="profileRequestColumns"/>
+		FROM ultary_tag_profile_request r
+		JOIN ultary_tag t ON t.tag_id = r.tag_id
+		LEFT JOIN ultary_user u ON u.user_no = r.requester_user_no
+		WHERE r.tag_id = #{tagId}
+		ORDER BY r.created_at DESC, r.tag_profile_request_id DESC
 		LIMIT 1
 	</select>
 
@@ -274,6 +297,9 @@
 		<if test="requesterUserNo != null">
 			AND r.requester_user_no = #{requesterUserNo}
 		</if>
+		<if test="requesterUserNo == null">
+			AND (u.withdrawal_status IS NULL OR u.withdrawal_status &lt;&gt; 'SUSPENDED')
+		</if>
 		<if test="status != null and status != ''">
 			AND r.status = #{status}
 		</if>
@@ -295,6 +321,25 @@
 		ORDER BY r.created_at DESC, r.tag_profile_request_id DESC
 		LIMIT #{limit}
 	</select>
+
+	<select id="countProfileRequests" resultType="int">
+		SELECT COUNT(*)
+		FROM ultary_tag_profile_request r
+		LEFT JOIN ultary_user u ON u.user_no = r.requester_user_no
+		WHERE (u.withdrawal_status IS NULL OR u.withdrawal_status &lt;&gt; 'SUSPENDED')
+		<if test="status != null and status != ''">
+			AND r.status = #{status}
+		</if>
+	</select>
+
+	<sql id="creatorNotSuspended">
+		NOT EXISTS (
+			SELECT 1
+			FROM ultary_user suspended_creator
+			WHERE suspended_creator.user_no = created_by_user_no
+			  AND suspended_creator.withdrawal_status = 'SUSPENDED'
+		)
+	</sql>
 
 	<insert id="insertRequestImage">
 		INSERT INTO ultary_tag_profile_request_image (
@@ -352,6 +397,15 @@
 			updated_at = NOW()
 		WHERE tag_id = #{tagId}
 		  AND is_deleted = 0
+	</update>
+
+	<update id="hidePublishedProfile">
+		UPDATE ultary_tag
+		SET profile_status = 'PENDING',
+			updated_at = NOW()
+		WHERE tag_id = #{tagId}
+		  AND is_deleted = 0
+		  AND profile_status = 'APPROVED'
 	</update>
 
 	<update id="incrementUseCount">

@@ -12,10 +12,9 @@ public class Report {
 
 	private Long reportId;
 	private Long reporterUserNo;
-	/** USER | PET | FEED | COMMENT | REPLY */
+	/** USER | FEED | COMMENT | REPLY */
 	private String targetType;
 	private Long targetUserNo;
-	private Long targetPetId;
 	private Long targetFeedId;
 	private Long targetCommentId;
 	private Long targetReplyId;
@@ -24,6 +23,8 @@ public class Report {
 	private String targetNickname;
 	/** 목록 조회용. FEED·COMMENT·REPLY 본문 */
 	private String targetContent;
+	/** 대상 회원이 정지인지. 회원은 그 회원, 글·댓글·답글은 작성자 */
+	private boolean targetSuspended;
 	/** REQUESTED 신고요청 | CONFIRMED 확인 | DELETED 삭제조치 | REJECTED 거절 | ON_HOLD 보류 | SUSPENDED 정지 */
 	private String status;
 	private Long adminNo;

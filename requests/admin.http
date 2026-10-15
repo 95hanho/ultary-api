@@ -34,6 +34,11 @@ Content-Type: application/json
   "refreshToken": "{{adminRefreshToken}}"
 }
 
+### 0d. 메뉴 뱃지 건수
+# pendingTagRequestCount, requestedReportCount. 목록은 없다.
+GET {{baseUrl}}/api/v1/admin/menu-counts
+Authorization: Bearer {{adminAccessToken}}
+
 ### 1. 회원 정지
 POST {{baseUrl}}/api/v1/admin/users/104/suspend
 Authorization: Bearer {{adminAccessToken}}
@@ -44,7 +49,13 @@ Authorization: Bearer {{adminAccessToken}}
 
 ### 3. 신고 목록
 # status 를 빼면 전체 최신순. 다음 페이지는 cursorReportId=직전 nextCursorReportId
+# totalCount 는 그 status 의 전체 건수. 커서와 limit 는 세지 않는다
 GET {{baseUrl}}/api/v1/admin/reports?limit=30
+Authorization: Bearer {{adminAccessToken}}
+
+### 3a. 신고 상세
+# targetSuspended 는 대상 회원, 또는 글·댓글·답글 작성자가 정지인지
+GET {{baseUrl}}/api/v1/admin/reports/1
 Authorization: Bearer {{adminAccessToken}}
 
 # 4~6의 reportId는 목록 항목으로 바꾼다.
@@ -72,6 +83,7 @@ Authorization: Bearer {{adminAccessToken}}
 
 ### 8a. 상업 태그 설명 요청 목록
 # status 를 빼면 전체 최신순. 다음 페이지는 cursorRequestId=직전 nextCursorRequestId
+# totalCount 는 그 status 의 전체 건수. 커서와 limit 는 세지 않는다
 GET {{baseUrl}}/api/v1/admin/tags/profile-requests?limit=30
 Authorization: Bearer {{adminAccessToken}}
 
@@ -88,6 +100,11 @@ Content-Type: application/json
 {
   "rejectMessage": "소개 문구를 다시 적어 주세요"
 }
+
+### 8d. 상업 태그 설명 대기
+# 본문 없음. 최신 요청을 PENDING 으로. 승인으로 공개 중이면 설명을 숨긴다.
+POST {{baseUrl}}/api/v1/admin/tags/102/pending
+Authorization: Bearer {{adminAccessToken}}
 
 ### 9. 관리자 로그아웃
 # 이 관리자의 리프레시만 폐기한다. 회원 토큰은 그대로다.

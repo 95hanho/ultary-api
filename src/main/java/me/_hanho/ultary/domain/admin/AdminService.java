@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import me._hanho.ultary.common.exception.BusinessException;
 import me._hanho.ultary.common.exception.ErrorCode;
+import me._hanho.ultary.domain.admin.dto.response.AdminMenuCountResponse;
 import me._hanho.ultary.domain.admin.dto.response.UserSuspendResponse;
 import me._hanho.ultary.domain.auth.TokenMapper;
 import me._hanho.ultary.domain.feed.FeedService;
@@ -31,6 +32,14 @@ public class AdminService {
 	private final FeedService feedService;
 	private final TagService tagService;
 
+	@Transactional(readOnly = true)
+	public AdminMenuCountResponse menuCounts() {
+		return AdminMenuCountResponse.builder()
+				.pendingTagRequestCount(tagService.countPendingProfileRequests())
+				.requestedReportCount(reportService.countRequested())
+				.build();
+	}
+
 	public TagProfileRequestPageResponse listTagProfileRequests(String status, Long cursorRequestId, int limit) {
 		return tagService.listProfileRequestsForAdmin(status, cursorRequestId, limit);
 	}
@@ -41,6 +50,10 @@ public class AdminService {
 
 	public TagProfileRequestResponse rejectTag(Long adminNo, Long tagId, String rejectMessage) {
 		return tagService.rejectProfile(adminNo, tagId, rejectMessage);
+	}
+
+	public TagProfileRequestResponse reopenTag(Long tagId) {
+		return tagService.reopenProfile(tagId);
 	}
 
 	@Transactional
@@ -73,6 +86,10 @@ public class AdminService {
 
 	public ReportPageResponse listReports(String status, Long cursorReportId, int limit) {
 		return reportService.list(status, cursorReportId, limit);
+	}
+
+	public ReportResponse getReport(Long reportId) {
+		return reportService.get(reportId);
 	}
 
 	@Transactional

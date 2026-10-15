@@ -155,10 +155,16 @@ public class TagService {
 	}
 
 	@Transactional(readOnly = true)
+	public int countPendingProfileRequests() {
+		return tagMapper.countProfileRequests("PENDING");
+	}
+
+	@Transactional(readOnly = true)
 	public TagProfileRequestPageResponse listProfileRequestsForAdmin(String status, Long cursorRequestId, int limit) {
+		String normalized = normalizeRequestStatus(status);
 		int size = resolveRequestLimit(limit);
 		List<TagProfileRequest> rows = tagMapper.findProfileRequests(
-				null, normalizeRequestStatus(status), cursorRequestId, size + 1);
+				null, normalized, cursorRequestId, size + 1);
 		Long nextCursorRequestId = null;
 		if (rows.size() > size) {
 			rows = rows.subList(0, size);
@@ -167,34 +173,57 @@ public class TagService {
 		return TagProfileRequestPageResponse.builder()
 				.items(rows.stream().map(this::toRequestResponse).toList())
 				.nextCursorRequestId(nextCursorRequestId)
+				.totalCount(tagMapper.countProfileRequests(normalized))
 				.build();
 	}
 
+	/** 최신 요청을 승인한다. 대기·승인·거절 모두 다시 승인할 수 있다. */
 	@Transactional
 	public TagProfileRequestResponse approveProfile(Long adminNo, Long tagId) {
-		TagProfileRequest pending = requirePending(tagId);
-		if (tagMapper.reviewProfileRequest(pending.getTagProfileRequestId(), "APPROVED", adminNo, null) == 0) {
+		TagProfileRequest latest = requireLatest(tagId);
+		if (tagMapper.reviewProfileRequest(latest.getTagProfileRequestId(), "APPROVED", adminNo, null) == 0) {
 			throw new BusinessException(ErrorCode.TAG_PROFILE_REQUEST_NOT_FOUND);
 		}
-		tagMapper.applyApprovedProfile(pending);
+		tagMapper.applyApprovedProfile(latest);
 		tagMapper.deleteImagesByTagId(tagId);
-		insertImages(tagId, tagMapper.findRequestImageFileIds(pending.getTagProfileRequestId()));
+		insertImages(tagId, tagMapper.findRequestImageFileIds(latest.getTagProfileRequestId()));
 		log.info("[approveProfile] tagId={} requestId={} adminNo={}",
-				tagId, pending.getTagProfileRequestId(), adminNo);
-		return toRequestResponse(reloadRequest(pending.getTagProfileRequestId()));
+				tagId, latest.getTagProfileRequestId(), adminNo);
+		return toRequestResponse(reloadRequest(latest.getTagProfileRequestId()));
 	}
 
+	/** 최신 요청을 거절한다. 이미 공개된 설명은 그대로 둔다. */
 	@Transactional
 	public TagProfileRequestResponse rejectProfile(Long adminNo, Long tagId, String rejectMessage) {
-		TagProfileRequest pending = requirePending(tagId);
+		TagProfileRequest latest = requireLatest(tagId);
 		String message = blankToNull(rejectMessage);
-		if (tagMapper.reviewProfileRequest(pending.getTagProfileRequestId(), "REJECTED", adminNo, message) == 0) {
+		if (tagMapper.reviewProfileRequest(latest.getTagProfileRequestId(), "REJECTED", adminNo, message) == 0) {
 			throw new BusinessException(ErrorCode.TAG_PROFILE_REQUEST_NOT_FOUND);
 		}
 		tagMapper.markProfileRejected(tagId);
 		log.info("[rejectProfile] tagId={} requestId={} adminNo={}",
-				tagId, pending.getTagProfileRequestId(), adminNo);
-		return toRequestResponse(reloadRequest(pending.getTagProfileRequestId()));
+				tagId, latest.getTagProfileRequestId(), adminNo);
+		return toRequestResponse(reloadRequest(latest.getTagProfileRequestId()));
+	}
+
+	/**
+	 * 최신 요청을 대기로 되돌린다.
+	 * 그 요청이 승인으로 공개 중이면 설명을 숨긴다.
+	 * 거절을 대기로 되돌릴 때 이전에 공개된 설명은 그대로 둔다.
+	 */
+	@Transactional
+	public TagProfileRequestResponse reopenProfile(Long tagId) {
+		TagProfileRequest latest = requireLatest(tagId);
+		boolean wasApproved = "APPROVED".equals(latest.getStatus());
+		if (tagMapper.reopenProfileRequest(latest.getTagProfileRequestId()) == 0) {
+			throw new BusinessException(ErrorCode.TAG_PROFILE_REQUEST_NOT_FOUND);
+		}
+		if (wasApproved) {
+			tagMapper.hidePublishedProfile(tagId);
+		}
+		log.info("[reopenProfile] tagId={} requestId={} wasApproved={}",
+				tagId, latest.getTagProfileRequestId(), wasApproved);
+		return toRequestResponse(reloadRequest(latest.getTagProfileRequestId()));
 	}
 
 	@Transactional(readOnly = true)
@@ -293,13 +322,13 @@ public class TagService {
 		}
 	}
 
-	private TagProfileRequest requirePending(Long tagId) {
+	private TagProfileRequest requireLatest(Long tagId) {
 		requireActive(tagId);
-		TagProfileRequest pending = tagMapper.findPendingByTagId(tagId);
-		if (pending == null) {
+		TagProfileRequest latest = tagMapper.findLatestByTagId(tagId);
+		if (latest == null) {
 			throw new BusinessException(ErrorCode.TAG_PROFILE_REQUEST_NOT_FOUND);
 		}
-		return pending;
+		return latest;
 	}
 
 	private TagProfileRequest reloadRequest(Long requestId) {

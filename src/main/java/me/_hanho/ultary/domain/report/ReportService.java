@@ -95,6 +95,11 @@ public class ReportService {
 		return toResponse(reportMapper.findById(report.getReportId()));
 	}
 
+	@Transactional(readOnly = true)
+	public int countRequested() {
+		return reportMapper.countList("REQUESTED");
+	}
+
 	public ReportPageResponse list(String status, Long cursorReportId, int limit) {
 		String normalized = null;
 		if (status != null && !status.isBlank()) {
@@ -113,6 +118,7 @@ public class ReportService {
 		return ReportPageResponse.builder()
 				.items(rows.stream().map(this::toResponse).toList())
 				.nextCursorReportId(nextCursorReportId)
+				.totalCount(reportMapper.countList(normalized))
 				.build();
 	}
 
@@ -127,12 +133,25 @@ public class ReportService {
 		return report;
 	}
 
+	private Report requireAdmin(Long reportId) {
+		Report report = reportMapper.findAdminById(reportId);
+		if (report == null) {
+			throw new BusinessException(ErrorCode.REPORT_NOT_FOUND);
+		}
+		return report;
+	}
+
 	@Transactional
 	public ReportResponse close(Long reportId, String status) {
 		if (reportMapper.close(reportId, status) == 0) {
 			throw new BusinessException(ErrorCode.REPORT_ALREADY_CLOSED);
 		}
-		return toResponse(reportMapper.findById(reportId));
+		return toResponse(requireAdmin(reportId));
+	}
+
+	@Transactional(readOnly = true)
+	public ReportResponse get(Long reportId) {
+		return toResponse(requireAdmin(reportId));
 	}
 
 	@Transactional
@@ -147,7 +166,7 @@ public class ReportService {
 		if (reportMapper.confirm(reportId) == 0) {
 			throw new BusinessException(ErrorCode.REPORT_ALREADY_CLOSED);
 		}
-		return toResponse(reportMapper.findById(reportId));
+		return toResponse(requireAdmin(reportId));
 	}
 
 	@Transactional
@@ -312,6 +331,7 @@ public class ReportService {
 				.reason(report.getReason())
 				.targetNickname(report.getTargetNickname())
 				.targetContent(preview(report.getTargetContent()))
+				.targetSuspended(report.isTargetSuspended())
 				.status(report.getStatus())
 				.createdAt(report.getCreatedAt())
 				.processedAt(report.getProcessedAt())

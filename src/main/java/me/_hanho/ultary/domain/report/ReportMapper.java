@@ -15,6 +15,9 @@ public interface ReportMapper {
 
 	Report findById(@Param("reportId") Long reportId);
 
+	/** 목록과 같은 대상 닉네임·본문·정지 여부 */
+	Report findAdminById(@Param("reportId") Long reportId);
+
 	Report findOpenByReporterAndTarget(
 			@Param("reporterUserNo") Long reporterUserNo,
 			@Param("targetType") String targetType,
@@ -27,6 +30,9 @@ public interface ReportMapper {
 			@Param("status") String status,
 			@Param("cursorReportId") Long cursorReportId,
 			@Param("limit") int limit);
+
+	/** status가 없으면 전부. 커서와 limit는 세지 않는다 */
+	int countList(@Param("status") String status);
 
 	int close(
 			@Param("reportId") Long reportId,

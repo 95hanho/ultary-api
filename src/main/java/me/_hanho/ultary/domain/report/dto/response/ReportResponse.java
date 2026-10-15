@@ -21,6 +21,8 @@ public class ReportResponse {
 	private String targetNickname;
 	/** 게시글·댓글·답글 본문. 10자, 넘으면 뒤에 ... 목록에서만 채운다 */
 	private String targetContent;
+	/** 대상 회원이 정지인지. 회원 신고는 그 회원, 글·댓글·답글은 작성자. withdrawal_status=SUSPENDED일 때만 true */
+	private boolean targetSuspended;
 	private String status;
 	private LocalDateTime createdAt;
 	private LocalDateTime processedAt;

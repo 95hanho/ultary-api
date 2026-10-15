@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.response.ApiResponse;
 import me._hanho.ultary.domain.admin.dto.request.RejectTagProfileRequest;
+import me._hanho.ultary.domain.admin.dto.response.AdminMenuCountResponse;
 import me._hanho.ultary.domain.admin.dto.response.UserSuspendResponse;
 import me._hanho.ultary.domain.report.dto.response.ReportPageResponse;
 import me._hanho.ultary.domain.report.dto.response.ReportResponse;
@@ -29,6 +30,11 @@ import me._hanho.ultary.security.principal.AdminPrincipal;
 public class AdminController {
 
 	private final AdminService adminService;
+
+	@GetMapping("/menu-counts")
+	public ApiResponse<AdminMenuCountResponse> menuCounts() {
+		return ApiResponse.ok(adminService.menuCounts(), "관리자 메뉴 건수 조회 성공");
+	}
 
 	@GetMapping("/tags/profile-requests")
 	public ApiResponse<TagProfileRequestPageResponse> tagProfileRequests(
@@ -61,6 +67,12 @@ public class AdminController {
 				"태그 설명 거절 성공");
 	}
 
+	@PostMapping("/tags/{tagId}/pending")
+	public ApiResponse<TagProfileRequestResponse> reopenTag(@PathVariable Long tagId) {
+		log.info("[reopenTag] tagId={}", tagId);
+		return ApiResponse.ok(adminService.reopenTag(tagId), "태그 설명 대기 성공");
+	}
+
 	@PostMapping("/users/{userNo}/suspend")
 	public ApiResponse<UserSuspendResponse> suspendUser(@PathVariable Long userNo) {
 		log.info("[suspendUser] userNo={}", userNo);
@@ -71,6 +83,11 @@ public class AdminController {
 	public ApiResponse<UserSuspendResponse> unsuspendUser(@PathVariable Long userNo) {
 		log.info("[unsuspendUser] userNo={}", userNo);
 		return ApiResponse.ok(adminService.unsuspendUser(userNo), "회원 정지 해제 성공");
+	}
+
+	@GetMapping("/reports/{reportId}")
+	public ApiResponse<ReportResponse> report(@PathVariable Long reportId) {
+		return ApiResponse.ok(adminService.getReport(reportId));
 	}
 
 	@GetMapping("/reports")

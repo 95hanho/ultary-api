@@ -49,3 +49,7 @@ mcp/mariadb/.env
 ### Logs ###
 spy.log
 *.log
+
+### Python ###
+__pycache__/
+*.pyc

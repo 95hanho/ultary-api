@@ -709,6 +709,10 @@ public class FeedService {
 
 	private Feed requireVisible(Long feedId, Long viewerUserNo) {
 		Feed feed = requireActive(feedId);
+		User author = userMapper.findByUserNo(feed.getUserNo());
+		if (author == null || !"ACTIVE".equals(author.getWithdrawalStatus())) {
+			throw new BusinessException(ErrorCode.FEED_NOT_FOUND);
+		}
 		String audience = privacyService.feedAudience(feed.getUserNo(), feed.getVisibility());
 		if (viewerUserNo == null) {
 			if (!"PUBLIC".equals(audience)) {
