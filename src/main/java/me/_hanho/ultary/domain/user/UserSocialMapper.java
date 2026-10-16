@@ -1,5 +1,7 @@
 package me._hanho.ultary.domain.user;
 
+import java.util.List;
+
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -15,6 +17,8 @@ public interface UserSocialMapper {
 	UserSocial findByUserNoAndProvider(
 			@Param("userNo") Long userNo,
 			@Param("provider") String provider);
+
+	List<String> findProvidersByUserNo(@Param("userNo") Long userNo);
 
 	int countByUserNo(@Param("userNo") Long userNo);
 

@@ -62,21 +62,19 @@ public class AuthController {
 	}
 
 	@PostMapping("/social/link")
-	public ApiResponse<Void> socialLink(
+	public ApiResponse<MeResponse> socialLink(
 			@AuthenticationPrincipal UserPrincipal principal,
 			@Valid @RequestBody SocialLoginRequest request) {
 		log.info("[socialLink] provider={}", request.getProvider());
-		authService.linkSocial(principal, request);
-		return ApiResponse.okEmpty("소셜 계정 연동 성공");
+		return ApiResponse.ok(authService.linkSocial(principal, request), "소셜 계정 연동 성공");
 	}
 
 	@DeleteMapping("/social/unlink")
-	public ApiResponse<Void> socialUnlink(
+	public ApiResponse<MeResponse> socialUnlink(
 			@AuthenticationPrincipal UserPrincipal principal,
 			@RequestParam String provider) {
 		log.info("[socialUnlink] provider={}", provider);
-		authService.unlinkSocial(principal, provider);
-		return ApiResponse.okEmpty("소셜 계정 연동 해제 성공");
+		return ApiResponse.ok(authService.unlinkSocial(principal, provider), "소셜 계정 연동 해제 성공");
 	}
 
 	@PostMapping("/login")

@@ -100,13 +100,19 @@ public interface FeedMapper {
 	/** 관리자 삭제. 삭제한 회원 번호는 비운다 */
 	int softDeleteFeedByAdmin(@Param("feedId") Long feedId);
 
+	int restoreFeedByAdmin(@Param("feedId") Long feedId);
+
 	FeedComment findActiveCommentById(@Param("commentId") Long commentId);
 
 	int softDeleteCommentByAdmin(@Param("commentId") Long commentId);
 
+	int restoreCommentByAdmin(@Param("commentId") Long commentId);
+
 	FeedReply findActiveReplyById(@Param("replyId") Long replyId);
 
 	int softDeleteReplyByAdmin(@Param("replyId") Long replyId);
+
+	int restoreReplyByAdmin(@Param("replyId") Long replyId);
 
 	int countCollaboratorOwnedByUser(
 			@Param("feedId") Long feedId,

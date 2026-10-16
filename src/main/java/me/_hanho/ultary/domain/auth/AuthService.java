@@ -2,6 +2,7 @@ package me._hanho.ultary.domain.auth;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -119,7 +120,7 @@ public class AuthService {
 	}
 
 	@Transactional
-	public void linkSocial(UserPrincipal principal, SocialLoginRequest request) {
+	public MeResponse linkSocial(UserPrincipal principal, SocialLoginRequest request) {
 		SocialProvider provider = SocialProvider.from(request.getProvider());
 		String providerUserId = request.getProviderUserId().trim();
 		String email = truncate(trimToNull(request.getEmail()), PROVIDER_EMAIL_MAX);
@@ -144,10 +145,11 @@ public class AuthService {
 		social.setProviderUserId(providerUserId);
 		social.setProviderEmail(email);
 		userSocialMapper.insert(social);
+		return toMeResponse(userMapper.findActiveByUserNo(user.getUserNo()));
 	}
 
 	@Transactional
-	public void unlinkSocial(UserPrincipal principal, String providerValue) {
+	public MeResponse unlinkSocial(UserPrincipal principal, String providerValue) {
 		SocialProvider provider = SocialProvider.from(providerValue);
 
 		User user = userMapper.findActiveByUserNo(principal.getUserNo());
@@ -167,6 +169,7 @@ public class AuthService {
 		}
 
 		userSocialMapper.deleteByUserNoAndProvider(user.getUserNo(), provider.name());
+		return toMeResponse(userMapper.findActiveByUserNo(user.getUserNo()));
 	}
 
 	@Transactional
@@ -237,9 +240,7 @@ public class AuthService {
 			throw new BusinessException(ErrorCode.EMAIL_DUPLICATED);
 		}
 
-		if (request.getName() != null) {
-			user.setName(request.getName());
-		}
+		applyNameFirstSet(user, request.getName());
 		if (request.getEmail() != null) {
 			user.setEmail(StringUtils.hasText(request.getEmail()) ? request.getEmail().trim() : null);
 		}
@@ -256,6 +257,28 @@ public class AuthService {
 
 		userMapper.updateProfile(user);
 		return toMeResponse(userMapper.findActiveByUserNo(user.getUserNo()));
+	}
+
+	/**
+	 * 이름이 비어 있을 때만 최초 등록. 카카오 등 OAuth에 이름이 없을 때 회원정보 수정에서 받는다.
+	 * 이미 있으면 변경·삭제 불가. 요청에서 name을 빼면 그대로 둔다.
+	 */
+	private void applyNameFirstSet(User user, String requestedName) {
+		if (requestedName == null) {
+			return;
+		}
+		String next = truncate(trimToNull(requestedName), USER_NAME_MAX);
+		boolean hasName = StringUtils.hasText(user.getName());
+		if (hasName) {
+			String current = user.getName().trim();
+			if (next == null || !current.equals(next)) {
+				throw new BusinessException(ErrorCode.NAME_ALREADY_SET);
+			}
+			return;
+		}
+		if (next != null) {
+			user.setName(next);
+		}
 	}
 
 	/** 번호가 기존과 다를 때만 인증 완료 토큰의 번호와 맞는지 보고 저장한다. */
@@ -578,12 +601,20 @@ public class AuthService {
 
 	private MeResponse toMeResponse(User user) {
 		Integer profileFileId = petService.representativeProfileFileId(user.getUserNo());
+		List<String> providers = userSocialMapper.findProvidersByUserNo(user.getUserNo());
+		if (providers == null) {
+			providers = List.of();
+		}
+		boolean googleLinked = providers.contains(SocialProvider.GOOGLE.name());
+		boolean kakaoLinked = providers.contains(SocialProvider.KAKAO.name());
 		return MeResponse.builder()
 				.userNo(user.getUserNo())
 				.name(user.getName())
 				.nickname(user.getNickname())
 				.defaultNickname(Boolean.TRUE.equals(user.getIsDefaultNickname()))
 				.hasPassword(StringUtils.hasText(user.getPassword()))
+				.googleLinked(googleLinked)
+				.kakaoLinked(kakaoLinked)
 				.email(user.getEmail())
 				.phone(user.getPhone())
 				.profileFileId(profileFileId)

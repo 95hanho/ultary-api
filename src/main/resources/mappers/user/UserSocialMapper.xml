@@ -34,6 +34,12 @@
 		LIMIT 1
 	</select>
 
+	<select id="findProvidersByUserNo" resultType="string">
+		SELECT provider
+		FROM ultary_user_social
+		WHERE user_no = #{userNo}
+	</select>
+
 	<select id="countByUserNo" resultType="int">
 		SELECT COUNT(1)
 		FROM ultary_user_social

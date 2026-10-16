@@ -17,6 +17,10 @@ public class MeResponse {
 	private boolean defaultNickname;
 	/** 비밀번호가 설정된 계정인지 */
 	private boolean hasPassword;
+	/** 구글 소셜 연동 여부 */
+	private boolean googleLinked;
+	/** 카카오 소셜 연동 여부 */
+	private boolean kakaoLinked;
 	private String email;
 	private String phone;
 	private Integer profileFileId;

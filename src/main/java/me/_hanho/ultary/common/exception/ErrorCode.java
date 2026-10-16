@@ -35,6 +35,7 @@ public enum ErrorCode {
 	INVALID_TOKEN("INVALID_TOKEN", "유효하지 않은 토큰입니다.", HttpStatus.UNAUTHORIZED),
 	NICKNAME_DUPLICATED("NICKNAME_DUPLICATED", "이미 사용 중인 닉네임입니다.", HttpStatus.CONFLICT),
 	NICKNAME_CHANGE_COOLDOWN("NICKNAME_CHANGE_COOLDOWN", "닉네임은 변경 후 7일간 다시 변경할 수 없습니다.", HttpStatus.BAD_REQUEST),
+	NAME_ALREADY_SET("NAME_ALREADY_SET", "이름은 최초 등록 후 변경할 수 없습니다.", HttpStatus.BAD_REQUEST),
 	EMAIL_DUPLICATED("EMAIL_DUPLICATED", "이미 사용 중인 이메일입니다.", HttpStatus.CONFLICT),
 	PHONE_AUTH_FAILED("PHONE_AUTH_FAILED", "휴대폰 인증에 실패했습니다.", HttpStatus.BAD_REQUEST),
 	PHONE_CODE_INVALID("PHONE_CODE_INVALID", "인증번호가 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
@@ -44,7 +45,7 @@ public enum ErrorCode {
 	CURRENT_PASSWORD_INVALID("CURRENT_PASSWORD_INVALID", "현재 비밀번호가 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
 	INVALID_SOCIAL_PROVIDER("INVALID_SOCIAL_PROVIDER", "지원하지 않는 소셜 제공자입니다.", HttpStatus.BAD_REQUEST),
 	SOCIAL_ALREADY_LINKED("SOCIAL_ALREADY_LINKED", "이미 연동된 소셜 계정입니다.", HttpStatus.CONFLICT),
-	SOCIAL_ACCOUNT_IN_USE("SOCIAL_ACCOUNT_IN_USE", "다른 계정에 이미 연동된 소셜 계정입니다.", HttpStatus.CONFLICT),
+	SOCIAL_ACCOUNT_IN_USE("SOCIAL_ACCOUNT_IN_USE", "다른 계정에 이미 연동된 소셜 계정입니다. SNS계정을 회원탈퇴 후 진행해주세요.", HttpStatus.CONFLICT),
 	SOCIAL_NOT_LINKED("SOCIAL_NOT_LINKED", "연동되지 않은 소셜 계정입니다.", HttpStatus.NOT_FOUND),
 	CANNOT_UNLINK_LAST_LOGIN("CANNOT_UNLINK_LAST_LOGIN", "마지막 로그인 수단은 해제할 수 없습니다.", HttpStatus.BAD_REQUEST),
 

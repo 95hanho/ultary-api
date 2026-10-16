@@ -551,6 +551,14 @@ public class FeedService {
 		}
 	}
 
+	/** 관리자 삭제조치 원상복구. 이미 살아 있으면 아무 것도 하지 않는다. */
+	@Transactional
+	public void restoreByAdmin(Long feedId) {
+		if (feedMapper.restoreFeedByAdmin(feedId) > 0) {
+			log.info("[restoreByAdmin] feedId={}", feedId);
+		}
+	}
+
 	@Transactional
 	public void deleteCommentByAdmin(Long commentId) {
 		FeedComment comment = feedMapper.findActiveCommentById(commentId);
@@ -561,6 +569,18 @@ public class FeedService {
 		notificationService.removeCommentTree(commentId);
 		notificationService.syncFeedThread(comment.getFeedId(), false);
 		log.info("[deleteCommentByAdmin] feedId={} commentId={}", comment.getFeedId(), commentId);
+	}
+
+	@Transactional
+	public void restoreCommentByAdmin(Long commentId, Long feedId) {
+		if (feedMapper.restoreCommentByAdmin(commentId) == 0) {
+			return;
+		}
+		if (feedId != null) {
+			feedMapper.adjustCommentCount(feedId, 1);
+			notificationService.syncFeedThread(feedId, false);
+		}
+		log.info("[restoreCommentByAdmin] feedId={} commentId={}", feedId, commentId);
 	}
 
 	@Transactional
@@ -575,6 +595,17 @@ public class FeedService {
 			notificationService.syncFeedThread(comment.getFeedId(), false);
 		}
 		log.info("[deleteReplyByAdmin] replyId={}", replyId);
+	}
+
+	@Transactional
+	public void restoreReplyByAdmin(Long replyId, Long feedId) {
+		if (feedMapper.restoreReplyByAdmin(replyId) == 0) {
+			return;
+		}
+		if (feedId != null) {
+			notificationService.syncFeedThread(feedId, false);
+		}
+		log.info("[restoreReplyByAdmin] replyId={}", replyId);
 	}
 
 	private void insertMedia(Long feedId, Long userNo, List<CreateFeedRequest.MediaItem> mediaItems) {

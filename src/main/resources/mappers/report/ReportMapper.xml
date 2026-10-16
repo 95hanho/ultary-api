@@ -51,7 +51,7 @@
 		FROM ultary_report
 		WHERE reporter_user_no = #{reporterUserNo}
 		  AND target_type = #{targetType}
-		  AND status IN ('REQUESTED', 'CONFIRMED', 'ON_HOLD')
+		  AND status IN ('REQUESTED', 'CONFIRMED')
 		<if test="targetUserNo != null">
 		  AND target_user_no = #{targetUserNo}
 		</if>
@@ -89,7 +89,13 @@
 			r.report_id,
 			r.reporter_user_no,
 			r.target_type,
-			r.target_user_no,
+			CASE r.target_type
+				WHEN 'USER' THEN r.target_user_no
+				WHEN 'FEED' THEN f.user_no
+				WHEN 'COMMENT' THEN c.user_no
+				WHEN 'REPLY' THEN rp.user_no
+				ELSE NULL
+			END AS target_user_no,
 			r.target_feed_id,
 			r.target_comment_id,
 			r.target_reply_id,
@@ -99,7 +105,13 @@
 			r.processed_at,
 			r.created_at,
 			r.updated_at,
-			u.nickname AS target_nickname,
+			CASE r.target_type
+				WHEN 'USER' THEN u.nickname
+				WHEN 'FEED' THEN fu.nickname
+				WHEN 'COMMENT' THEN cu.nickname
+				WHEN 'REPLY' THEN ru.nickname
+				ELSE NULL
+			END AS target_nickname,
 			CASE r.target_type
 				WHEN 'FEED' THEN f.content
 				WHEN 'COMMENT' THEN c.content
@@ -122,6 +134,52 @@
 		WHERE r.report_id = #{reportId}
 	</select>
 
+	<!-- 신고요청·확인이고 대상이 정지 아니면 0, 그 외(정지 대상·처리됨)=1 -->
+	<sql id="reportActionPriority">
+		CASE WHEN r.status IN ('REQUESTED', 'CONFIRMED')
+			AND COALESCE(
+				CASE r.target_type
+					WHEN 'USER' THEN u.withdrawal_status
+					WHEN 'FEED' THEN fu.withdrawal_status
+					WHEN 'COMMENT' THEN cu.withdrawal_status
+					WHEN 'REPLY' THEN ru.withdrawal_status
+					ELSE NULL
+				END, '') &lt;&gt; 'SUSPENDED'
+		THEN 0 ELSE 1 END
+	</sql>
+
+	<!-- 커서 신고의 같은 우선순위 (대상 정지 여부 포함) -->
+	<sql id="cursorReportActionPriority">
+		(
+			SELECT CASE WHEN c2.status IN ('REQUESTED', 'CONFIRMED')
+				AND COALESCE(
+					CASE c2.target_type
+						WHEN 'USER' THEN cu2.withdrawal_status
+						WHEN 'FEED' THEN cfu.withdrawal_status
+						WHEN 'COMMENT' THEN ccu.withdrawal_status
+						WHEN 'REPLY' THEN cru.withdrawal_status
+						ELSE NULL
+					END, '') &lt;&gt; 'SUSPENDED'
+			THEN 0 ELSE 1 END
+			FROM ultary_report c2
+			LEFT JOIN ultary_user cu2
+				ON c2.target_type = 'USER' AND cu2.user_no = c2.target_user_no
+			LEFT JOIN ultary_feed cf
+				ON c2.target_type = 'FEED' AND cf.feed_id = c2.target_feed_id
+			LEFT JOIN ultary_user cfu
+				ON c2.target_type = 'FEED' AND cfu.user_no = cf.user_no
+			LEFT JOIN ultary_feed_comment cc
+				ON c2.target_type = 'COMMENT' AND cc.feed_comment_id = c2.target_comment_id
+			LEFT JOIN ultary_user ccu
+				ON c2.target_type = 'COMMENT' AND ccu.user_no = cc.user_no
+			LEFT JOIN ultary_feed_reply crp
+				ON c2.target_type = 'REPLY' AND crp.feed_reply_id = c2.target_reply_id
+			LEFT JOIN ultary_user cru
+				ON c2.target_type = 'REPLY' AND cru.user_no = crp.user_no
+			WHERE c2.report_id = #{cursorReportId}
+		)
+	</sql>
+
 	<select id="findList" resultType="me._hanho.ultary.domain.report.model.Report">
 		SELECT
 			<include refid="adminReportColumns"/>
@@ -132,19 +190,36 @@
 			</if>
 			<if test="cursorReportId != null">
 				AND (
-					r.created_at &lt; (
-						SELECT c2.created_at FROM ultary_report c2 WHERE c2.report_id = #{cursorReportId}
+					(
+						<include refid="reportActionPriority"/>
+					) &gt; (
+						<include refid="cursorReportActionPriority"/>
 					)
 					OR (
-						r.created_at = (
-							SELECT c2.created_at FROM ultary_report c2 WHERE c2.report_id = #{cursorReportId}
+						(
+							<include refid="reportActionPriority"/>
+						) = (
+							<include refid="cursorReportActionPriority"/>
 						)
-						AND r.report_id &lt; #{cursorReportId}
+						AND (
+							r.created_at &lt; (
+								SELECT c2.created_at FROM ultary_report c2 WHERE c2.report_id = #{cursorReportId}
+							)
+							OR (
+								r.created_at = (
+									SELECT c2.created_at FROM ultary_report c2 WHERE c2.report_id = #{cursorReportId}
+								)
+								AND r.report_id &lt; #{cursorReportId}
+							)
+						)
 					)
 				)
 			</if>
 		</where>
-		ORDER BY r.created_at DESC, r.report_id DESC
+		ORDER BY
+			<include refid="reportActionPriority"/> ASC,
+			r.created_at DESC,
+			r.report_id DESC
 		LIMIT #{limit}
 	</select>
 
@@ -158,23 +233,39 @@
 		</where>
 	</select>
 
+	<select id="countOpen" resultType="int">
+		SELECT COUNT(*)
+		FROM ultary_report
+		WHERE status IN ('REQUESTED', 'CONFIRMED')
+	</select>
+
 	<update id="close">
 		UPDATE ultary_report
 		SET status = #{status},
 			processed_at = NOW(),
 			updated_at = NOW()
 		WHERE report_id = #{reportId}
-		  AND status IN ('REQUESTED', 'CONFIRMED', 'ON_HOLD')
 	</update>
 
-	<update id="confirm">
-		UPDATE ultary_report
-		SET status = 'CONFIRMED',
-			processed_at = NOW(),
-			updated_at = NOW()
-		WHERE report_id = #{reportId}
-		  AND status = 'REQUESTED'
-	</update>
+	<select id="countOtherWithStatus" resultType="int">
+		SELECT COUNT(*)
+		FROM ultary_report
+		WHERE report_id &lt;&gt; #{excludeReportId}
+		  AND status = #{status}
+		  AND target_type = #{targetType}
+		<if test="targetUserNo != null">
+		  AND target_user_no = #{targetUserNo}
+		</if>
+		<if test="targetFeedId != null">
+		  AND target_feed_id = #{targetFeedId}
+		</if>
+		<if test="targetCommentId != null">
+		  AND target_comment_id = #{targetCommentId}
+		</if>
+		<if test="targetReplyId != null">
+		  AND target_reply_id = #{targetReplyId}
+		</if>
+	</select>
 
 	<select id="findMineByFeedIds" resultType="me._hanho.ultary.domain.report.model.Report">
 		SELECT report_id, target_feed_id, status

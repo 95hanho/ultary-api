@@ -34,11 +34,22 @@ public interface ReportMapper {
 	/** status가 없으면 전부. 커서와 limit는 세지 않는다 */
 	int countList(@Param("status") String status);
 
+	/** 신고요청·확인 건수. 메뉴 뱃지용 */
+	int countOpen();
+
 	int close(
 			@Param("reportId") Long reportId,
 			@Param("status") String status);
 
-	int confirm(@Param("reportId") Long reportId);
+	/** 같은 대상·상태의 다른 신고 건수. 정지·삭제조치 원상복구 전에 본다 */
+	int countOtherWithStatus(
+			@Param("excludeReportId") Long excludeReportId,
+			@Param("status") String status,
+			@Param("targetType") String targetType,
+			@Param("targetUserNo") Long targetUserNo,
+			@Param("targetFeedId") Long targetFeedId,
+			@Param("targetCommentId") Long targetCommentId,
+			@Param("targetReplyId") Long targetReplyId);
 
 	List<Report> findMineByFeedIds(
 			@Param("reporterUserNo") Long reporterUserNo,

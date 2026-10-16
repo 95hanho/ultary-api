@@ -10,6 +10,6 @@ public class AdminMenuCountResponse {
 
 	/** 상업 태그 설명 요청 중 PENDING */
 	private int pendingTagRequestCount;
-	/** 신고 중 REQUESTED */
+	/** 신고 중 REQUESTED·CONFIRMED 합 */
 	private int requestedReportCount;
 }

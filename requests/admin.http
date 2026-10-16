@@ -35,7 +35,7 @@ Content-Type: application/json
 }
 
 ### 0d. 메뉴 뱃지 건수
-# pendingTagRequestCount, requestedReportCount. 목록은 없다.
+# pendingTagRequestCount, requestedReportCount(신고요청·확인 합). 목록은 없다.
 GET {{baseUrl}}/api/v1/admin/menu-counts
 Authorization: Bearer {{adminAccessToken}}
 
@@ -48,18 +48,21 @@ POST {{baseUrl}}/api/v1/admin/users/104/unsuspend
 Authorization: Bearer {{adminAccessToken}}
 
 ### 3. 신고 목록
-# status 를 빼면 전체 최신순. 다음 페이지는 cursorReportId=직전 nextCursorReportId
+# status 를 빼면 신고요청·확인이 먼저, 그다음 나머지. 같은 묶음은 최신순
+# 다음 페이지는 cursorReportId=직전 nextCursorReportId
 # totalCount 는 그 status 의 전체 건수. 커서와 limit 는 세지 않는다
 GET {{baseUrl}}/api/v1/admin/reports?limit=30
 Authorization: Bearer {{adminAccessToken}}
 
 ### 3a. 신고 상세
-# targetSuspended 는 대상 회원, 또는 글·댓글·답글 작성자가 정지인지
+# targetUserNo·targetNickname 은 회원 신고뿐 아니라 글·댓글·답글 작성자도 준다
+# targetSuspended 는 그 회원이 정지인지
 GET {{baseUrl}}/api/v1/admin/reports/1
 Authorization: Bearer {{adminAccessToken}}
 
-# 4~6의 reportId는 목록 항목으로 바꾼다.
-# delete-content 는 게시글·댓글·답글을 소프트 삭제한다. suspend 는 유저 신고만.
+# 4~7의 reportId는 목록 항목으로 바꾼다. 어떤 상태에서든 다시 조치할 수 있다.
+# delete-content 는 글·댓글·답글 소프트 삭제. 다른 상태로 바꾸면 복구한다(같은 대상 삭제조치가 더 없으면).
+# suspend 는 유저 신고만. 다른 상태로 바꾸면 정지를 푼다(같은 회원 정지가 더 없으면).
 
 ### 4. 신고 글·댓글·답글 삭제
 POST {{baseUrl}}/api/v1/admin/reports/105/delete-content
@@ -73,11 +76,7 @@ Authorization: Bearer {{adminAccessToken}}
 POST {{baseUrl}}/api/v1/admin/reports/1/reject
 Authorization: Bearer {{adminAccessToken}}
 
-### 7. 신고 보류
-POST {{baseUrl}}/api/v1/admin/reports/1/hold
-Authorization: Bearer {{adminAccessToken}}
-
-### 8. 신고 확인 (신고요청만. 이후 신고자는 취소 불가)
+### 7. 신고 확인 (CONFIRMED 뒤 신고자는 취소 불가. 정지·삭제조치에서도 가능)
 POST {{baseUrl}}/api/v1/admin/reports/1/confirm
 Authorization: Bearer {{adminAccessToken}}
 

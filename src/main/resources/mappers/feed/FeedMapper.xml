@@ -445,6 +445,16 @@
 		  AND is_deleted = 0
 	</update>
 
+	<update id="restoreFeedByAdmin">
+		UPDATE ultary_feed
+		SET is_deleted = 0,
+			deleted_at = NULL,
+			deleted_by_user_no = NULL,
+			updated_at = NOW()
+		WHERE feed_id = #{feedId}
+		  AND is_deleted = 1
+	</update>
+
 	<select id="countCollaboratorOwnedByUser" resultType="int">
 		SELECT COUNT(1)
 		FROM ultary_feed_pet fp
@@ -887,6 +897,15 @@
 		  AND is_deleted = 0
 	</update>
 
+	<update id="restoreCommentByAdmin">
+		UPDATE ultary_feed_comment
+		SET is_deleted = 0,
+			deleted_at = NULL,
+			updated_at = NOW()
+		WHERE feed_comment_id = #{commentId}
+		  AND is_deleted = 1
+	</update>
+
 	<update id="softDeleteCommentByFeedAuthor">
 		UPDATE ultary_feed_comment
 		SET is_deleted = 1,
@@ -1011,6 +1030,15 @@
 			updated_at = NOW()
 		WHERE feed_reply_id = #{replyId}
 		  AND is_deleted = 0
+	</update>
+
+	<update id="restoreReplyByAdmin">
+		UPDATE ultary_feed_reply
+		SET is_deleted = 0,
+			deleted_at = NULL,
+			updated_at = NOW()
+		WHERE feed_reply_id = #{replyId}
+		  AND is_deleted = 1
 	</update>
 
 	<update id="softDeleteReplyByFeedAuthor">

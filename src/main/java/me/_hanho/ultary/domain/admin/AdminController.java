@@ -121,10 +121,4 @@ public class AdminController {
 		log.info("[rejectReport] reportId={}", reportId);
 		return ApiResponse.ok(adminService.rejectReport(reportId), "신고 거절 성공");
 	}
-
-	@PostMapping("/reports/{reportId}/hold")
-	public ApiResponse<ReportResponse> holdReport(@PathVariable Long reportId) {
-		log.info("[holdReport] reportId={}", reportId);
-		return ApiResponse.ok(adminService.holdReport(reportId), "신고 보류 성공");
-	}
 }

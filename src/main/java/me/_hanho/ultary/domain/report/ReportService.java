@@ -47,10 +47,9 @@ public class ReportService {
 	public static final String CONFIRMED = "CONFIRMED";
 	public static final String DELETED = "DELETED";
 	public static final String REJECTED = "REJECTED";
-	public static final String ON_HOLD = "ON_HOLD";
 	public static final String SUSPENDED = "SUSPENDED";
-	public static final Set<String> STATUSES = Set.of(REQUESTED, CONFIRMED, DELETED, REJECTED, ON_HOLD, SUSPENDED);
-	public static final Set<String> OPEN_STATUSES = Set.of(REQUESTED, CONFIRMED, ON_HOLD);
+	public static final Set<String> STATUSES = Set.of(REQUESTED, CONFIRMED, DELETED, REJECTED, SUSPENDED);
+	public static final Set<String> OPEN_STATUSES = Set.of(REQUESTED, CONFIRMED);
 
 	public static final Set<String> TARGET_TYPES = Set.of("USER", "FEED", "COMMENT", "REPLY");
 
@@ -95,9 +94,10 @@ public class ReportService {
 		return toResponse(reportMapper.findById(report.getReportId()));
 	}
 
+	/** 신고요청·확인 합. 메뉴 뱃지 requestedReportCount */
 	@Transactional(readOnly = true)
 	public int countRequested() {
-		return reportMapper.countList("REQUESTED");
+		return reportMapper.countOpen();
 	}
 
 	public ReportPageResponse list(String status, Long cursorReportId, int limit) {
@@ -122,13 +122,10 @@ public class ReportService {
 				.build();
 	}
 
-	public Report requireOpen(Long reportId) {
+	public Report requireExists(Long reportId) {
 		Report report = reportMapper.findById(reportId);
 		if (report == null) {
 			throw new BusinessException(ErrorCode.REPORT_NOT_FOUND);
-		}
-		if (!OPEN_STATUSES.contains(report.getStatus())) {
-			throw new BusinessException(ErrorCode.REPORT_ALREADY_CLOSED);
 		}
 		return report;
 	}
@@ -144,7 +141,7 @@ public class ReportService {
 	@Transactional
 	public ReportResponse close(Long reportId, String status) {
 		if (reportMapper.close(reportId, status) == 0) {
-			throw new BusinessException(ErrorCode.REPORT_ALREADY_CLOSED);
+			throw new BusinessException(ErrorCode.REPORT_NOT_FOUND);
 		}
 		return toResponse(requireAdmin(reportId));
 	}
@@ -154,19 +151,16 @@ public class ReportService {
 		return toResponse(requireAdmin(reportId));
 	}
 
-	@Transactional
-	public ReportResponse confirm(Long reportId) {
-		Report report = reportMapper.findById(reportId);
-		if (report == null) {
-			throw new BusinessException(ErrorCode.REPORT_NOT_FOUND);
-		}
-		if (!REQUESTED.equals(report.getStatus())) {
-			throw new BusinessException(ErrorCode.REPORT_ALREADY_CLOSED);
-		}
-		if (reportMapper.confirm(reportId) == 0) {
-			throw new BusinessException(ErrorCode.REPORT_ALREADY_CLOSED);
-		}
-		return toResponse(requireAdmin(reportId));
+	/** 같은 대상에 같은 상태인 다른 신고가 있으면 true */
+	public boolean hasOtherWithStatus(Report report, String status) {
+		return reportMapper.countOtherWithStatus(
+				report.getReportId(),
+				status,
+				report.getTargetType(),
+				"USER".equals(report.getTargetType()) ? report.getTargetUserNo() : null,
+				"FEED".equals(report.getTargetType()) ? report.getTargetFeedId() : null,
+				"COMMENT".equals(report.getTargetType()) ? report.getTargetCommentId() : null,
+				"REPLY".equals(report.getTargetType()) ? report.getTargetReplyId() : null) > 0;
 	}
 
 	@Transactional

@@ -94,34 +94,39 @@ public class AdminService {
 
 	@Transactional
 	public ReportResponse deleteReportedContent(Long reportId) {
-		Report report = reportService.requireOpen(reportId);
+		Report report = reportService.requireExists(reportId);
 		switch (report.getTargetType()) {
 			case "FEED" -> {
 				if (report.getTargetFeedId() == null) {
 					throw new BusinessException(ErrorCode.REPORT_ACTION_MISMATCH);
 				}
-				feedService.deleteByAdmin(report.getTargetFeedId());
 			}
 			case "COMMENT" -> {
 				if (report.getTargetCommentId() == null) {
 					throw new BusinessException(ErrorCode.REPORT_ACTION_MISMATCH);
 				}
-				feedService.deleteCommentByAdmin(report.getTargetCommentId());
 			}
 			case "REPLY" -> {
 				if (report.getTargetReplyId() == null) {
 					throw new BusinessException(ErrorCode.REPORT_ACTION_MISMATCH);
 				}
-				feedService.deleteReplyByAdmin(report.getTargetReplyId());
 			}
 			default -> throw new BusinessException(ErrorCode.REPORT_ACTION_MISMATCH);
+		}
+		undoReportSideEffects(report);
+		switch (report.getTargetType()) {
+			case "FEED" -> feedService.deleteByAdmin(report.getTargetFeedId());
+			case "COMMENT" -> feedService.deleteCommentByAdmin(report.getTargetCommentId());
+			case "REPLY" -> feedService.deleteReplyByAdmin(report.getTargetReplyId());
+			default -> {
+			}
 		}
 		return reportService.close(reportId, ReportService.DELETED);
 	}
 
 	@Transactional
 	public ReportResponse suspendReportedUser(Long reportId) {
-		Report report = reportService.requireOpen(reportId);
+		Report report = reportService.requireExists(reportId);
 		if (!"USER".equals(report.getTargetType()) || report.getTargetUserNo() == null) {
 			throw new BusinessException(ErrorCode.REPORT_ACTION_MISMATCH);
 		}
@@ -129,6 +134,8 @@ public class AdminService {
 		if ("WITHDRAWN".equals(user.getWithdrawalStatus())) {
 			throw new BusinessException(ErrorCode.CANNOT_SUSPEND_WITHDRAWN);
 		}
+		undoReportSideEffects(report);
+		user = requireUser(report.getTargetUserNo());
 		if (!"SUSPENDED".equals(user.getWithdrawalStatus())) {
 			if (userMapper.suspend(user.getUserNo()) == 0) {
 				throw new BusinessException(ErrorCode.USER_INACTIVE);
@@ -140,19 +147,56 @@ public class AdminService {
 
 	@Transactional
 	public ReportResponse rejectReport(Long reportId) {
-		reportService.requireOpen(reportId);
+		Report report = reportService.requireExists(reportId);
+		undoReportSideEffects(report);
 		return reportService.close(reportId, ReportService.REJECTED);
 	}
 
 	@Transactional
-	public ReportResponse holdReport(Long reportId) {
-		reportService.requireOpen(reportId);
-		return reportService.close(reportId, ReportService.ON_HOLD);
+	public ReportResponse confirmReport(Long reportId) {
+		Report report = reportService.requireExists(reportId);
+		undoReportSideEffects(report);
+		return reportService.close(reportId, ReportService.CONFIRMED);
 	}
 
-	@Transactional
-	public ReportResponse confirmReport(Long reportId) {
-		return reportService.confirm(reportId);
+	/**
+	 * 이전 조치의 부수 효과를 되돌린다.
+	 * 정지→다른 상태면 회원 정지 해제, 삭제조치→다른 상태면 글·댓글·답글 복구.
+	 * 같은 대상에 같은 상태 신고가 더 있으면 유지한다.
+	 */
+	private void undoReportSideEffects(Report report) {
+		if (ReportService.SUSPENDED.equals(report.getStatus())
+				&& "USER".equals(report.getTargetType())
+				&& report.getTargetUserNo() != null
+				&& !reportService.hasOtherWithStatus(report, ReportService.SUSPENDED)) {
+			User user = userMapper.findByUserNo(report.getTargetUserNo());
+			if (user != null && "SUSPENDED".equals(user.getWithdrawalStatus())) {
+				userMapper.unsuspend(user.getUserNo());
+			}
+		}
+		if (!ReportService.DELETED.equals(report.getStatus())
+				|| reportService.hasOtherWithStatus(report, ReportService.DELETED)) {
+			return;
+		}
+		switch (report.getTargetType()) {
+			case "FEED" -> {
+				if (report.getTargetFeedId() != null) {
+					feedService.restoreByAdmin(report.getTargetFeedId());
+				}
+			}
+			case "COMMENT" -> {
+				if (report.getTargetCommentId() != null) {
+					feedService.restoreCommentByAdmin(report.getTargetCommentId(), report.getTargetFeedId());
+				}
+			}
+			case "REPLY" -> {
+				if (report.getTargetReplyId() != null) {
+					feedService.restoreReplyByAdmin(report.getTargetReplyId(), report.getTargetFeedId());
+				}
+			}
+			default -> {
+			}
+		}
 	}
 
 	private User requireUser(Long userNo) {
