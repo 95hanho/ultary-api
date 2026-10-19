@@ -90,11 +90,11 @@ jwt:
   # - 액세스·리프레시 JWT와 리프레시 DB 만료는 이 값보다 30초 길다
   # - 재발급/만료 테스트 시 아래 TEST 주석을 사용
   expiration:
-    access: 1800                 # 30분
-    refresh: 1209600             # 14일
-    phoneauth: 300               # 5분
-    phoneauth-complete: 600      # 10분
-    pwdchange: 600               # 10분
+    access: 1800 # 30분
+    refresh: 1209600 # 14일
+    phoneauth: 300 # 5분
+    phoneauth-complete: 600 # 10분
+    pwdchange: 600 # 10분
     # ---- TEST (만료/재발급 테스트용) ----
     # access: 10                 # 10초
     # refresh: 60                # 1분
@@ -115,7 +115,7 @@ ultary:
 ai:
   gemini:
     api-key: ${GEMINI_API_KEY:}
-    model: ${GEMINI_MODEL:gemini-2.0-flash}
+    model: ${GEMINI_MODEL:gemini-3.8-flash}
     base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com/v1beta}
     connect-timeout-ms: 3000
     read-timeout-ms: 8000
