@@ -109,3 +109,13 @@ ultary:
       - http://localhost:3000
       - http://127.0.0.1:3000
     ticket-ttl-seconds: 30
+
+# Gemini AI (키는 코드·git에 넣지 않음. 환경변수만)
+# GEMINI_API_KEY 비어 있으면 태그 추천은 DB fallback, 댓글 모더레이션은 통과
+ai:
+  gemini:
+    api-key: ${GEMINI_API_KEY:}
+    model: ${GEMINI_MODEL:gemini-2.0-flash}
+    base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com/v1beta}
+    connect-timeout-ms: 3000
+    read-timeout-ms: 8000

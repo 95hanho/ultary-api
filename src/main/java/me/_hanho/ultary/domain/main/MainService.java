@@ -42,7 +42,10 @@ import me._hanho.ultary.domain.pet.model.PetMention;
 import me._hanho.ultary.domain.story.StoryService;
 import me._hanho.ultary.domain.story.dto.response.StoryOwnerResponse;
 import me._hanho.ultary.domain.story.dto.response.StoryResponse;
+import me._hanho.ultary.domain.main.dto.request.SaveSearchHistoryRequest;
+import me._hanho.ultary.domain.tag.TagMapper;
 import me._hanho.ultary.domain.tag.TagService;
+import me._hanho.ultary.domain.tag.model.Tag;
 import me._hanho.ultary.domain.user.UserBlockMapper;
 import me._hanho.ultary.domain.user.UserMapper;
 import me._hanho.ultary.domain.user.UserPetTagHistoryMapper;
@@ -80,6 +83,7 @@ public class MainService {
 	private final PetMapper petMapper;
 	private final PetService petService;
 	private final TagService tagService;
+	private final TagMapper tagMapper;
 	private final FileService fileService;
 
 	@Transactional(readOnly = true)
@@ -143,7 +147,7 @@ public class MainService {
 				principal.getUserNo());
 	}
 
-	/** 검색창을 열었을 때 최근 울타리 5건 */
+	/** 검색창을 열었을 때 최근 울타리·태그 5건 */
 	@Transactional(readOnly = true)
 	public SearchHistoryPageResponse getRecentSearches(UserPrincipal principal) {
 		return pageRecentSearches(principal, null, RECENT_SEARCH_LIMIT);
@@ -158,12 +162,25 @@ public class MainService {
 		return pageRecentSearches(principal, cursorHistoryId, RECENT_SEARCH_MORE_LIMIT);
 	}
 
-	/** 검색 후 그 유저 울타리에 들어갈 때 저장. 같은 울타리는 searched_at만 갱신 */
+	/**
+	 * 울타리 또는 태그 피드 진입 시 저장.
+	 * Body는 targetUserNo 또는 tagId 중 하나만. 같은 대상은 searched_at만 갱신.
+	 */
 	@Transactional
-	public SearchHistoryItemResponse saveRecentSearch(UserPrincipal principal, Long targetUserNo) {
-		if (targetUserNo == null) {
-			throw new BusinessException(ErrorCode.INVALID_INPUT, "targetUserNo는 필수입니다.");
+	public SearchHistoryItemResponse saveRecentSearch(
+			UserPrincipal principal, SaveSearchHistoryRequest request) {
+		boolean hasUser = request.getTargetUserNo() != null;
+		boolean hasTag = request.getTagId() != null;
+		if (hasUser == hasTag) {
+			throw new BusinessException(ErrorCode.INVALID_INPUT, "targetUserNo 또는 tagId 중 하나만 보내세요.");
 		}
+		if (hasUser) {
+			return saveRecentUser(principal, request.getTargetUserNo());
+		}
+		return saveRecentTag(principal, request.getTagId());
+	}
+
+	private SearchHistoryItemResponse saveRecentUser(UserPrincipal principal, Long targetUserNo) {
 		User target = userMapper.findActiveByUserNo(targetUserNo);
 		if (target == null) {
 			throw new BusinessException(ErrorCode.USER_NOT_FOUND);
@@ -171,13 +188,25 @@ public class MainService {
 		if (userBlockMapper.findActiveEitherWay(principal.getUserNo(), targetUserNo) != null) {
 			throw new BusinessException(ErrorCode.USER_BLOCKED);
 		}
-		userSearchHistoryMapper.upsert(principal.getUserNo(), targetUserNo);
-		SearchHistoryRow row = userSearchHistoryMapper.findByPair(principal.getUserNo(), targetUserNo);
+		userSearchHistoryMapper.upsertUser(principal.getUserNo(), targetUserNo);
+		SearchHistoryRow row = userSearchHistoryMapper.findByUserPair(principal.getUserNo(), targetUserNo);
 		log.info("[saveRecentSearch] userNo={} targetUserNo={}", principal.getUserNo(), targetUserNo);
 		return toHistoryItem(
 				row,
 				fileService.findSummary(row.getProfileFileId()),
 				petTagsByUser(List.of(row.getTargetUserNo())).getOrDefault(row.getTargetUserNo(), List.of()));
+	}
+
+	private SearchHistoryItemResponse saveRecentTag(UserPrincipal principal, Long tagId) {
+		Tag tag = tagMapper.findActiveByTagId(tagId);
+		if (tag == null) {
+			throw new BusinessException(ErrorCode.TAG_NOT_FOUND);
+		}
+		userSearchHistoryMapper.upsertTag(principal.getUserNo(), tagId);
+		SearchHistoryRow row = userSearchHistoryMapper.findByTagPair(principal.getUserNo(), tagId);
+		log.info("[saveRecentSearch] userNo={} tagId={} hashtag={}",
+				principal.getUserNo(), tagId, tag.getHashtag());
+		return toHistoryItem(row, null, List.of());
 	}
 
 	/** 스토리 @·사진 태그 모달의 최근 펫. 검색 최근 울타리와 별도 */
@@ -260,21 +289,26 @@ public class MainService {
 			nextCursor = rows.get(rows.size() - 1).getUserSearchHistoryId();
 		}
 		Set<Long> profileIds = new HashSet<>();
+		List<Long> userNos = new ArrayList<>();
 		for (SearchHistoryRow row : rows) {
 			if (row.getProfileFileId() != null) {
 				profileIds.add(row.getProfileFileId().longValue());
 			}
+			if (row.getTargetUserNo() != null) {
+				userNos.add(row.getTargetUserNo());
+			}
 		}
 		Map<Long, FileSummaryResponse> files = fileService.findSummaries(profileIds);
-		Map<Long, List<String>> petTags = petTagsByUser(
-				rows.stream().map(SearchHistoryRow::getTargetUserNo).toList());
+		Map<Long, List<String>> petTags = petTagsByUser(userNos);
 		List<SearchHistoryItemResponse> items = rows.stream()
 				.map(row -> toHistoryItem(
 						row,
 						row.getProfileFileId() == null
 								? null
 								: files.get(row.getProfileFileId().longValue()),
-						petTags.getOrDefault(row.getTargetUserNo(), List.of())))
+						row.getTargetUserNo() == null
+								? List.of()
+								: petTags.getOrDefault(row.getTargetUserNo(), List.of())))
 				.toList();
 		return SearchHistoryPageResponse.builder()
 				.items(items)
@@ -338,13 +372,17 @@ public class MainService {
 
 	private SearchHistoryItemResponse toHistoryItem(
 			SearchHistoryRow row, FileSummaryResponse profileFile, List<String> petTags) {
+		boolean tag = "TAG".equals(row.getHistoryType()) || row.getTargetTagId() != null;
 		return SearchHistoryItemResponse.builder()
 				.userSearchHistoryId(row.getUserSearchHistoryId())
-				.userNo(row.getTargetUserNo())
-				.nickname(row.getNickname())
-				.profileFileId(row.getProfileFileId())
-				.profileFile(profileFile)
-				.petTags(petTags == null ? List.of() : petTags)
+				.type(tag ? "TAG" : "USER")
+				.userNo(tag ? null : row.getTargetUserNo())
+				.nickname(tag ? null : row.getNickname())
+				.profileFileId(tag ? null : row.getProfileFileId())
+				.profileFile(tag ? null : profileFile)
+				.petTags(tag ? List.of() : (petTags == null ? List.of() : petTags))
+				.tagId(tag ? row.getTargetTagId() : null)
+				.hashtag(tag ? row.getHashtag() : null)
 				.searchedAt(row.getSearchedAt())
 				.build();
 	}

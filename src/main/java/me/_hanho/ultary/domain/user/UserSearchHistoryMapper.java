@@ -22,13 +22,21 @@ public interface UserSearchHistoryMapper {
 			@Param("cursorHistoryId") Long cursorHistoryId,
 			@Param("limit") int limit);
 
-	int upsert(
+	int upsertUser(
 			@Param("userNo") Long userNo,
 			@Param("targetUserNo") Long targetUserNo);
 
-	SearchHistoryRow findByPair(
+	int upsertTag(
+			@Param("userNo") Long userNo,
+			@Param("targetTagId") Long targetTagId);
+
+	SearchHistoryRow findByUserPair(
 			@Param("viewerUserNo") Long viewerUserNo,
 			@Param("targetUserNo") Long targetUserNo);
+
+	SearchHistoryRow findByTagPair(
+			@Param("viewerUserNo") Long viewerUserNo,
+			@Param("targetTagId") Long targetTagId);
 
 	int deleteByUserNo(@Param("userNo") Long userNo);
 

@@ -136,6 +136,16 @@
 		LIMIT #{limit}
 	</select>
 
+	<select id="findActiveByHashtag" resultType="me._hanho.ultary.domain.tag.model.Tag">
+		SELECT <include refid="tagColumns"/>
+		FROM ultary_tag
+		WHERE is_deleted = 0
+		  AND <include refid="creatorNotSuspended"/>
+		  AND hashtag = #{hashtag}
+		ORDER BY use_count DESC, tag_id DESC
+		LIMIT 1
+	</select>
+
 	<select id="countByHandle" resultType="int">
 		SELECT COUNT(1)
 		FROM ultary_tag

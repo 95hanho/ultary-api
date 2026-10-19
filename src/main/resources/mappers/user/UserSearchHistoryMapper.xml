@@ -10,6 +10,7 @@
 			user_search_history_id,
 			user_no,
 			target_user_no,
+			target_tag_id,
 			searched_at
 		FROM ultary_user_search_history
 		WHERE user_search_history_id = #{userSearchHistoryId}
@@ -19,8 +20,8 @@
 	<select id="findRecent" resultType="me._hanho.ultary.domain.user.model.SearchHistoryRow">
 		SELECT
 			h.user_search_history_id,
+			CASE WHEN h.target_tag_id IS NOT NULL THEN 'TAG' ELSE 'USER' END AS historyType,
 			h.target_user_no,
-			h.searched_at,
 			u.nickname,
 			(
 				SELECT rp.profile_file_id
@@ -30,20 +31,39 @@
 				  AND rp.profile_file_id IS NOT NULL
 				ORDER BY rp.priority ASC, rp.pet_id ASC
 				LIMIT 1
-			) AS profileFileId
+			) AS profileFileId,
+			h.target_tag_id,
+			t.hashtag,
+			h.searched_at
 		FROM ultary_user_search_history h
-		INNER JOIN ultary_user u
+		LEFT JOIN ultary_user u
 			ON u.user_no = h.target_user_no
 		   AND u.withdrawal_status = 'ACTIVE'
+		LEFT JOIN ultary_tag t
+			ON t.tag_id = h.target_tag_id
+		   AND t.is_deleted = 0
+		LEFT JOIN ultary_user tag_creator
+			ON tag_creator.user_no = t.created_by_user_no
 		WHERE h.user_no = #{viewerUserNo}
-		  AND NOT EXISTS (
-			SELECT 1
-			FROM ultary_user_block b
-			WHERE b.is_deleted = 0
-			  AND (
-				(b.blocker_user_no = #{viewerUserNo} AND b.blocked_user_no = h.target_user_no)
-				OR (b.blocker_user_no = h.target_user_no AND b.blocked_user_no = #{viewerUserNo})
-			  )
+		  AND (
+			(
+				h.target_user_no IS NOT NULL
+				AND u.user_no IS NOT NULL
+				AND NOT EXISTS (
+					SELECT 1
+					FROM ultary_user_block b
+					WHERE b.is_deleted = 0
+					  AND (
+						(b.blocker_user_no = #{viewerUserNo} AND b.blocked_user_no = h.target_user_no)
+						OR (b.blocker_user_no = h.target_user_no AND b.blocked_user_no = #{viewerUserNo})
+					  )
+				)
+			)
+			OR (
+				h.target_tag_id IS NOT NULL
+				AND t.tag_id IS NOT NULL
+				AND (tag_creator.user_no IS NULL OR tag_creator.withdrawal_status &lt;&gt; 'SUSPENDED')
+			)
 		  )
 		<if test="cursorSearchedAt != null and cursorHistoryId != null">
 		  AND (
@@ -58,24 +78,41 @@
 		LIMIT #{limit}
 	</select>
 
-	<insert id="upsert">
+	<insert id="upsertUser">
 		INSERT INTO ultary_user_search_history (
 			user_no,
 			target_user_no,
+			target_tag_id,
 			searched_at
 		) VALUES (
 			#{userNo},
 			#{targetUserNo},
+			NULL,
 			NOW()
 		)
 		ON DUPLICATE KEY UPDATE searched_at = NOW()
 	</insert>
 
-	<select id="findByPair" resultType="me._hanho.ultary.domain.user.model.SearchHistoryRow">
+	<insert id="upsertTag">
+		INSERT INTO ultary_user_search_history (
+			user_no,
+			target_user_no,
+			target_tag_id,
+			searched_at
+		) VALUES (
+			#{userNo},
+			NULL,
+			#{targetTagId},
+			NOW()
+		)
+		ON DUPLICATE KEY UPDATE searched_at = NOW()
+	</insert>
+
+	<select id="findByUserPair" resultType="me._hanho.ultary.domain.user.model.SearchHistoryRow">
 		SELECT
 			h.user_search_history_id,
+			'USER' AS historyType,
 			h.target_user_no,
-			h.searched_at,
 			u.nickname,
 			(
 				SELECT rp.profile_file_id
@@ -85,11 +122,32 @@
 				  AND rp.profile_file_id IS NOT NULL
 				ORDER BY rp.priority ASC, rp.pet_id ASC
 				LIMIT 1
-			) AS profileFileId
+			) AS profileFileId,
+			NULL AS target_tag_id,
+			NULL AS hashtag,
+			h.searched_at
 		FROM ultary_user_search_history h
 		INNER JOIN ultary_user u ON u.user_no = h.target_user_no
 		WHERE h.user_no = #{viewerUserNo}
 		  AND h.target_user_no = #{targetUserNo}
+	</select>
+
+	<select id="findByTagPair" resultType="me._hanho.ultary.domain.user.model.SearchHistoryRow">
+		SELECT
+			h.user_search_history_id,
+			'TAG' AS historyType,
+			NULL AS target_user_no,
+			NULL AS nickname,
+			NULL AS profileFileId,
+			h.target_tag_id,
+			t.hashtag,
+			h.searched_at
+		FROM ultary_user_search_history h
+		INNER JOIN ultary_tag t
+			ON t.tag_id = h.target_tag_id
+		   AND t.is_deleted = 0
+		WHERE h.user_no = #{viewerUserNo}
+		  AND h.target_tag_id = #{targetTagId}
 	</select>
 
 	<delete id="deleteByUserNo">

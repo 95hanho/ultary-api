@@ -23,8 +23,12 @@ Authorization: Bearer {{accessToken}}
 GET {{baseUrl}}/api/v1/tags/search?q=royal&limit=20
 Authorization: Bearer {{accessToken}}
 
-### 0d. 시드 태그 추천
-GET {{baseUrl}}/api/v1/tags/recommend?q=roy&limit=10
+### 0d. 내용 기반 태그 추천 (Gemini → 실패 시 DB). 최대 5
+GET {{baseUrl}}/api/v1/tags/recommend?q=오늘 몽이랑 한강공원에서 산책&limit=5
+Authorization: Bearer {{accessToken}}
+
+### 0e. 짧은 접두어 (AI 실패·빈 결과면 DB LIKE)
+GET {{baseUrl}}/api/v1/tags/recommend?q=roy&limit=5
 Authorization: Bearer {{accessToken}}
 
 ### 1a. 태그 등록 (시드 royalcanin과 충돌 방지)
@@ -59,8 +63,8 @@ Authorization: Bearer {{accessToken}}
 GET {{baseUrl}}/api/v1/tags/search?q=http&limit=20
 Authorization: Bearer {{accessToken}}
 
-### 4. 태그 추천 (입력 중 접두/부분일치, q 없으면 인기순)
-GET {{baseUrl}}/api/v1/tags/recommend?q=http&limit=10
+### 4. 태그 추천 (내용·접두어, 최대 5)
+GET {{baseUrl}}/api/v1/tags/recommend?q=http&limit=5
 Authorization: Bearer {{accessToken}}
 
 ### 5a. 태그 수정 — 설명은 승인 요청이 된다 (hashtag·handle 제외)

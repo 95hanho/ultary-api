@@ -16,6 +16,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.exception.BusinessException;
 import me._hanho.ultary.common.exception.ErrorCode;
+import me._hanho.ultary.domain.ai.AiService;
+import me._hanho.ultary.domain.ai.ContentModerationKind;
 import me._hanho.ultary.domain.neighbor.NeighborService;
 import me._hanho.ultary.domain.settings.PrivacyService;
 import me._hanho.ultary.domain.notification.NotificationService;
@@ -78,6 +80,7 @@ public class FeedService {
 	private final NeighborService neighborService;
 	private final NotificationService notificationService;
 	private final PrivacyService privacyService;
+	private final AiService aiService;
 	private final ReportService reportService;
 
 	@Transactional
@@ -85,6 +88,9 @@ public class FeedService {
 		if (request.getMedia() == null || request.getMedia().isEmpty()) {
 			throw new BusinessException(ErrorCode.FEED_MEDIA_REQUIRED);
 		}
+
+		aiService.assertContentSafe(
+				principal.getUserNo(), null, request.getContent(), ContentModerationKind.FEED);
 
 		String visibility = privacyService.resolveFeedVisibility(principal.getUserNo(), request.getVisibility());
 		Feed feed = new Feed();
@@ -161,6 +167,8 @@ public class FeedService {
 		patch.setUserNo(principal.getUserNo());
 		patch.setClearContent(Boolean.TRUE.equals(request.getClearContent()));
 		if (!Boolean.TRUE.equals(request.getClearContent()) && request.getContent() != null) {
+			aiService.assertContentSafe(
+					principal.getUserNo(), feedId, request.getContent(), ContentModerationKind.FEED);
 			patch.setContent(request.getContent().trim());
 		}
 		if (request.getVisibility() != null) {
@@ -340,10 +348,13 @@ public class FeedService {
 			UserPrincipal principal, Long feedId, CreateCommentRequest request) {
 		Feed feed = requireVisible(feedId, principal.getUserNo());
 		privacyService.assertCommentAllowed(principal.getUserNo(), feed.getUserNo());
+		String content = request.getContent().trim();
+		aiService.assertContentSafe(
+				principal.getUserNo(), feedId, content, ContentModerationKind.COMMENT);
 		FeedComment comment = new FeedComment();
 		comment.setFeedId(feedId);
 		comment.setUserNo(principal.getUserNo());
-		comment.setContent(request.getContent().trim());
+		comment.setContent(content);
 		feedMapper.insertComment(comment);
 		insertCommentMentions(principal.getUserNo(), comment.getFeedCommentId(), null, request.getMentions());
 		feedMapper.adjustCommentCount(feedId, 1);
@@ -358,7 +369,10 @@ public class FeedService {
 			UserPrincipal principal, Long feedId, Long commentId, UpdateCommentRequest request) {
 		requireVisible(feedId, principal.getUserNo());
 		requireComment(feedId, commentId);
-		int updated = feedMapper.updateCommentContent(commentId, principal.getUserNo(), request.getContent().trim());
+		String content = request.getContent().trim();
+		aiService.assertContentSafe(
+				principal.getUserNo(), feedId, content, ContentModerationKind.COMMENT);
+		int updated = feedMapper.updateCommentContent(commentId, principal.getUserNo(), content);
 		if (updated == 0) {
 			throw new BusinessException(ErrorCode.FORBIDDEN);
 		}
@@ -451,10 +465,13 @@ public class FeedService {
 		Feed feed = requireVisible(feedId, principal.getUserNo());
 		privacyService.assertCommentAllowed(principal.getUserNo(), feed.getUserNo());
 		requireComment(feedId, commentId);
+		String content = request.getContent().trim();
+		aiService.assertContentSafe(
+				principal.getUserNo(), feedId, content, ContentModerationKind.REPLY);
 		FeedReply reply = new FeedReply();
 		reply.setFeedCommentId(commentId);
 		reply.setUserNo(principal.getUserNo());
-		reply.setContent(request.getContent().trim());
+		reply.setContent(content);
 		feedMapper.insertReply(reply);
 		insertCommentMentions(principal.getUserNo(), null, reply.getFeedReplyId(), request.getMentions());
 		notificationService.syncFeedThread(feedId, true);
@@ -473,7 +490,10 @@ public class FeedService {
 		requireVisible(feedId, principal.getUserNo());
 		requireComment(feedId, commentId);
 		requireReply(commentId, replyId);
-		int updated = feedMapper.updateReplyContent(replyId, principal.getUserNo(), request.getContent().trim());
+		String content = request.getContent().trim();
+		aiService.assertContentSafe(
+				principal.getUserNo(), feedId, content, ContentModerationKind.REPLY);
+		int updated = feedMapper.updateReplyContent(replyId, principal.getUserNo(), content);
 		if (updated == 0) {
 			throw new BusinessException(ErrorCode.FORBIDDEN);
 		}

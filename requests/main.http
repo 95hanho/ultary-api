@@ -77,7 +77,7 @@ GET {{baseUrl}}/api/v1/main/search/recommended?limit=9
 Authorization: Bearer {{accessToken}}
 
 ### 7. 최근 검색 5건 (검색창을 열 때)
-# 검색 후 들어간 유저 울타리. items[] userNo/nickname/profileFile. nextCursorHistoryId 있으면 8번
+# 울타리(type=USER) + 태그(type=TAG) 혼합. searchedAt 내림차순
 # @name recentSearch
 GET {{baseUrl}}/api/v1/main/search/recent
 Authorization: Bearer {{accessToken}}
@@ -88,14 +88,24 @@ Authorization: Bearer {{accessToken}}
 GET {{baseUrl}}/api/v1/main/search/recent/more?cursorHistoryId={{cursorHistoryId}}
 Authorization: Bearer {{accessToken}}
 
-### 9. 최근 검색 저장 (검색 후 그 울타리에 들어갈 때)
-# 같은 targetUserNo면 새 행 없이 searched_at만 갱신. 시드 주민 102
+### 9a. 최근 검색 저장 — 울타리
+# 같은 targetUserNo면 searched_at만 갱신. 시드 주민 102
 POST {{baseUrl}}/api/v1/main/search/recent
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
   "targetUserNo": 102
+}
+
+### 9b. 최근 검색 저장 — 태그 피드
+# /search/tags/{tagId} 진입 시. 같은 tagId면 searched_at만 갱신. 없으면 404 TAG_NOT_FOUND
+POST {{baseUrl}}/api/v1/main/search/recent
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "tagId": 101
 }
 
 ### 10a. 최근 검색 한 건 지우기

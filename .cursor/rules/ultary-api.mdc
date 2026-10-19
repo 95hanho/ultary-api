@@ -19,7 +19,7 @@ Spring Boot 3.4 / MyBatis / MariaDB 10.1 / 패키지 `me._hanho.ultary` / API pr
 
 ## 진행 상태 (커밋 메시지와 함께 갱신)
 
-- 스키마: **v29** (신고 `ON_HOLD` 보류 제거. PET 제거는 v28, 거절 멘트는 v27, 태그 `purpose`는 v26)
+- 스키마: **v31** (본문·댓글·답글 100자. 최근검색 태그는 v30, ON_HOLD 제거 v29, PET 제거 v28)
 - 완료(스모크): auth, file, pet, tag, feed, myultary, story, neighbor(block 포함), **main**(feeds/search/recommended/최근검색), **notification**(목록·읽음, 배지는 소켓 `NOTIFICATION_UNREAD`), **dm**(방·메시지·게시글/스토리 공유. 공유 대상은 `GET /dm/share-targets`. 새 메시지는 `DM_MESSAGE`의 `room.following`·`followedBy`, 읽음은 `DM_READ`, 입력 중은 `DM_TYPING`), **report**(게시글·댓글·답글·유저. 사유 ENUM. 관리자 삭제·정지)
 - 로컬 시드(선택): `share/database/seed/mariadb_10_1/001_dev_sample_data.sql` — 재실행 가능, 운영에서는 제외. user **101~105**, pet 유저당 1~2. HTTP는 user 101 / phone `01011112222` / `Test1234!`. SNS 연동 시드 없음(실제 OAuth만)
 - HTTP: `requests/my-ultary.http`, `requests/story.http`, `requests/neighbor.http`, `requests/main.http`, `requests/notification.http`, `requests/dm.http`, `requests/ws.http` 등

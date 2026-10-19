@@ -1,5 +1,6 @@
 package me._hanho.ultary.domain.tag;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -14,6 +15,7 @@ import me._hanho.ultary.common.exception.BusinessException;
 import me._hanho.ultary.common.exception.ErrorCode;
 import me._hanho.ultary.common.response.ChangeAvailabilityResponse;
 import me._hanho.ultary.common.validation.IdentityChangeCooldown;
+import me._hanho.ultary.domain.ai.AiService;
 import me._hanho.ultary.domain.file.FileService;
 import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
 import me._hanho.ultary.domain.tag.dto.request.ChangeTagHandleRequest;
@@ -36,11 +38,14 @@ public class TagService {
 
 	private static final int DEFAULT_LIMIT = 20;
 	private static final int MAX_LIMIT = 50;
+	/** 게시글 내용 기반 추천 상한 */
+	private static final int RECOMMEND_MAX = 5;
 	private static final int REQUEST_DEFAULT_LIMIT = 30;
 	private static final Set<String> REQUEST_STATUSES = Set.of("PENDING", "APPROVED", "REJECTED");
 
 	private final TagMapper tagMapper;
 	private final FileService fileService;
+	private final AiService aiService;
 
 	@Transactional
 	public TagResponse create(UserPrincipal principal, CreateTagRequest request) {
@@ -242,12 +247,54 @@ public class TagService {
 		return tagMapper.searchByHashtag(viewerUserNo, q, limit);
 	}
 
+	/**
+	 * 게시글 작성 중 내용(q) 기반 태그 추천.
+	 * Gemini 우선, 실패·비활성·빈 결과면 기존 DB LIKE 추천으로 fallback.
+	 * 최대 5개. 기존 DB 태그가 있으면 tagId 등을 채운다.
+	 */
 	@Transactional(readOnly = true)
-	public List<TagResponse> recommend(String q, Integer limit) {
+	public List<TagResponse> recommend(UserPrincipal principal, String q, Integer limit) {
+		int capped = Math.min(resolveLimit(limit), RECOMMEND_MAX);
 		String query = StringUtils.hasText(q) ? q.trim() : null;
-		return tagMapper.recommend(query, resolveLimit(limit)).stream()
+		Long userNo = principal != null ? principal.getUserNo() : null;
+
+		if (query != null) {
+			List<String> aiTags = aiService.recommendHashtags(userNo, query);
+			if (!aiTags.isEmpty()) {
+				return toRecommendResponses(aiTags, capped);
+			}
+		}
+		return recommendFromDb(query, capped);
+	}
+
+	private List<TagResponse> recommendFromDb(String query, int limit) {
+		return tagMapper.recommend(query, limit).stream()
 				.map(this::toResponse)
 				.toList();
+	}
+
+	private List<TagResponse> toRecommendResponses(List<String> hashtags, int limit) {
+		List<TagResponse> result = new ArrayList<>();
+		for (String hashtag : hashtags) {
+			if (result.size() >= limit) {
+				break;
+			}
+			Tag existing = tagMapper.findActiveByHashtag(hashtag);
+			if (existing != null) {
+				result.add(toResponse(existing));
+			} else {
+				result.add(TagResponse.builder()
+						.tagId(null)
+						.hashtag(hashtag)
+						.purpose("USER")
+						.profileStatus("NONE")
+						.useCount(0)
+						.imageFileIds(List.of())
+						.images(List.of())
+						.build());
+			}
+		}
+		return result;
 	}
 
 	@Transactional(readOnly = true)

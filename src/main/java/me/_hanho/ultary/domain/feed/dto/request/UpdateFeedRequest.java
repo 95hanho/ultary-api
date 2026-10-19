@@ -10,7 +10,7 @@ import lombok.Setter;
 @Setter
 public class UpdateFeedRequest {
 
-	@Size(max = 1000, message = "본문은 1000자 이하여야 합니다.")
+	@Size(max = 100, message = "본문은 100자 이하여야 합니다.")
 	private String content;
 
 	@Pattern(regexp = "PUBLIC|NEIGHBORS|PRIVATE", message = "visibility는 PUBLIC, NEIGHBORS, PRIVATE만 가능합니다.")

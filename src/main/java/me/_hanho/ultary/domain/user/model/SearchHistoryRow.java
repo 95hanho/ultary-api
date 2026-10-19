@@ -5,14 +5,18 @@ import java.time.LocalDateTime;
 import lombok.Getter;
 import lombok.Setter;
 
-/** 최근 검색 목록 조인 행. 대상은 들어간 울타리 주인 */
+/** 최근 검색 목록 조인 행 */
 @Getter
 @Setter
 public class SearchHistoryRow {
 
 	private Long userSearchHistoryId;
+	/** USER | TAG */
+	private String historyType;
 	private Long targetUserNo;
 	private String nickname;
 	private Integer profileFileId;
+	private Long targetTagId;
+	private String hashtag;
 	private LocalDateTime searchedAt;
 }

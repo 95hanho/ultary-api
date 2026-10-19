@@ -5,15 +5,14 @@ import java.time.LocalDateTime;
 import lombok.Getter;
 import lombok.Setter;
 
-/** ultary_user_search_history — 검색 후 들어간 유저 울타리 */
+/** ultary_user_search_history — 들어간 유저 울타리 또는 태그 피드 */
 @Getter
 @Setter
 public class UserSearchHistory {
 
 	private Long userSearchHistoryId;
-	/** 검색 후 울타리에 들어간 사용자 */
 	private Long userNo;
-	/** 들어간 울타리 주인 */
 	private Long targetUserNo;
+	private Long targetTagId;
 	private LocalDateTime searchedAt;
 }

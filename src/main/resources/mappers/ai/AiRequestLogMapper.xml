@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+	"https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="me._hanho.ultary.domain.ai.AiRequestLogMapper">
+
+	<insert id="insert" useGeneratedKeys="true" keyProperty="aiRequestId" keyColumn="ai_request_id">
+		INSERT INTO ultary_ai_request_log (
+			user_no,
+			feature_type,
+			target_feed_id,
+			target_pet_id,
+			prompt,
+			result,
+			model_name,
+			used_token_count,
+			status,
+			error_message
+		) VALUES (
+			#{userNo},
+			#{featureType},
+			#{targetFeedId},
+			#{targetPetId},
+			#{prompt},
+			#{result},
+			#{modelName},
+			#{usedTokenCount},
+			#{status},
+			#{errorMessage}
+		)
+	</insert>
+
+</mapper>

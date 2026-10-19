@@ -137,6 +137,11 @@ public enum ErrorCode {
 	REPORT_CANNOT_CANCEL("REPORT_CANNOT_CANCEL", "신고요청 상태에서만 취소할 수 있습니다.", HttpStatus.CONFLICT),
 
 	// ==============================
+	// AI
+	// ==============================
+	AI_CONTENT_BLOCKED("AI_CONTENT_BLOCKED", "등록할 수 없는 표현이 포함되어 있습니다.", HttpStatus.BAD_REQUEST),
+
+	// ==============================
 	// 관리자 (admin)
 	// ==============================
 	// ADMIN_NOT_FOUND("ADMIN_NOT_FOUND", "관리자를 찾을 수 없습니다.", HttpStatus.NOT_FOUND),

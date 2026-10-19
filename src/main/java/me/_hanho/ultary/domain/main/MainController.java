@@ -156,15 +156,15 @@ public class MainController {
 				"최근 검색 더보기 성공");
 	}
 
-	/** 검색 후 그 유저 울타리에 들어갈 때 저장 */
+	/** 울타리 또는 태그 피드 진입 시 저장. Body: targetUserNo | tagId 중 하나 */
 	@PostMapping("/search/recent")
 	public ApiResponse<SearchHistoryItemResponse> saveRecentSearch(
 			@AuthenticationPrincipal UserPrincipal principal,
 			@Valid @RequestBody SaveSearchHistoryRequest request) {
-		log.info("[saveRecentSearch] userNo={} targetUserNo={}",
-				principal.getUserNo(), request.getTargetUserNo());
+		log.info("[saveRecentSearch] userNo={} targetUserNo={} tagId={}",
+				principal.getUserNo(), request.getTargetUserNo(), request.getTagId());
 		return ApiResponse.ok(
-				mainService.saveRecentSearch(principal, request.getTargetUserNo()),
+				mainService.saveRecentSearch(principal, request),
 				"최근 검색 저장 성공");
 	}
 

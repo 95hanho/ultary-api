@@ -74,10 +74,11 @@ public class TagController {
 
 	@GetMapping("/recommend")
 	public ApiResponse<List<TagResponse>> recommend(
+			@AuthenticationPrincipal UserPrincipal principal,
 			@RequestParam(required = false) String q,
 			@RequestParam(required = false) Integer limit) {
 		log.info("[recommend] q={} limit={}", q, limit);
-		return ApiResponse.ok(tagService.recommend(q, limit), "태그 추천 조회 성공");
+		return ApiResponse.ok(tagService.recommend(principal, q, limit), "태그 추천 조회 성공");
 	}
 
 	@GetMapping("/{tagId}/handle/change-availability")

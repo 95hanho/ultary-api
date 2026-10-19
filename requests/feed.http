@@ -29,6 +29,7 @@ GET {{baseUrl}}/api/v1/feeds/102
 Authorization: Bearer {{accessToken}}
 
 ### 1. 게시글 등록 (시드 file/pet/tag ID 사용)
+# 유해 본문이면 400 AI_CONTENT_BLOCKED (Gemini 키 있을 때). 본문 없으면 검사 생략
 # @name createFeed
 POST {{baseUrl}}/api/v1/feeds
 Authorization: Bearer {{accessToken}}
@@ -65,6 +66,7 @@ GET {{baseUrl}}/api/v1/feeds/{{feedId}}
 Authorization: Bearer {{accessToken}}
 
 ### 3. 게시글 수정 (content·visibility)
+# content 변경 시에도 모더레이션. clearContent / visibility만이면 검사 생략
 PATCH {{baseUrl}}/api/v1/feeds/{{feedId}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
