@@ -126,6 +126,11 @@ public interface FeedMapper {
 
 	int insertMediaMention(FeedMediaMention mention);
 
+	int deleteMediaMentions(@Param("feedMediaId") Long feedMediaId);
+	int deleteTaggedPet(@Param("feedId") Long feedId, @Param("petId") Long petId);
+	int removeFeedTag(@Param("feedId") Long feedId, @Param("tagId") Long tagId);
+	int restoreOrInsertFeedTag(@Param("feedId") Long feedId, @Param("tagId") Long tagId);
+
 	List<FeedMediaMention> findMentionsByFeedMediaId(@Param("feedMediaId") Long feedMediaId);
 
 	int insertFeedPet(FeedPet feedPet);

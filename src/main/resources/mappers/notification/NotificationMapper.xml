@@ -41,7 +41,7 @@
 		)
 		AND (n.type &lt;&gt; 'NEIGHBOR_REQUEST' OR n.neighbor_id IS NOT NULL)
 		AND (
-			NOT EXISTS (
+			n.type = 'AI_MODERATION' OR NOT EXISTS (
 				SELECT 1 FROM ultary_notification_setting s
 				WHERE s.user_no = n.receiver_user_no
 			)

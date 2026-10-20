@@ -14,6 +14,11 @@ public class FeedMediaMention {
 	private Long feedMediaMentionId;
 	private Long feedMediaId;
 	private Long petId;
+	/** Read-only labels joined from the pet and owner for existing photo-tag editing. */
+	private String mentionId;
+	private String petName;
+	private Long ownerUserNo;
+	private String ownerNickname;
 	private BigDecimal posX;
 	private BigDecimal posY;
 	private Long addedByUserNo;

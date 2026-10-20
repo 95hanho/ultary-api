@@ -16,8 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.exception.BusinessException;
 import me._hanho.ultary.common.exception.ErrorCode;
-import me._hanho.ultary.domain.ai.AiService;
-import me._hanho.ultary.domain.ai.ContentModerationKind;
+import me._hanho.ultary.domain.ai.ModerationQueue;
 import me._hanho.ultary.domain.neighbor.NeighborService;
 import me._hanho.ultary.domain.settings.PrivacyService;
 import me._hanho.ultary.domain.notification.NotificationService;
@@ -80,17 +79,15 @@ public class FeedService {
 	private final NeighborService neighborService;
 	private final NotificationService notificationService;
 	private final PrivacyService privacyService;
-	private final AiService aiService;
+	private final ModerationQueue moderationQueue;
 	private final ReportService reportService;
 
+	/** Persistence after synchronous approval by FeedCreationService. */
 	@Transactional
 	public FeedResponse create(UserPrincipal principal, CreateFeedRequest request) {
 		if (request.getMedia() == null || request.getMedia().isEmpty()) {
 			throw new BusinessException(ErrorCode.FEED_MEDIA_REQUIRED);
 		}
-
-		aiService.assertContentSafe(
-				principal.getUserNo(), null, request.getContent(), ContentModerationKind.FEED);
 
 		String visibility = privacyService.resolveFeedVisibility(principal.getUserNo(), request.getVisibility());
 		Feed feed = new Feed();
@@ -103,6 +100,7 @@ public class FeedService {
 		insertPets(feed.getFeedId(), principal.getUserNo(), request.getPets());
 		insertTags(feed.getFeedId(), request.getTagIds());
 		notificationService.syncFeedTags(feed.getFeedId());
+		moderationQueue.approveCreatedFeed(feed.getFeedId(), feed.getContent());
 
 		log.info("[create] feedId={} userNo={} media={}",
 				feed.getFeedId(), principal.getUserNo(), request.getMedia().size());
@@ -160,6 +158,7 @@ public class FeedService {
 
 	@Transactional
 	public FeedResponse update(UserPrincipal principal, Long feedId, UpdateFeedRequest request) {
+		var previous = moderationQueue.lock("FEED", feedId, feedId);
 		requireAuthor(feedId, principal.getUserNo());
 
 		Feed patch = new Feed();
@@ -167,8 +166,6 @@ public class FeedService {
 		patch.setUserNo(principal.getUserNo());
 		patch.setClearContent(Boolean.TRUE.equals(request.getClearContent()));
 		if (!Boolean.TRUE.equals(request.getClearContent()) && request.getContent() != null) {
-			aiService.assertContentSafe(
-					principal.getUserNo(), feedId, request.getContent(), ContentModerationKind.FEED);
 			patch.setContent(request.getContent().trim());
 		}
 		if (request.getVisibility() != null) {
@@ -179,12 +176,21 @@ public class FeedService {
 		if (updated == 0) {
 			throw new BusinessException(ErrorCode.FEED_NOT_FOUND);
 		}
+		if (request.getContent() != null || Boolean.TRUE.equals(request.getClearContent())) {
+			String content = Boolean.TRUE.equals(request.getClearContent()) ? null : blankToNull(request.getContent());
+			moderationQueue.enqueue("FEED", feedId, feedId, principal.getUserNo(), previous.getContent(), content, false);
+		}
+		if (request.getMediaTags() != null && replacePhotoTags(feedId, principal.getUserNo(), request.getMediaTags())) {
+			notificationService.syncFeedTags(feedId);
+		}
+		if (request.getTagIds() != null) replaceCaptionTags(feedId, request.getTagIds());
 		log.info("[update] feedId={} userNo={}", feedId, principal.getUserNo());
 		return toResponse(requireVisible(feedId, principal.getUserNo()), principal.getUserNo());
 	}
 
 	@Transactional
 	public void delete(UserPrincipal principal, Long feedId) {
+		moderationQueue.lock("FEED", feedId, feedId);
 		Feed feed = requireActive(feedId);
 		if (!canDelete(feed, principal.getUserNo())) {
 			throw new BusinessException(ErrorCode.FORBIDDEN);
@@ -346,11 +352,10 @@ public class FeedService {
 	@Transactional
 	public FeedCommentResponse createComment(
 			UserPrincipal principal, Long feedId, CreateCommentRequest request) {
+		moderationQueue.lock("FEED", feedId, feedId);
 		Feed feed = requireVisible(feedId, principal.getUserNo());
 		privacyService.assertCommentAllowed(principal.getUserNo(), feed.getUserNo());
 		String content = request.getContent().trim();
-		aiService.assertContentSafe(
-				principal.getUserNo(), feedId, content, ContentModerationKind.COMMENT);
 		FeedComment comment = new FeedComment();
 		comment.setFeedId(feedId);
 		comment.setUserNo(principal.getUserNo());
@@ -360,6 +365,7 @@ public class FeedService {
 		feedMapper.adjustCommentCount(feedId, 1);
 		notificationService.syncFeedThread(feedId, true);
 		notificationService.syncCommentMentions(comment.getFeedCommentId());
+		moderationQueue.enqueue("COMMENT", comment.getFeedCommentId(), feedId, principal.getUserNo(), null, content, true);
 		log.info("[createComment] feedId={} commentId={}", feedId, comment.getFeedCommentId());
 		return toCommentResponse(requireComment(feedId, comment.getFeedCommentId()), false, principal.getUserNo(), null);
 	}
@@ -367,22 +373,23 @@ public class FeedService {
 	@Transactional
 	public FeedCommentResponse updateComment(
 			UserPrincipal principal, Long feedId, Long commentId, UpdateCommentRequest request) {
+		var previous = moderationQueue.lock("COMMENT", commentId, feedId);
 		requireVisible(feedId, principal.getUserNo());
 		requireComment(feedId, commentId);
 		String content = request.getContent().trim();
-		aiService.assertContentSafe(
-				principal.getUserNo(), feedId, content, ContentModerationKind.COMMENT);
 		int updated = feedMapper.updateCommentContent(commentId, principal.getUserNo(), content);
 		if (updated == 0) {
 			throw new BusinessException(ErrorCode.FORBIDDEN);
 		}
 		notificationService.refreshCommentSnippet(commentId);
 		notificationService.syncFeedThread(feedId, false);
+		moderationQueue.enqueue("COMMENT", commentId, feedId, principal.getUserNo(), previous.getContent(), content, false);
 		return toCommentResponse(requireComment(feedId, commentId), false, principal.getUserNo(), null);
 	}
 
 	@Transactional
 	public void deleteComment(UserPrincipal principal, Long feedId, Long commentId) {
+		moderationQueue.lock("COMMENT", commentId, feedId);
 		Feed feed = requireVisible(feedId, principal.getUserNo());
 		FeedComment comment = requireComment(feedId, commentId);
 		int deleted;
@@ -462,12 +469,11 @@ public class FeedService {
 	@Transactional
 	public FeedReplyResponse createReply(
 			UserPrincipal principal, Long feedId, Long commentId, CreateReplyRequest request) {
+		moderationQueue.lock("COMMENT", commentId, feedId);
 		Feed feed = requireVisible(feedId, principal.getUserNo());
 		privacyService.assertCommentAllowed(principal.getUserNo(), feed.getUserNo());
 		requireComment(feedId, commentId);
 		String content = request.getContent().trim();
-		aiService.assertContentSafe(
-				principal.getUserNo(), feedId, content, ContentModerationKind.REPLY);
 		FeedReply reply = new FeedReply();
 		reply.setFeedCommentId(commentId);
 		reply.setUserNo(principal.getUserNo());
@@ -476,6 +482,7 @@ public class FeedService {
 		insertCommentMentions(principal.getUserNo(), null, reply.getFeedReplyId(), request.getMentions());
 		notificationService.syncFeedThread(feedId, true);
 		notificationService.syncReplyMentions(reply.getFeedReplyId());
+		moderationQueue.enqueue("REPLY", reply.getFeedReplyId(), feedId, principal.getUserNo(), null, content, true);
 		log.info("[createReply] commentId={} replyId={}", commentId, reply.getFeedReplyId());
 		return toReplyResponse(requireReply(commentId, reply.getFeedReplyId()), principal.getUserNo(), null);
 	}
@@ -487,18 +494,18 @@ public class FeedService {
 			Long commentId,
 			Long replyId,
 			UpdateReplyRequest request) {
+		var previous = moderationQueue.lock("REPLY", replyId, feedId);
 		requireVisible(feedId, principal.getUserNo());
 		requireComment(feedId, commentId);
 		requireReply(commentId, replyId);
 		String content = request.getContent().trim();
-		aiService.assertContentSafe(
-				principal.getUserNo(), feedId, content, ContentModerationKind.REPLY);
 		int updated = feedMapper.updateReplyContent(replyId, principal.getUserNo(), content);
 		if (updated == 0) {
 			throw new BusinessException(ErrorCode.FORBIDDEN);
 		}
 		notificationService.refreshReplySnippet(replyId);
 		notificationService.syncFeedThread(feedId, false);
+		moderationQueue.enqueue("REPLY", replyId, feedId, principal.getUserNo(), previous.getContent(), content, false);
 		return toReplyResponse(requireReply(commentId, replyId), principal.getUserNo(), null);
 	}
 
@@ -543,6 +550,7 @@ public class FeedService {
 
 	@Transactional
 	public void deleteReply(UserPrincipal principal, Long feedId, Long commentId, Long replyId) {
+		moderationQueue.lock("REPLY", replyId, feedId);
 		Feed feed = requireVisible(feedId, principal.getUserNo());
 		requireComment(feedId, commentId);
 		FeedReply reply = requireReply(commentId, replyId);
@@ -565,6 +573,7 @@ public class FeedService {
 	/** 관리자 삭제. 이미 없으면 아무 것도 하지 않는다. */
 	@Transactional
 	public void deleteByAdmin(Long feedId) {
+		moderationQueue.lock("FEED", feedId, feedId);
 		if (feedMapper.softDeleteFeedByAdmin(feedId) > 0) {
 			notificationService.removeByFeed(feedId);
 			log.info("[deleteByAdmin] feedId={}", feedId);
@@ -574,6 +583,7 @@ public class FeedService {
 	/** 관리자 삭제조치 원상복구. 이미 살아 있으면 아무 것도 하지 않는다. */
 	@Transactional
 	public void restoreByAdmin(Long feedId) {
+		moderationQueue.lock("FEED", feedId, feedId);
 		if (feedMapper.restoreFeedByAdmin(feedId) > 0) {
 			log.info("[restoreByAdmin] feedId={}", feedId);
 		}
@@ -582,7 +592,9 @@ public class FeedService {
 	@Transactional
 	public void deleteCommentByAdmin(Long commentId) {
 		FeedComment comment = feedMapper.findActiveCommentById(commentId);
-		if (comment == null || feedMapper.softDeleteCommentByAdmin(commentId) == 0) {
+		if (comment == null) return;
+		moderationQueue.lock("COMMENT", commentId, comment.getFeedId());
+		if (feedMapper.softDeleteCommentByAdmin(commentId) == 0) {
 			return;
 		}
 		feedMapper.adjustCommentCount(comment.getFeedId(), -1);
@@ -593,6 +605,7 @@ public class FeedService {
 
 	@Transactional
 	public void restoreCommentByAdmin(Long commentId, Long feedId) {
+		moderationQueue.lock("COMMENT", commentId, feedId);
 		if (feedMapper.restoreCommentByAdmin(commentId) == 0) {
 			return;
 		}
@@ -606,7 +619,10 @@ public class FeedService {
 	@Transactional
 	public void deleteReplyByAdmin(Long replyId) {
 		FeedReply reply = feedMapper.findActiveReplyById(replyId);
-		if (reply == null || feedMapper.softDeleteReplyByAdmin(replyId) == 0) {
+		if (reply == null) return;
+		FeedComment parent = feedMapper.findActiveCommentById(reply.getFeedCommentId());
+		if (parent != null) moderationQueue.lock("REPLY", replyId, parent.getFeedId());
+		if (feedMapper.softDeleteReplyByAdmin(replyId) == 0) {
 			return;
 		}
 		notificationService.removeReply(replyId);
@@ -619,6 +635,7 @@ public class FeedService {
 
 	@Transactional
 	public void restoreReplyByAdmin(Long replyId, Long feedId) {
+		moderationQueue.lock("REPLY", replyId, feedId);
 		if (feedMapper.restoreReplyByAdmin(replyId) == 0) {
 			return;
 		}
@@ -668,6 +685,82 @@ public class FeedService {
 				}
 			}
 		}
+	}
+
+	private String mentionKey(Long petId, java.math.BigDecimal x, java.math.BigDecimal y) {
+		return petId + ":" + x.stripTrailingZeros().toPlainString() + ":" + y.stripTrailingZeros().toPlainString();
+	}
+
+	private boolean replacePhotoTags(Long feedId, Long userNo, List<UpdateFeedRequest.MediaTags> changes) {
+		List<FeedMedia> media = feedMapper.findMediaByFeedId(feedId);
+		Set<Long> allowed = new HashSet<>();
+		Set<Long> oldPhotoPets = new HashSet<>();
+		for (FeedMedia slot : media) {
+			allowed.add(slot.getFeedMediaId());
+			for (FeedMediaMention mention : feedMapper.findMentionsByFeedMediaId(slot.getFeedMediaId())) oldPhotoPets.add(mention.getPetId());
+		}
+		Set<Long> seenMedia = new HashSet<>();
+		for (var change : changes) {
+			if (!allowed.contains(change.getFeedMediaId()) || !seenMedia.add(change.getFeedMediaId())) {
+				throw new BusinessException(ErrorCode.INVALID_INPUT, "이 게시글의 사진 태그만 수정할 수 있습니다.");
+			}
+		}
+		boolean changed = false;
+		for (var change : changes) {
+			Map<Long, CreateFeedRequest.MentionItem> desired = new java.util.LinkedHashMap<>();
+			for (var mention : change.getMentions()) desired.putIfAbsent(mention.getPetId(), mention);
+			Set<String> before = new HashSet<>();
+			for (var mention : feedMapper.findMentionsByFeedMediaId(change.getFeedMediaId())) before.add(mentionKey(mention.getPetId(), mention.getPosX(), mention.getPosY()));
+			Set<String> after = new HashSet<>();
+			for (var mention : desired.values()) after.add(mentionKey(mention.getPetId(), mention.getPosX(), mention.getPosY()));
+			if (before.equals(after)) continue;
+			for (var item : desired.values()) {
+				Pet pet = requirePet(item.getPetId());
+				privacyService.assertTagAllowed(userNo, pet.getUserNo());
+			}
+			feedMapper.deleteMediaMentions(change.getFeedMediaId());
+			for (var item : desired.values()) {
+				FeedMediaMention mention = new FeedMediaMention();
+				mention.setFeedMediaId(change.getFeedMediaId()); mention.setPetId(item.getPetId());
+				mention.setPosX(item.getPosX()); mention.setPosY(item.getPosY()); mention.setAddedByUserNo(userNo);
+				feedMapper.insertMediaMention(mention);
+			}
+			changed = true;
+		}
+		if (!changed) return false;
+		Set<Long> desiredPets = new java.util.LinkedHashSet<>();
+		for (var slot : media) for (var mention : feedMapper.findMentionsByFeedMediaId(slot.getFeedMediaId())) desiredPets.add(mention.getPetId());
+		for (Long old : oldPhotoPets) if (!desiredPets.contains(old)) feedMapper.deleteTaggedPet(feedId, old);
+		List<FeedPet> retained = feedMapper.findPetsByFeedId(feedId);
+		Set<Long> retainedIds = new HashSet<>();
+		boolean mainAssigned = false;
+		for (var pet : retained) { retainedIds.add(pet.getPetId()); mainAssigned |= Boolean.TRUE.equals(pet.getIsMain()); }
+		for (Long petId : desiredPets) {
+			if (retainedIds.contains(petId)) continue;
+			FeedPet pet = new FeedPet(); pet.setFeedId(feedId); pet.setPetId(petId); pet.setAddedByUserNo(userNo);
+			pet.setRole("TAGGED"); pet.setIsMain(!mainAssigned); mainAssigned = true; feedMapper.insertFeedPet(pet);
+		}
+		return true;
+	}
+
+	private void replaceCaptionTags(Long feedId, List<Long> tagIds) {
+		Set<Long> before = new HashSet<>(feedMapper.findTagIdsByFeedId(feedId));
+		Set<Long> desired = new HashSet<>(tagIds);
+		for (Long tagId : desired) if (tagMapper.findActiveByTagId(tagId) == null) throw new BusinessException(ErrorCode.TAG_NOT_FOUND);
+		for (Long tagId : before) if (!desired.contains(tagId) && feedMapper.removeFeedTag(feedId, tagId) > 0) tagMapper.decrementUseCount(tagId);
+		for (Long tagId : desired) if (!before.contains(tagId)) { feedMapper.restoreOrInsertFeedTag(feedId, tagId); tagMapper.incrementUseCount(tagId); }
+	}
+
+	/** The compose editor derives hashtag links from the caption; restore them with rejected text. */
+	@Transactional
+	public void restoreCaptionTags(Long feedId, String approvedContent) {
+		Set<Long> tags = new HashSet<>();
+		var matcher = java.util.regex.Pattern.compile("#([0-9A-Za-z가-힣_]+)").matcher(approvedContent == null ? "" : approvedContent);
+		while (matcher.find()) {
+			Tag tag = tagMapper.findActiveByHashtag(matcher.group(1));
+			if (tag != null) tags.add(tag.getTagId());
+		}
+		replaceCaptionTags(feedId, new ArrayList<>(tags));
 	}
 
 	private void insertPets(Long feedId, Long userNo, List<CreateFeedRequest.PetItem> pets) {
@@ -860,6 +953,10 @@ public class FeedService {
 					.stream()
 					.map(m -> FeedResponse.MentionItem.builder()
 							.petId(m.getPetId())
+							.mentionId(m.getMentionId())
+							.petName(m.getPetName())
+							.userNo(m.getOwnerUserNo())
+							.ownerNickname(m.getOwnerNickname())
 							.posX(m.getPosX())
 							.posY(m.getPosY())
 							.build())

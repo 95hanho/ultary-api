@@ -1,134 +1,86 @@
 package me._hanho.ultary.domain.ai;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
-import java.util.List;
-
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Mock;
+import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
-
-import me._hanho.ultary.common.exception.BusinessException;
-import me._hanho.ultary.common.exception.ErrorCode;
-import me._hanho.ultary.domain.ai.GeminiClient.GeminiException;
-import me._hanho.ultary.domain.ai.model.AiRequestLog;
+import me._hanho.ultary.domain.ai.model.*;
 
 @ExtendWith(MockitoExtension.class)
 class AiServiceTest {
+    @Mock GeminiClient client;
+    @Mock AiLogService logs;
+    AiService service;
+    @BeforeEach void init() { service = new AiService(client, new ObjectMapper(), logs); }
+    ModerationJob job() {
+        ModerationJob j = new ModerationJob(); j.setJobId(7L); j.setUserNo(101L); j.setFeedId(120L);
+        j.setTargetType("COMMENT"); j.setTargetId(815L); j.setContentVersion(2L); j.setAttemptCount(1); j.setContent("hello"); return j;
+    }
+    @Test void unsafeIsAVerdictNotAnInfrastructureFailure() {
+        when(client.generateJson(anyString(),anyString())).thenReturn("{\"safe\":false,\"category\":\"ABUSE\"}");
+        var result = service.moderate(job());
+        assertThat(result.safe()).isFalse(); assertThat(result.failed()).isFalse();
+        var c = ArgumentCaptor.forClass(AiRequestLog.class); verify(logs).write(c.capture());
+        assertThat(c.getValue().getStatus()).isEqualTo("SUCCESS");
+        assertThat(c.getValue().getModerationJobId()).isEqualTo(7L);
+        assertThat(c.getValue().getTargetId()).isEqualTo(815L);
+        assertThat(c.getValue().getContentVersion()).isEqualTo(2L);
+    }
+    @Test void malformedVerdictDoesNotApproveOrRejectContent() {
+        when(client.generateJson(anyString(),anyString())).thenReturn("{\"category\":\"ABUSE\"}");
+        var result = service.moderate(job());
+        assertThat(result.failed()).isTrue(); assertThat(result.safe()).isNull(); assertThat(result.retryable()).isTrue();
+    }
+    @Test void timeoutIsRecordedWithTargetAttemptAndNoUserText() {
+        when(client.generateJson(anyString(),anyString())).thenThrow(new GeminiClient.GeminiException("GEMINI_TIMEOUT",null,"Response deadline exceeded",true));
+        var result = service.moderate(job());
+        assertThat(result.failed()).isTrue(); assertThat(result.errorCode()).isEqualTo("GEMINI_TIMEOUT");
+        var c=ArgumentCaptor.forClass(AiRequestLog.class);verify(logs).write(c.capture());
+        assertThat(c.getValue().getAttemptNo()).isEqualTo(1);
+        assertThat(c.getValue().getErrorMessage()).isEqualTo("Response deadline exceeded");
+        assertThat(c.getValue().getPrompt()).doesNotContain("hello");
+    }
+    @Test void emptyCaptionRequiresNoExternalCall() {
+        var j=job();j.setContent(null);assertThat(service.moderate(j).safe()).isTrue();verify(client,never()).generateJson(anyString(),anyString());
+    }
+    @Test void tagRecommendationStillUsesSynchronousFallbackAndSanitizesTags() {
+        when(client.isEnabled()).thenReturn(true);
+        when(client.generateJson(anyString(),anyString())).thenReturn("{\"hashtags\":[\"dog\",\"#walk\",\"dog\",\"invalid!!\"]}");
+        assertThat(service.recommendHashtags(101L,"walk")).containsExactly("dog","walk");
+        when(client.generateJson(anyString(),anyString())).thenThrow(new GeminiClient.GeminiException("GEMINI_TIMEOUT"));
+        assertThat(service.recommendHashtags(101L,"walk")).isEmpty();
+    }
 
-	@Mock
-	private GeminiClient geminiClient;
+    @Test void feedCreationRejectsUnsafeTextWithAReasonAndKeepsTheInspectionLog() {
+        when(client.generateJson(anyString(),anyString())).thenReturn("{\"safe\":false,\"category\":\"ABUSE\"}");
+        assertThatThrownBy(() -> service.assertFeedCreationAllowed(101L,"unsafe"))
+                .isInstanceOfSatisfying(me._hanho.ultary.common.exception.BusinessException.class, ex -> {
+                    assertThat(ex.getErrorCode()).isEqualTo(me._hanho.ultary.common.exception.ErrorCode.AI_CONTENT_BLOCKED);
+                    assertThat(ex.getMessage()).contains("욕설·비방");
+                });
+        var row=ArgumentCaptor.forClass(AiRequestLog.class);verify(logs).write(row.capture());
+        assertThat(row.getValue().getStatus()).isEqualTo("SUCCESS");
+        assertThat(row.getValue().getModerationJobId()).isNull();
+        assertThat(row.getValue().getTargetType()).isEqualTo("FEED");
+    }
 
-	@Mock
-	private AiRequestLogMapper aiRequestLogMapper;
+    @Test void feedCreationTimeoutIsAServiceFailureAndNeverAUserViolation() {
+        when(client.generateJson(anyString(),anyString())).thenThrow(new GeminiClient.GeminiException("GEMINI_TIMEOUT"));
+        assertThatThrownBy(() -> service.assertFeedCreationAllowed(101L,"content"))
+                .isInstanceOfSatisfying(me._hanho.ultary.common.exception.BusinessException.class, ex -> {
+                    assertThat(ex.getErrorCode()).isEqualTo(me._hanho.ultary.common.exception.ErrorCode.AI_CHECK_UNAVAILABLE);
+                    assertThat(ex.getMessage()).contains("응답 시간");
+                });
+        var row=ArgumentCaptor.forClass(AiRequestLog.class);verify(logs).write(row.capture());
+        assertThat(row.getValue().getStatus()).isEqualTo("FAILED");
+    }
 
-	private AiService aiService;
-
-	@BeforeEach
-	void setUp() {
-		aiService = new AiService(geminiClient, new ObjectMapper(), aiRequestLogMapper);
-	}
-
-	@Test
-	void recommendHashtags_returnsUpToFiveCleanTags() {
-		when(geminiClient.isEnabled()).thenReturn(true);
-		when(geminiClient.modelName()).thenReturn("gemini-2.0-flash");
-		when(geminiClient.generateJson(anyString(), anyString())).thenReturn(
-				"{\"hashtags\":[\"강아지산책\",\"#한강산책\",\"강아지산책\",\"invalid!!\",\"반려견일상\",\"댕댕이\",\"초과태그\"]}");
-
-		List<String> tags = aiService.recommendHashtags(101L, "오늘 몽이랑 한강 산책");
-
-		assertThat(tags).containsExactly("강아지산책", "한강산책", "반려견일상", "댕댕이", "초과태그");
-		verify(aiRequestLogMapper).insert(any(AiRequestLog.class));
-	}
-
-	@Test
-	void recommendHashtags_geminiFailure_returnsEmptyForFallback() {
-		when(geminiClient.isEnabled()).thenReturn(true);
-		when(geminiClient.modelName()).thenReturn("gemini-2.0-flash");
-		when(geminiClient.generateJson(anyString(), anyString()))
-				.thenThrow(new GeminiException("GEMINI_HTTP_FAILED"));
-
-		assertThat(aiService.recommendHashtags(101L, "산책")).isEmpty();
-
-		ArgumentCaptor<AiRequestLog> captor = ArgumentCaptor.forClass(AiRequestLog.class);
-		verify(aiRequestLogMapper).insert(captor.capture());
-		assertThat(captor.getValue().getStatus()).isEqualTo("FAILED");
-		assertThat(captor.getValue().getFeatureType()).isEqualTo(AiFeatureTypes.HASHTAG);
-	}
-
-	@Test
-	void assertContentSafe_unsafe_throwsBlocked() {
-		when(geminiClient.isEnabled()).thenReturn(true);
-		when(geminiClient.modelName()).thenReturn("gemini-2.0-flash");
-		when(geminiClient.generateJson(anyString(), anyString())).thenReturn(
-				"{\"safe\":false,\"category\":\"ABUSE\",\"reason\":\"욕설\"}");
-
-		assertThatThrownBy(() -> aiService.assertContentSafe(
-						101L, 1L, "욕설내용", ContentModerationKind.COMMENT))
-				.isInstanceOf(BusinessException.class)
-				.satisfies(ex -> assertThat(((BusinessException) ex).getErrorCode())
-						.isEqualTo(ErrorCode.AI_CONTENT_BLOCKED));
-	}
-
-	@Test
-	void assertContentSafe_feedUnsafe_throwsBlocked() {
-		when(geminiClient.isEnabled()).thenReturn(true);
-		when(geminiClient.modelName()).thenReturn("gemini-2.0-flash");
-		when(geminiClient.generateJson(anyString(), anyString())).thenReturn(
-				"{\"safe\":false,\"category\":\"ABUSE\",\"reason\":\"욕설\"}");
-
-		assertThatThrownBy(() -> aiService.assertContentSafe(
-						101L, null, "유해 게시글", ContentModerationKind.FEED))
-				.isInstanceOf(BusinessException.class)
-				.satisfies(ex -> assertThat(((BusinessException) ex).getErrorCode())
-						.isEqualTo(ErrorCode.AI_CONTENT_BLOCKED));
-
-		ArgumentCaptor<AiRequestLog> captor = ArgumentCaptor.forClass(AiRequestLog.class);
-		verify(aiRequestLogMapper).insert(captor.capture());
-		assertThat(captor.getValue().getFeatureType()).isEqualTo(AiFeatureTypes.FEED_CAPTION);
-	}
-
-	@Test
-	void assertContentSafe_safe_allows() {
-		when(geminiClient.isEnabled()).thenReturn(true);
-		when(geminiClient.modelName()).thenReturn("gemini-2.0-flash");
-		when(geminiClient.generateJson(anyString(), anyString())).thenReturn(
-				"{\"safe\":true,\"category\":null,\"reason\":null}");
-
-		aiService.assertContentSafe(101L, 1L, "귀여운 강아지네요", ContentModerationKind.COMMENT);
-		verify(aiRequestLogMapper).insert(any(AiRequestLog.class));
-	}
-
-	@Test
-	void assertContentSafe_geminiFailure_allowsWrite() {
-		when(geminiClient.isEnabled()).thenReturn(true);
-		when(geminiClient.modelName()).thenReturn("gemini-2.0-flash");
-		when(geminiClient.generateJson(anyString(), anyString()))
-				.thenThrow(new GeminiException("GEMINI_HTTP_FAILED"));
-
-		aiService.assertContentSafe(101L, 1L, "아무말", ContentModerationKind.REPLY);
-		ArgumentCaptor<AiRequestLog> captor = ArgumentCaptor.forClass(AiRequestLog.class);
-		verify(aiRequestLogMapper).insert(captor.capture());
-		assertThat(captor.getValue().getStatus()).isEqualTo("FAILED");
-	}
-
-	@Test
-	void recommendHashtags_disabled_skipsGemini() {
-		when(geminiClient.isEnabled()).thenReturn(false);
-
-		assertThat(aiService.recommendHashtags(101L, "산책")).isEmpty();
-		verify(geminiClient, never()).generateJson(anyString(), anyString());
-	}
+    @Test void feedCreationAllowsApprovedContent() {
+        when(client.generateJson(anyString(),anyString())).thenReturn("{\"safe\":true}");
+        assertThatCode(() -> service.assertFeedCreationAllowed(101L,"content")).doesNotThrowAnyException();
+    }
 }

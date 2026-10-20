@@ -40,6 +40,7 @@ import me._hanho.ultary.security.principal.UserPrincipal;
 public class FeedController {
 
 	private final FeedService feedService;
+	private final FeedCreationService feedCreationService;
 
 	@PostMapping
 	public ApiResponse<FeedResponse> create(
@@ -48,7 +49,7 @@ public class FeedController {
 		log.info("[create] mediaCount={} visibility={}",
 				request.getMedia() != null ? request.getMedia().size() : 0,
 				request.getVisibility());
-		return ApiResponse.ok(feedService.create(principal, request), "게시글 등록 성공");
+		return ApiResponse.ok(feedCreationService.create(principal, request), "게시글 등록 성공");
 	}
 
 	@GetMapping("/{feedId}")

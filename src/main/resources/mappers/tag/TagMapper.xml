@@ -418,6 +418,9 @@
 		  AND profile_status = 'APPROVED'
 	</update>
 
+	<update id="decrementUseCount">
+		UPDATE ultary_tag SET use_count=GREATEST(0,use_count-1), updated_at=NOW() WHERE tag_id=#{tagId}
+	</update>
 	<update id="incrementUseCount">
 		UPDATE ultary_tag
 		SET use_count = use_count + 1,

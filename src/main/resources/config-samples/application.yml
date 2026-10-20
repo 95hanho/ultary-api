@@ -67,6 +67,9 @@ mybatis:
 logging:
   level:
     '[org.mybatis]': DEBUG
+    # Background polling uses non-transactional SELECTs; suppress session lifecycle DEBUG noise.
+    '[org.mybatis.spring.SqlSessionUtils]': INFO
+    '[org.mybatis.spring.transaction.SpringManagedTransaction]': INFO
     '[org.apache.ibatis]': DEBUG
     '[java.sql]': DEBUG
     '[com.p6spy]': INFO
@@ -111,11 +114,17 @@ ultary:
     ticket-ttl-seconds: 30
 
 # Gemini AI (키는 코드·git에 넣지 않음. 환경변수만)
-# GEMINI_API_KEY 비어 있으면 태그 추천은 DB fallback, 댓글 모더레이션은 통과
+# GEMINI_API_KEY 비어 있으면 추천은 DB fallback, 모더레이션은 FAILED 로그(콘텐츠 유지)
 ai:
   gemini:
     api-key: ${GEMINI_API_KEY:}
     model: ${GEMINI_MODEL:gemini-3.8-flash}
+    thinking-level: ${GEMINI_THINKING_LEVEL:low}
     base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com/v1beta}
     connect-timeout-ms: 3000
-    read-timeout-ms: 8000
+    read-timeout-ms: 10000
+
+  moderation:
+    worker-enabled: true
+    poll-ms: 1000
+    initial-delay-ms: 5000

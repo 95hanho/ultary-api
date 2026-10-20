@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import me._hanho.ultary.domain.dm.dto.response.DmMessageResponse;
 import me._hanho.ultary.domain.dm.dto.response.DmRoomItemResponse;
 import me._hanho.ultary.domain.notification.NotificationMapper;
+import me._hanho.ultary.domain.ai.model.ModerationJob;
 
 @Service
 @RequiredArgsConstructor
@@ -17,6 +18,14 @@ public class RealtimePush {
 
 	private final WsSessionRegistry registry;
 	private final NotificationMapper notificationMapper;
+
+	public void pushModeration(ModerationJob job, String action, String message) {
+		afterCommit(() -> {
+			registry.broadcast(Map.of("type", "CONTENT_MODERATED", "jobId", job.getJobId(),
+					"targetType", job.getTargetType(), "targetId", job.getTargetId(), "feedId", job.getFeedId(), "action", action));
+			registry.send(job.getUserNo(), Map.of("type", "MODERATION_RESULT", "jobId", job.getJobId(), "message", message));
+		});
+	}
 
 	public void pushNotificationUnread(Long userNo) {
 		if (userNo == null) {

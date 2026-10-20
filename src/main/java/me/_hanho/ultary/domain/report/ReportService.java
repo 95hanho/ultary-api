@@ -94,7 +94,7 @@ public class ReportService {
 		return toResponse(reportMapper.findById(report.getReportId()));
 	}
 
-	/** 신고요청·확인 합. 메뉴 뱃지 requestedReportCount */
+	/** 대상 회원/작성자가 정지되지 않은 신고요청·확인 합. 메뉴 뱃지 requestedReportCount */
 	@Transactional(readOnly = true)
 	public int countRequested() {
 		return reportMapper.countOpen();

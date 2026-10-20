@@ -517,6 +517,20 @@
 		ORDER BY feed_id ASC, sort_order ASC, feed_media_id ASC
 	</select>
 
+	<delete id="deleteMediaMentions">
+		DELETE FROM ultary_feed_media_mention WHERE feed_media_id = #{feedMediaId}
+	</delete>
+	<delete id="deleteTaggedPet">
+		DELETE FROM ultary_feed_pet WHERE feed_id = #{feedId} AND pet_id = #{petId} AND role = 'TAGGED'
+	</delete>
+	<update id="removeFeedTag">
+		UPDATE ultary_feed_tag SET is_deleted=1, deleted_at=NOW()
+		WHERE feed_id=#{feedId} AND tag_id=#{tagId} AND is_deleted=0
+	</update>
+	<insert id="restoreOrInsertFeedTag">
+		INSERT INTO ultary_feed_tag(feed_id,tag_id) VALUES(#{feedId},#{tagId})
+		ON DUPLICATE KEY UPDATE is_deleted=0, deleted_at=NULL
+	</insert>
 	<insert id="insertMediaMention" useGeneratedKeys="true" keyProperty="feedMediaMentionId" keyColumn="feed_media_mention_id">
 		INSERT INTO ultary_feed_media_mention (
 			feed_media_id,
@@ -535,16 +549,14 @@
 
 	<select id="findMentionsByFeedMediaId" resultType="me._hanho.ultary.domain.feed.model.FeedMediaMention">
 		SELECT
-			feed_media_mention_id,
-			feed_media_id,
-			pet_id,
-			pos_x,
-			pos_y,
-			added_by_user_no,
-			created_at
-		FROM ultary_feed_media_mention
-		WHERE feed_media_id = #{feedMediaId}
-		ORDER BY feed_media_mention_id ASC
+			mm.feed_media_mention_id, mm.feed_media_id, mm.pet_id, mm.pos_x, mm.pos_y,
+			mm.added_by_user_no, mm.created_at,
+			p.mention_id, p.name AS pet_name, p.user_no AS owner_user_no, u.nickname AS owner_nickname
+		FROM ultary_feed_media_mention mm
+		LEFT JOIN ultary_pet p ON p.pet_id=mm.pet_id AND p.is_deleted=0
+		LEFT JOIN ultary_user u ON u.user_no=p.user_no AND u.withdrawal_status='ACTIVE'
+		WHERE mm.feed_media_id = #{feedMediaId}
+		ORDER BY mm.feed_media_mention_id ASC
 	</select>
 
 	<insert id="insertFeedPet" useGeneratedKeys="true" keyProperty="feedPetId" keyColumn="feed_pet_id">

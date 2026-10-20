@@ -140,6 +140,7 @@ public enum ErrorCode {
 	// AI
 	// ==============================
 	AI_CONTENT_BLOCKED("AI_CONTENT_BLOCKED", "등록할 수 없는 표현이 포함되어 있습니다.", HttpStatus.BAD_REQUEST),
+	AI_CHECK_UNAVAILABLE("AI_CHECK_UNAVAILABLE", "AI 검사를 완료하지 못해 게시글이 등록되지 않았습니다. 잠시 후 다시 시도해 주세요.", HttpStatus.SERVICE_UNAVAILABLE),
 
 	// ==============================
 	// 관리자 (admin)

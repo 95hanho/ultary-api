@@ -35,8 +35,22 @@ Content-Type: application/json
 }
 
 ### 0d. 메뉴 뱃지 건수
-# pendingTagRequestCount, requestedReportCount(신고요청·확인 합). 목록은 없다.
+# pendingTagRequestCount, requestedReportCount(신고요청·확인 중 정지 대상 제외), failedAiRequestCount(실패 호출 로그 전체). 목록은 없다.
 GET {{baseUrl}}/api/v1/admin/menu-counts
+Authorization: Bearer {{adminAccessToken}}
+
+### AI 호출 실패 로그 (기본 FAILED, 최신순)
+GET {{baseUrl}}/api/v1/admin/ai/logs?limit=30
+Authorization: Bearer {{adminAccessToken}}
+
+### AI 호출 로그 필터 (status=ALL 이면 성공 포함)
+# 다음 페이지: cursorAiRequestId=응답의 nextCursorAiRequestId
+# 선택 필터: featureType, targetType, targetId, userNo, moderationJobId, errorCode
+GET {{baseUrl}}/api/v1/admin/ai/logs?status=FAILED&targetType=COMMENT&errorCode=GEMINI_TIMEOUT&limit=30
+Authorization: Bearer {{adminAccessToken}}
+
+### AI 호출 로그 상세 (ID를 목록의 aiRequestId로 교체)
+GET {{baseUrl}}/api/v1/admin/ai/logs/1
 Authorization: Bearer {{adminAccessToken}}
 
 ### 1. 회원 정지

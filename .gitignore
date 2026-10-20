@@ -45,6 +45,7 @@ src/main/resources/application-local.yml
 
 ### MCP (DB 비밀번호 등) ###
 mcp/mariadb/.env
+mcp/mariadb/.env.codex
 
 ### Logs ###
 spy.log

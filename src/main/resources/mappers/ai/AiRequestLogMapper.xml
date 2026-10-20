@@ -14,7 +14,8 @@
 			model_name,
 			used_token_count,
 			status,
-			error_message
+			error_message, moderation_job_id, target_type, target_id, content_version,
+			attempt_no, latency_ms, http_status, error_code
 		) VALUES (
 			#{userNo},
 			#{featureType},
@@ -25,8 +26,53 @@
 			#{modelName},
 			#{usedTokenCount},
 			#{status},
-			#{errorMessage}
+			#{errorMessage}, #{moderationJobId}, #{targetType}, #{targetId}, #{contentVersion},
+			#{attemptNo}, #{latencyMs}, #{httpStatus}, #{errorCode}
 		)
 	</insert>
 
+    <select id="countFailed" resultType="int">
+        SELECT COUNT(*) FROM ultary_ai_request_log WHERE status = 'FAILED'
+    </select>
+
+    <sql id="adminColumns">
+        l.ai_request_id, l.user_no, l.feature_type, l.target_feed_id, l.target_type, l.target_id,
+        l.moderation_job_id, l.content_version, l.attempt_no, l.model_name, l.status,
+        l.error_code, l.error_message, l.latency_ms, l.http_status, l.created_at,
+        j.status AS job_status, j.result_action, j.attempt_count AS job_attempt_count,
+        j.next_attempt_at
+    </sql>
+
+    <sql id="adminFilters">
+            <if test="status != null">AND l.status = #{status}</if>
+            <if test="featureType != null">AND l.feature_type = #{featureType}</if>
+            <if test="targetType != null">AND l.target_type = #{targetType}</if>
+            <if test="targetId != null">AND l.target_id = #{targetId}</if>
+            <if test="errorCode != null">AND l.error_code = #{errorCode}</if>
+            <if test="userNo != null">AND l.user_no = #{userNo}</if>
+            <if test="moderationJobId != null">AND l.moderation_job_id = #{moderationJobId}</if>
+    </sql>
+
+    <select id="countForAdmin" resultType="int">
+        SELECT COUNT(*) FROM ultary_ai_request_log l
+        <where><include refid="adminFilters"/></where>
+    </select>
+
+    <select id="listForAdmin" resultType="me._hanho.ultary.domain.admin.dto.response.AdminAiLogResponse">
+        SELECT <include refid="adminColumns"/>
+        FROM ultary_ai_request_log l
+        LEFT JOIN ultary_ai_moderation_job j ON j.job_id = l.moderation_job_id
+        <where>
+            <include refid="adminFilters"/>
+            <if test="cursorAiRequestId != null">AND l.ai_request_id &lt; #{cursorAiRequestId}</if>
+        </where>
+        ORDER BY l.ai_request_id DESC LIMIT #{limit}
+    </select>
+
+    <select id="findForAdmin" resultType="me._hanho.ultary.domain.admin.dto.response.AdminAiLogResponse">
+        SELECT <include refid="adminColumns"/>
+        FROM ultary_ai_request_log l
+        LEFT JOIN ultary_ai_moderation_job j ON j.job_id = l.moderation_job_id
+        WHERE l.ai_request_id = #{aiRequestId}
+    </select>
 </mapper>

@@ -100,6 +100,14 @@ public class NotificationService {
 		applySingle(FEED_LIKE, "FEED_LIKE:" + feedId, notificationMapper.findFeedLike(feedId), markUnread);
 	}
 
+	/** Service decision notice: self actor, no feed FK, so hidden content cannot hide the notice. */
+	public void notifyModeration(Long userNo, Long jobId, String message) {
+		notificationMapper.upsert(NotificationUpsert.builder().receiverUserNo(userNo).actorUserNo(userNo)
+				.type("AI_MODERATION").content(message).actorCount(1).hasComment(0).hasReply(0)
+				.groupKey("AI_MODERATION:" + jobId).markUnread(1).build());
+		pushUnread(userNo);
+	}
+
 	public void syncCommentLike(Long commentId, boolean markUnread) {
 		applySingle(COMMENT_LIKE, "COMMENT_LIKE:" + commentId, notificationMapper.findCommentLike(commentId), markUnread);
 	}
@@ -369,7 +377,8 @@ public class NotificationService {
 		return NotificationItemResponse.builder()
 				.notificationId(row.getNotificationId())
 				.type(row.getType())
-				.message(message(row.getType(), row.getActorNickname(), actorCount, hasComment, hasReply, actorFollows))
+				.message("AI_MODERATION".equals(row.getType()) ? row.getContent()
+						: message(row.getType(), row.getActorNickname(), actorCount, hasComment, hasReply, actorFollows))
 				.actorUserNo(row.getActorUserNo())
 				.actorNickname(row.getActorNickname())
 				.actorProfileFileId(profileId)

@@ -31,12 +31,14 @@ public class AdminService {
 	private final ReportService reportService;
 	private final FeedService feedService;
 	private final TagService tagService;
+	private final AdminAiLogService aiLogService;
 
 	@Transactional(readOnly = true)
 	public AdminMenuCountResponse menuCounts() {
 		return AdminMenuCountResponse.builder()
 				.pendingTagRequestCount(tagService.countPendingProfileRequests())
 				.requestedReportCount(reportService.countRequested())
+				.failedAiRequestCount(aiLogService.countFailed())
 				.build();
 	}
 

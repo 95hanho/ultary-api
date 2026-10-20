@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="me._hanho.ultary.domain.ai.ModerationMapper">
+  <sql id="table"><choose><when test="kind == 'FEED'">ultary_feed</when><when test="kind == 'COMMENT'">ultary_feed_comment</when><otherwise>ultary_feed_reply</otherwise></choose></sql>
+  <sql id="pk"><choose><when test="kind == 'FEED'">feed_id</when><when test="kind == 'COMMENT'">feed_comment_id</when><otherwise>feed_reply_id</otherwise></choose></sql>
+  <select id="lockTarget" resultType="me._hanho.ultary.domain.ai.model.ModerationTarget">
+    SELECT <include refid="pk"/> AS target_id, user_no, content, is_deleted AS deleted,
+    <choose><when test="kind == 'FEED'">feed_id, NULL AS parent_comment_id</when>
+    <when test="kind == 'COMMENT'">feed_id, NULL AS parent_comment_id</when>
+    <otherwise>(SELECT c.feed_id FROM ultary_feed_comment c WHERE c.feed_comment_id = ultary_feed_reply.feed_comment_id) AS feed_id, feed_comment_id AS parent_comment_id</otherwise></choose>
+    FROM <include refid="table"/> WHERE <include refid="pk"/> = #{id} FOR UPDATE
+  </select>
+  <insert id="ensureState">
+    INSERT IGNORE INTO ultary_ai_moderation_state(target_type,target_id,approved_content,has_approved)
+    VALUES(#{kind},#{id},#{previous},#{trusted})
+  </insert>
+  <select id="lockState" resultType="me._hanho.ultary.domain.ai.model.ModerationState">
+    SELECT * FROM ultary_ai_moderation_state WHERE target_type=#{kind} AND target_id=#{id} FOR UPDATE
+  </select>
+  <update id="saveState">
+    UPDATE ultary_ai_moderation_state SET latest_version=#{latestVersion}, approved_version=#{approvedVersion},
+    approved_content=#{approvedContent},has_approved=#{hasApproved} WHERE target_type=#{targetType} AND target_id=#{targetId}
+  </update>
+  <insert id="insertJob" useGeneratedKeys="true" keyProperty="jobId">
+    INSERT INTO ultary_ai_moderation_job(target_type,target_id,feed_id,user_no,content_version,operation,content)
+    VALUES(#{targetType},#{targetId},#{feedId},#{userNo},#{contentVersion},#{operation},#{content})
+  </insert>
+  <select id="findReady" resultType="java.lang.Long">
+    SELECT j.job_id FROM ultary_ai_moderation_job j
+    WHERE ((j.status='PENDING' AND j.next_attempt_at &lt;= NOW()) OR (j.status='PROCESSING' AND j.lease_until &lt;= NOW()))
+      AND NOT EXISTS (SELECT 1 FROM ultary_ai_moderation_job older
+        WHERE older.target_type=j.target_type AND older.target_id=j.target_id
+          AND older.content_version &lt; j.content_version AND older.status IN ('PENDING','PROCESSING'))
+    ORDER BY j.job_id LIMIT #{limit}
+  </select>
+  <update id="claim">
+    UPDATE ultary_ai_moderation_job SET status='PROCESSING',attempt_count=attempt_count+1,
+      claim_token=#{token},lease_until=DATE_ADD(NOW(),INTERVAL 120 SECOND)
+    WHERE job_id=#{id} AND ((status='PENDING' AND next_attempt_at &lt;= NOW()) OR (status='PROCESSING' AND lease_until &lt;= NOW()))
+  </update>
+  <select id="findJob" resultType="me._hanho.ultary.domain.ai.model.ModerationJob">SELECT * FROM ultary_ai_moderation_job WHERE job_id=#{id}</select>
+  <select id="lockJob" resultType="me._hanho.ultary.domain.ai.model.ModerationJob">SELECT * FROM ultary_ai_moderation_job WHERE job_id=#{id} FOR UPDATE</select>
+  <update id="finishJob">
+    UPDATE ultary_ai_moderation_job SET status=#{status},last_error_code=#{lastErrorCode},last_error=#{lastError},
+      result_action=#{resultAction},lease_until=NULL,claim_token=NULL,
+      next_attempt_at=DATE_ADD(NOW(),INTERVAL #{retryDelay} SECOND),
+      finished_at=IF(#{status}='PENDING',NULL,NOW())
+    WHERE job_id=#{jobId} AND claim_token=#{claimToken} AND status='PROCESSING'
+  </update>
+  <update id="restoreContent">UPDATE <include refid="table"/> SET content=#{content},updated_at=NOW() WHERE <include refid="pk"/>=#{id} AND is_deleted=0</update>
+  <update id="hide">UPDATE <include refid="table"/> SET is_deleted=1,deleted_at=NOW(),updated_at=NOW() WHERE <include refid="pk"/>=#{id} AND is_deleted=0</update>
+</mapper>

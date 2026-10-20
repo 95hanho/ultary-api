@@ -50,6 +50,7 @@ public interface TagMapper {
 	List<Long> findImageFileIdsByTagId(@Param("tagId") Long tagId);
 
 	int incrementUseCount(@Param("tagId") Long tagId);
+	int decrementUseCount(@Param("tagId") Long tagId);
 
 	/** 삭제되지 않은 게시글 중 이 태그가 달린 수 */
 	int countActiveFeeds(@Param("tagId") Long tagId);

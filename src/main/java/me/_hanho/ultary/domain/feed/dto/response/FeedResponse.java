@@ -53,6 +53,10 @@ public class FeedResponse {
 	@Builder
 	public static class MentionItem {
 		private Long petId;
+		private String mentionId;
+		private String petName;
+		private Long userNo;
+		private String ownerNickname;
 		private BigDecimal posX;
 		private BigDecimal posY;
 	}

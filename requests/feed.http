@@ -29,7 +29,7 @@ GET {{baseUrl}}/api/v1/feeds/102
 Authorization: Bearer {{accessToken}}
 
 ### 1. 게시글 등록 (시드 file/pet/tag ID 사용)
-# 유해 본문이면 400 AI_CONTENT_BLOCKED (Gemini 키 있을 때). 본문 없으면 검사 생략
+# 게시글 작성은 AI 승인 후 저장. 부적절 400 AI_CONTENT_BLOCKED, 검사 장애 503 AI_CHECK_UNAVAILABLE 및 사유. 실패 시 게시글 미생성.
 # @name createFeed
 POST {{baseUrl}}/api/v1/feeds
 Authorization: Bearer {{accessToken}}
@@ -65,7 +65,8 @@ Content-Type: application/json
 GET {{baseUrl}}/api/v1/feeds/{{feedId}}
 Authorization: Bearer {{accessToken}}
 
-### 3. 게시글 수정 (content·visibility)
+### 3. 게시글 수정 (content·visibility, 선택 mediaTags·tagIds)
+# 사진 태그는 GET 상세의 media[].feedMediaId를 사용. mediaTags 생략은 유지, 항목의 mentions=[]는 해당 사진 태그 삭제.
 # content 변경 시에도 모더레이션. clearContent / visibility만이면 검사 생략
 PATCH {{baseUrl}}/api/v1/feeds/{{feedId}}
 Authorization: Bearer {{accessToken}}

@@ -34,7 +34,7 @@ public interface ReportMapper {
 	/** status가 없으면 전부. 커서와 limit는 세지 않는다 */
 	int countList(@Param("status") String status);
 
-	/** 신고요청·확인 건수. 메뉴 뱃지용 */
+	/** 목록의 처리 우선순위 0(신고요청·확인, 대상 회원/작성자 정지 제외) 건수. 메뉴 뱃지용 */
 	int countOpen();
 
 	int close(

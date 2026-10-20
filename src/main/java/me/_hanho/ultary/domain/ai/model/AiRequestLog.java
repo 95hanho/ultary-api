@@ -24,4 +24,12 @@ public class AiRequestLog {
 	private String status;
 	private String errorMessage;
 	private LocalDateTime createdAt;
+	private Long moderationJobId;
+	private String targetType;
+	private Long targetId;
+	private Long contentVersion;
+	private Integer attemptNo;
+	private Long latencyMs;
+	private Integer httpStatus;
+	private String errorCode;
 }

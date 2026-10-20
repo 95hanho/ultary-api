@@ -14,17 +14,17 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import me._hanho.ultary.common.validation.HashtagRules;
 import me._hanho.ultary.common.exception.BusinessException;
 import me._hanho.ultary.common.exception.ErrorCode;
-import me._hanho.ultary.common.validation.HashtagRules;
 import me._hanho.ultary.domain.ai.GeminiClient.GeminiException;
 import me._hanho.ultary.domain.ai.dto.GeminiHashtagResult;
-import me._hanho.ultary.domain.ai.dto.GeminiModerationResult;
 import me._hanho.ultary.domain.ai.model.AiRequestLog;
+import me._hanho.ultary.domain.ai.model.ModerationJob;
 
 /**
  * Gemini 비즈니스 호출. 원문·API Key는 DB에 넣지 않는다.
- * 장애 시 호출자에게 예외를 넘기지 않고(모더레이션 차단 제외) empty/allow 로 처리한다.
+ * 추천은 동기 fallback, 게시글 작성은 동기 검사, 수정·댓글·답글은 DB 작업자로 검사한다.
  */
 @Slf4j
 @Service
@@ -40,7 +40,7 @@ public class AiService {
 
 	private final GeminiClient geminiClient;
 	private final ObjectMapper objectMapper;
-	private final AiRequestLogMapper aiRequestLogMapper;
+	private final AiLogService aiLogService;
 
 	/**
 	 * 게시글 내용 기반 해시태그 추천. 실패·비활성·빈 입력이면 empty.
@@ -75,56 +75,80 @@ public class AiService {
 		}
 	}
 
-	/**
-	 * 게시글·댓글·답글 저장 직전 검사.
-	 * unsafe → {@link ErrorCode#AI_CONTENT_BLOCKED}.
-	 * Gemini 장애 → 통과(등록 허용).
-	 */
-	public void assertContentSafe(
-			Long userNo, Long feedId, String content, ContentModerationKind kind) {
-		if (kind == null) {
-			kind = ContentModerationKind.COMMENT;
-		}
-		if (!StringUtils.hasText(content) || !geminiClient.isEnabled()) {
-			return;
-		}
-		long started = System.currentTimeMillis();
-		String feature = kind == ContentModerationKind.FEED
-				? AiFeatureTypes.FEED_CAPTION
-				: AiFeatureTypes.COMMENT_FILTER;
-		String label = switch (kind) {
-			case FEED -> "FEED_MODERATION";
-			case COMMENT -> "COMMENT_MODERATION";
-			case REPLY -> "REPLY_MODERATION";
-		};
+	/** New feed creation waits for a verdict; provider failure is a service error. */
+	public void assertFeedCreationAllowed(Long userNo, String content) {
+		ModerationJob inspection = new ModerationJob();
+		inspection.setUserNo(userNo); inspection.setTargetType("FEED");
+		inspection.setOperation("CREATE"); inspection.setAttemptCount(1); inspection.setContent(content);
+		ModerationResult verdict;
 		try {
-			String json = geminiClient.generateJson(
-					AiPrompts.contentModerationSystem(),
-					AiPrompts.contentModerationUser(content.trim()));
-			GeminiModerationResult parsed = objectMapper.readValue(json, GeminiModerationResult.class);
-			boolean safe = parsed == null || parsed.isSafe();
-			String category = normalizeCategory(parsed != null ? parsed.getCategory() : null);
-			saveLog(userNo, feature, feedId,
-					summaryPrompt(label, content),
-					truncate("latencyMs=" + (System.currentTimeMillis() - started)
-							+ "; safe=" + safe
-							+ (category != null ? "; category=" + category : ""), RESULT_SUMMARY_MAX),
-					"SUCCESS", null, null);
-			if (!safe) {
-				throw new BusinessException(ErrorCode.AI_CONTENT_BLOCKED);
+			verdict = moderate(inspection);
+		} catch (Exception ex) {
+			log.error("[AI feed creation] inspection/logging unavailable cause={}", ex.getClass().getSimpleName());
+			throw new BusinessException(ErrorCode.AI_CHECK_UNAVAILABLE);
+		}
+		if (verdict.failed()) {
+			String reason = switch (verdict.errorCode()) {
+				case "GEMINI_TIMEOUT" -> "AI 검사 응답 시간이 초과되어 게시글이 등록되지 않았습니다. 잠시 후 다시 시도해 주세요.";
+				case "GEMINI_HTTP_429" -> "AI 검사 요청이 많아 게시글이 등록되지 않았습니다. 잠시 후 다시 시도해 주세요.";
+				default -> ErrorCode.AI_CHECK_UNAVAILABLE.getMessage();
+			};
+			throw new BusinessException(ErrorCode.AI_CHECK_UNAVAILABLE, reason);
+		}
+		if (!Boolean.TRUE.equals(verdict.safe())) {
+			String reason = switch (verdict.category() == null ? "OTHER" : verdict.category()) {
+				case "SPAM" -> "스팸·광고성 내용";
+				case "ABUSE" -> "욕설·비방 표현";
+				case "HARASSMENT" -> "괴롭힘 표현";
+				case "SEXUAL" -> "음란한 표현";
+				case "VIOLENCE" -> "폭력적인 표현";
+				case "HATE" -> "혐오 표현";
+				case "PRIVACY" -> "개인정보 침해 내용";
+				default -> "부적절한 표현";
+			};
+			throw new BusinessException(ErrorCode.AI_CONTENT_BLOCKED,
+					reason + "이 포함되어 게시글을 작성할 수 없습니다. 내용을 수정해 다시 시도해 주세요.");
+		}
+	}
+
+	/** Shared inspection/logging for synchronous creation and the durable worker. No content transaction. */
+	public ModerationResult moderate(ModerationJob job) {
+		long started = System.nanoTime();
+		ModerationResult result;
+		Integer httpStatus = null;
+		try {
+			if (!StringUtils.hasText(job.getContent())) {
+				result = ModerationResult.allowed();
+			} else {
+				String json = geminiClient.generateJson(AiPrompts.contentModerationSystem(),
+						AiPrompts.contentModerationUser(job.getContent()));
+				var parsed = objectMapper.readTree(json);
+				if (parsed == null || !parsed.path("safe").isBoolean()) {
+					throw new GeminiException("GEMINI_INVALID_VERDICT", null, "Missing boolean safe field", true);
+				}
+				result = new ModerationResult(parsed.get("safe").booleanValue(),
+						normalizeCategory(parsed.path("category").asText(null)), null, null, false);
 			}
-		} catch (BusinessException ex) {
-			throw ex;
 		} catch (Exception ex) {
 			String code = errorCode(ex);
-			log.warn("[AiService] moderation failed (allow) code={} latencyMs={} kind={}",
-					code, System.currentTimeMillis() - started, kind);
-			saveLog(userNo, feature, feedId,
-					summaryPrompt(label, content),
-					null,
-					"FAILED", code,
-					truncate("latencyMs=" + (System.currentTimeMillis() - started), RESULT_SUMMARY_MAX));
+			String diagnostic = ex instanceof GeminiException gemini ? gemini.diagnostic() : ex.getClass().getSimpleName();
+			boolean retryable = !(ex instanceof GeminiException gemini) || gemini.retryable();
+			if (ex instanceof GeminiException gemini) httpStatus = gemini.httpStatus();
+			result = new ModerationResult(null, null, code, diagnostic, retryable);
+			log.warn("[AI moderation] jobId={} target={}:{} version={} attempt={} code={} cause={}",
+					job.getJobId(), job.getTargetType(), job.getTargetId(), job.getContentVersion(), job.getAttemptCount(), code, diagnostic);
 		}
+		AiRequestLog row = new AiRequestLog();
+		row.setUserNo(job.getUserNo()); row.setTargetFeedId(job.getFeedId());
+		row.setFeatureType("FEED".equals(job.getTargetType()) ? AiFeatureTypes.FEED_CAPTION : AiFeatureTypes.COMMENT_FILTER);
+		row.setModerationJobId(job.getJobId()); row.setTargetType(job.getTargetType()); row.setTargetId(job.getTargetId());
+		row.setContentVersion(job.getContentVersion()); row.setAttemptNo(job.getAttemptCount());
+		row.setLatencyMs((System.nanoTime() - started) / 1_000_000); row.setHttpStatus(httpStatus);
+		row.setModelName(geminiClient.modelName()); row.setPrompt(summaryPrompt(job.getTargetType(), job.getContent()));
+		row.setStatus(result.failed() ? "FAILED" : "SUCCESS"); row.setErrorCode(result.errorCode()); row.setErrorMessage(result.error());
+		row.setResult(result.failed() ? null : "safe=" + result.safe() + "; category=" + result.category());
+		aiLogService.write(row);
+		return result;
 	}
 
 	List<String> sanitizeHashtags(List<String> raw) {
@@ -182,7 +206,8 @@ public class AiService {
 						+ (StringUtils.hasText(errorMessage) ? (" " + errorMessage) : "");
 				row.setErrorMessage(truncate(combined.trim(), 1000));
 			}
-			aiRequestLogMapper.insert(row);
+			row.setErrorCode(errorCode);
+			aiLogService.write(row);
 		} catch (Exception ex) {
 			log.warn("[AiService] failed to write ai_request_log: {}", ex.toString());
 		}
@@ -207,10 +232,6 @@ public class AiService {
 		if (ex instanceof GeminiException gemini) {
 			return gemini.code();
 		}
-		String message = ex.getMessage();
-		if (StringUtils.hasText(message)) {
-			return message.length() > 80 ? message.substring(0, 80) : message;
-		}
-		return ex.getClass().getSimpleName();
+		return "GEMINI_INVALID_JSON";
 	}
 }

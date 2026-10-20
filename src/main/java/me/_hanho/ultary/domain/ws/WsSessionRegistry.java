@@ -78,6 +78,10 @@ public class WsSessionRegistry {
 		}
 	}
 
+	public void broadcast(Object payload) {
+		for (Long userNo : sessions.keySet()) send(userNo, payload);
+	}
+
 	@Scheduled(fixedRate = 25_000)
 	public void ping() {
 		for (Long userNo : sessions.keySet()) {

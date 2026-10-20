@@ -2,10 +2,15 @@ package me._hanho.ultary.domain.feed.dto.request;
 
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import java.util.List;
+import me._hanho.ultary.domain.feed.dto.request.CreateFeedRequest.MentionItem;
 import lombok.Getter;
 import lombok.Setter;
 
-/** content·visibility만. 미디어/펫/태그 교체는 별도 정책 전까지 미지원 */
+/** Existing media stay fixed; only content, visibility and their tags may change. */
 @Getter
 @Setter
 public class UpdateFeedRequest {
@@ -18,4 +23,22 @@ public class UpdateFeedRequest {
 
 	/** true면 content를 NULL로 클리어 */
 	private Boolean clearContent;
+
+	/** null preserves photo tags; each supplied media's mentions are replaced (empty clears). */
+	@Size(max = 10)
+	@Valid
+	private List<@NotNull MediaTags> mediaTags;
+
+	/** null preserves hashtag links; empty clears them. */
+	@Size(max = 30)
+	private List<@NotNull @Positive Long> tagIds;
+
+	@Getter
+	@Setter
+	public static class MediaTags {
+		@NotNull @Positive
+		private Long feedMediaId;
+		@NotNull @Size(max = 20) @Valid
+		private List<@NotNull MentionItem> mentions;
+	}
 }

@@ -235,8 +235,8 @@
 
 	<select id="countOpen" resultType="int">
 		SELECT COUNT(*)
-		FROM ultary_report
-		WHERE status IN ('REQUESTED', 'CONFIRMED')
+		<include refid="adminReportFrom"/>
+		WHERE (<include refid="reportActionPriority"/>) = 0
 	</select>
 
 	<update id="close">
