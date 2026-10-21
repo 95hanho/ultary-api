@@ -1,3 +1,4 @@
+# 공통 설정 템플릿 → ../application.yml. 실제 비밀값은 환경변수로 주입한다.
 spring:
   profiles:
     active: local
@@ -128,3 +129,8 @@ ai:
     worker-enabled: true
     poll-ms: 1000
     initial-delay-ms: 5000
+security:
+  bff:
+    # 실제 키는 Git에 넣지 않는다. 양쪽 서버 환경변수에 동일한 32자 이상 난수를 설정한다.
+    shared-key: ${BFF_INTERNAL_KEY:}
+    require-https: false

@@ -312,6 +312,7 @@ public class MainService {
 				.toList();
 		return SearchHistoryPageResponse.builder()
 				.items(items)
+				.totalCount(userSearchHistoryMapper.countRecent(principal.getUserNo()))
 				.nextCursorHistoryId(nextCursor)
 				.build();
 	}
@@ -383,6 +384,7 @@ public class MainService {
 				.petTags(tag ? List.of() : (petTags == null ? List.of() : petTags))
 				.tagId(tag ? row.getTargetTagId() : null)
 				.hashtag(tag ? row.getHashtag() : null)
+				.feedCount(tag ? (row.getFeedCount() == null ? 0L : row.getFeedCount()) : null)
 				.searchedAt(row.getSearchedAt())
 				.build();
 	}

@@ -1,7 +1,11 @@
 @baseUrl = http://localhost:9377
+# 로컬 서버 환경변수의 공유 키. 실제 값을 이 파일에 커밋하지 않는다.
+@bffKey = {{$processEnv BFF_INTERNAL_KEY}}
 
 ### Health
 GET {{baseUrl}}/api/v1/health
+X-BFF-Key: {{bffKey}}
 
 ### DB Health
 GET {{baseUrl}}/api/v1/health/db
+X-BFF-Key: {{bffKey}}

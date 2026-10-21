@@ -1,4 +1,6 @@
 @baseUrl = http://localhost:9377
+# 로컬 서버 환경변수의 공유 키. 실제 값을 이 파일에 커밋하지 않는다.
+@bffKey = {{$processEnv BFF_INTERNAL_KEY}}
 @accessToken = {{socialLogin.response.body.$.data.accessToken}}
 @storyId = {{createStory.response.body.$.data.storyId}}
 
@@ -8,6 +10,7 @@
 ### 0. 소셜 로그인 (시드 user 101)
 # @name socialLogin
 POST {{baseUrl}}/api/v1/auth/login
+X-BFF-Key: {{bffKey}}
 Content-Type: application/json
 
 {
@@ -18,6 +21,7 @@ Content-Type: application/json
 ### 1. 스토리 등록 (시드 fileId=130 story.png)
 # @name createStory
 POST {{baseUrl}}/api/v1/my-ultary/stories
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -49,33 +53,41 @@ Content-Type: application/json
 ### 2. 내 스토리 목록 (createdAt / expiresAt, viewedByMe, likedByMe)
 # 본인 스토리도 읽음 기록이 있을 때만 viewedByMe=true. likedByMe는 내 공감(취소 제외)
 GET {{baseUrl}}/api/v1/my-ultary/stories
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 3. 주민 중 스토리 있는 목록 (시드: 주민 102·103, profileFile=profile2/3)
 GET {{baseUrl}}/api/v1/main/stories/owners
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 4. 특정 유저 스토리 조회 (본인 101 또는 ACCEPTED 이웃)
 # data[] 각 항목 viewedByMe, likedByMe — FE: 첫 viewedByMe false부터 재생, 전부 true면 index 0
 GET {{baseUrl}}/api/v1/main/stories?userNo=101
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 4b. 주민 103 스토리 조회 (시드 story 103)
 GET {{baseUrl}}/api/v1/main/stories?userNo=103
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 5. 스토리 읽음 처리 (본인 스토리도 ultary_story_view INSERT IGNORE)
 POST {{baseUrl}}/api/v1/stories/{{storyId}}/view
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 6. 스토리 삭제
 DELETE {{baseUrl}}/api/v1/my-ultary/stories/{{storyId}}
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 7. 스토리 공감 (본인 또는 ACCEPTED 이웃. 본인 스토리면 알림 없음)
 POST {{baseUrl}}/api/v1/stories/{{storyId}}/like
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 8. 스토리 공감 취소
 DELETE {{baseUrl}}/api/v1/stories/{{storyId}}/like
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}

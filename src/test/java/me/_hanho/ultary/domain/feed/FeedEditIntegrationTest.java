@@ -25,6 +25,8 @@ class FeedEditIntegrationTest {
     @Autowired jakarta.validation.Validator validator;
     @Autowired me._hanho.ultary.domain.ai.ModerationMapper moderation;
     @Autowired me._hanho.ultary.domain.ai.ModerationTransactions transactions;
+    @Autowired me._hanho.ultary.domain.settings.PrivacyService privacy;
+    @Autowired org.mybatis.spring.SqlSessionTemplate sqlSession;
     Long owner, other, feed, file, media, secondMedia, foreignMedia, oldPet, newPet, collaborator;
     UserPrincipal principal;
 
@@ -105,6 +107,48 @@ class FeedEditIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT content FROM ultary_feed WHERE feed_id=?",String.class,feed)).isEqualTo(oldText);
         assertThat(mapper.findTagIdsByFeedId(feed)).containsExactly(a);
         assertThat(jdbc.queryForObject("SELECT use_count FROM ultary_tag WHERE tag_id=?",Integer.class,b)).isZero();
+    }
+
+    @Test void createsWithAccountDefaultOrExplicitPostVisibility() {
+        var defaults = new me._hanho.ultary.domain.settings.dto.request.UpdatePrivacyRequest();
+        defaults.setFeedVisibility("PRIVATE");
+        privacy.update(principal, defaults);
+        var request = new CreateFeedRequest();
+        var image = new CreateFeedRequest.MediaItem();
+        image.setFileId(file); image.setMediaType("IMAGE");
+        request.setMedia(List.of(image));
+        assertThat(feeds.create(principal, request).getVisibility()).isEqualTo("PRIVATE");
+        for (String visibility : List.of("PUBLIC", "NEIGHBORS", "PRIVATE")) {
+            request.setVisibility(visibility);
+            var created = feeds.create(principal, request);
+            assertThat(created.getVisibility()).isEqualTo(visibility);
+            assertThat(mapper.findActiveByFeedId(created.getFeedId()).getVisibility()).isEqualTo(visibility);
+        }
+        assertThat(privacy.get(principal).getFeedVisibility()).isEqualTo("PRIVATE");
+    }
+
+    @Test void updatesVisibilityAndEnforcesAudienceWithoutChangingCaptionOrPhotos() {
+        var viewer = new UserPrincipal(other, "other");
+        assertThat(feeds.getDetail(null, feed).getVisibility()).isEqualTo("PUBLIC");
+        var request = new UpdateFeedRequest(); request.setVisibility("NEIGHBORS");
+        assertThat(feeds.update(principal, feed, request).getVisibility()).isEqualTo("NEIGHBORS");
+        assertThatThrownBy(() -> feeds.getDetail(viewer, feed)).isInstanceOf(BusinessException.class);
+        jdbc.update("INSERT INTO ultary_neighbor(requester_user_no,receiver_user_no,pair_key,status,requested_at,accepted_at) VALUES(?,?,?,'ACCEPTED',NOW(),NOW())",
+                other, owner, Math.min(owner, other) + ":" + Math.max(owner, other));
+        // JDBC fixture changes bypass MyBatis's transaction-local query cache.
+        sqlSession.clearCache();
+        assertThat(feeds.getDetail(viewer, feed).getVisibility()).isEqualTo("NEIGHBORS");
+        request.setVisibility("PRIVATE");
+        feeds.update(principal, feed, request);
+        assertThatThrownBy(() -> feeds.getDetail(viewer, feed)).isInstanceOf(BusinessException.class);
+        assertThatThrownBy(() -> feeds.getDetail(null, feed)).isInstanceOf(BusinessException.class);
+        var own = feeds.getDetail(principal, feed);
+        assertThat(own.getVisibility()).isEqualTo("PRIVATE");
+        assertThat(own.getContent()).isEqualTo("original");
+        assertThat(own.getMedia()).extracting(x -> x.getFeedMediaId()).containsExactly(media, secondMedia);
+        request.setVisibility("PUBLIC");
+        feeds.update(principal, feed, request);
+        assertThat(feeds.getDetail(null, feed).getVisibility()).isEqualTo("PUBLIC");
     }
 
     UpdateFeedRequest.MediaTags tags(Long slot,Long pet) {

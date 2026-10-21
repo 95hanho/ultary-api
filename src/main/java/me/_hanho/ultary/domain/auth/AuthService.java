@@ -39,6 +39,8 @@ import me._hanho.ultary.domain.auth.dto.response.TokenResponse;
 import me._hanho.ultary.domain.auth.model.SocialProvider;
 import me._hanho.ultary.domain.auth.model.Token;
 import me._hanho.ultary.domain.auth.support.PhoneAuthCodeStore;
+import me._hanho.ultary.domain.auth.support.TokenSessionSupport;
+import me._hanho.ultary.domain.auth.support.TokenRotationSupport;
 import me._hanho.ultary.domain.file.FileService;
 import me._hanho.ultary.domain.pet.PetService;
 import me._hanho.ultary.domain.user.UserMapper;
@@ -69,6 +71,7 @@ public class AuthService {
 	private final UserMapper userMapper;
 	private final UserSocialMapper userSocialMapper;
 	private final TokenMapper tokenMapper;
+	private final TokenRotationSupport tokenRotation;
 	private final PasswordEncoder passwordEncoder;
 	private final JwtTokenProvider jwtTokenProvider;
 	private final JwtProperties jwtProperties;
@@ -198,7 +201,7 @@ public class AuthService {
 		}
 
 		Long userNo = jwtTokenProvider.getSubjectAsLong(claims);
-		Token storedToken = tokenMapper.findValidUserRefreshToken(userNo, request.getRefreshToken());
+		Token storedToken = tokenRotation.lockUserToken(userNo, request.getRefreshToken());
 		if (storedToken == null) {
 			throw new BusinessException(ErrorCode.INVALID_TOKEN);
 		}
@@ -209,13 +212,31 @@ public class AuthService {
 			throw new BusinessException(ErrorCode.USER_INACTIVE);
 		}
 
-		tokenMapper.revokeByTokenId(storedToken.getTokenId());
-		return issueTokens(user, httpRequest);
+		if (Boolean.TRUE.equals(storedToken.getIsRevoked())) {
+			return tokenRotation.replay(tokenRotation.activeSuccessor(storedToken));
+		}
+		return issueTokens(user, httpRequest, storedToken);
 	}
 
 	@Transactional
-	public void logout(UserPrincipal principal) {
-		tokenMapper.revokeAllByUserNo(principal.getUserNo());
+	public void logout(RefreshTokenRequest request) {
+		Claims claims = jwtTokenProvider.parseRefreshToken(request.getRefreshToken());
+		if (jwtTokenProvider.getOwnerType(claims) != TokenOwnerType.USER) {
+			throw new BusinessException(ErrorCode.INVALID_TOKEN);
+		}
+		Long userNo = jwtTokenProvider.getSubjectAsLong(claims);
+		Token token = tokenRotation.lockUserToken(userNo, request.getRefreshToken());
+		if (token == null) return; // 이미 만료/해제된 세션의 로그아웃은 멱등 처리한다.
+		if (Boolean.TRUE.equals(token.getIsRevoked())) {
+			if (token.getReplacedByTokenId() == null || !Boolean.TRUE.equals(token.getRotationRetryAllowed())) return;
+			token = tokenRotation.successorForLogout(token);
+			if (token == null) return;
+		}
+		if (StringUtils.hasText(token.getSessionId())) {
+			tokenMapper.revokeUserSession(userNo, token.getSessionId());
+		} else {
+			tokenMapper.revokeByTokenId(token.getTokenId());
+		}
 	}
 
 	@Transactional(readOnly = true)
@@ -629,17 +650,20 @@ public class AuthService {
 	}
 
 	private TokenResponse issueTokens(User user, HttpServletRequest httpRequest) {
-		String accessToken = jwtTokenProvider.createUserAccessToken(user.getUserNo());
-		String refreshToken = jwtTokenProvider.createRefreshToken(user.getUserNo(), TokenOwnerType.USER);
+		return issueTokens(user, httpRequest, null);
+	}
 
-		Token token = new Token();
+	private TokenResponse issueTokens(User user, HttpServletRequest httpRequest, Token previous) {
+		Token token = TokenSessionSupport.newToken(previous, httpRequest);
+		String accessToken = jwtTokenProvider.createUserAccessToken(user.getUserNo());
+		String refreshToken = jwtTokenProvider.createRefreshToken(user.getUserNo(), TokenOwnerType.USER, token.getSessionId());
+
 		token.setOwnerType(TokenOwnerType.USER.name());
 		token.setUserNo(user.getUserNo());
-		token.setConnectIp(resolveClientIp(httpRequest));
-		token.setConnectAgent(trimAgent(httpRequest.getHeader("User-Agent")));
 		token.setRefreshToken(refreshToken);
 		token.setExpiresAt(LocalDateTime.now().plusSeconds(jwtTokenProvider.refreshLifetimeSeconds()));
 		tokenMapper.insert(token);
+		if (previous != null) tokenRotation.complete(previous, token);
 
 		return TokenResponse.builder()
 				.accessToken(accessToken)
@@ -649,18 +673,4 @@ public class AuthService {
 				.build();
 	}
 
-	private String resolveClientIp(HttpServletRequest request) {
-		String forwarded = request.getHeader("X-Forwarded-For");
-		if (forwarded != null && !forwarded.isBlank()) {
-			return forwarded.split(",")[0].trim();
-		}
-		return request.getRemoteAddr();
-	}
-
-	private String trimAgent(String userAgent) {
-		if (userAgent == null) {
-			return null;
-		}
-		return userAgent.length() > 200 ? userAgent.substring(0, 200) : userAgent;
-	}
 }

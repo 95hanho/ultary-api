@@ -1,4 +1,6 @@
 @baseUrl = http://localhost:9377
+# 로컬 서버 환경변수의 공유 키. 실제 값을 이 파일에 커밋하지 않는다.
+@bffKey = {{$processEnv BFF_INTERNAL_KEY}}
 @adminAccessToken = {{adminLogin.response.body.$.data.accessToken}}
 @adminRefreshToken = {{adminLogin.response.body.$.data.refreshToken}}
 
@@ -10,6 +12,7 @@
 ### 0a. 평문 비밀번호 → DB용 해시 (local 프로필 전용. 인증 없음)
 # 규칙: 8자 이상, 영문·숫자·특수문자 각 1자. 호출마다 해시가 달라진다.
 POST {{baseUrl}}/api/v1/test/password/encode
+X-BFF-Key: {{bffKey}}
 Content-Type: application/json
 
 {
@@ -19,6 +22,7 @@ Content-Type: application/json
 ### 0b. 관리자 로그인
 # @name adminLogin
 POST {{baseUrl}}/api/v1/admin/auth/login
+X-BFF-Key: {{bffKey}}
 Content-Type: application/json
 
 {
@@ -28,6 +32,7 @@ Content-Type: application/json
 
 ### 0c. 관리자 토큰 재발급
 POST {{baseUrl}}/api/v1/admin/auth/refresh
+X-BFF-Key: {{bffKey}}
 Content-Type: application/json
 
 {
@@ -37,28 +42,34 @@ Content-Type: application/json
 ### 0d. 메뉴 뱃지 건수
 # pendingTagRequestCount, requestedReportCount(신고요청·확인 중 정지 대상 제외), failedAiRequestCount(실패 호출 로그 전체). 목록은 없다.
 GET {{baseUrl}}/api/v1/admin/menu-counts
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{adminAccessToken}}
 
 ### AI 호출 실패 로그 (기본 FAILED, 최신순)
 GET {{baseUrl}}/api/v1/admin/ai/logs?limit=30
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{adminAccessToken}}
 
 ### AI 호출 로그 필터 (status=ALL 이면 성공 포함)
 # 다음 페이지: cursorAiRequestId=응답의 nextCursorAiRequestId
 # 선택 필터: featureType, targetType, targetId, userNo, moderationJobId, errorCode
 GET {{baseUrl}}/api/v1/admin/ai/logs?status=FAILED&targetType=COMMENT&errorCode=GEMINI_TIMEOUT&limit=30
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{adminAccessToken}}
 
 ### AI 호출 로그 상세 (ID를 목록의 aiRequestId로 교체)
 GET {{baseUrl}}/api/v1/admin/ai/logs/1
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{adminAccessToken}}
 
 ### 1. 회원 정지
 POST {{baseUrl}}/api/v1/admin/users/104/suspend
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{adminAccessToken}}
 
 ### 2. 회원 정지 해제
 POST {{baseUrl}}/api/v1/admin/users/104/unsuspend
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{adminAccessToken}}
 
 ### 3. 신고 목록
@@ -66,12 +77,14 @@ Authorization: Bearer {{adminAccessToken}}
 # 다음 페이지는 cursorReportId=직전 nextCursorReportId
 # totalCount 는 그 status 의 전체 건수. 커서와 limit 는 세지 않는다
 GET {{baseUrl}}/api/v1/admin/reports?limit=30
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{adminAccessToken}}
 
 ### 3a. 신고 상세
 # targetUserNo·targetNickname 은 회원 신고뿐 아니라 글·댓글·답글 작성자도 준다
 # targetSuspended 는 그 회원이 정지인지
 GET {{baseUrl}}/api/v1/admin/reports/1
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{adminAccessToken}}
 
 # 4~7의 reportId는 목록 항목으로 바꾼다. 어떤 상태에서든 다시 조치할 수 있다.
@@ -80,33 +93,40 @@ Authorization: Bearer {{adminAccessToken}}
 
 ### 4. 신고 글·댓글·답글 삭제
 POST {{baseUrl}}/api/v1/admin/reports/105/delete-content
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{adminAccessToken}}
 
 ### 5. 신고 회원 정지
 POST {{baseUrl}}/api/v1/admin/reports/101/suspend
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{adminAccessToken}}
 
 ### 6. 신고 거절
 POST {{baseUrl}}/api/v1/admin/reports/1/reject
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{adminAccessToken}}
 
 ### 7. 신고 확인 (CONFIRMED 뒤 신고자는 취소 불가. 정지·삭제조치에서도 가능)
 POST {{baseUrl}}/api/v1/admin/reports/1/confirm
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{adminAccessToken}}
 
 ### 8a. 상업 태그 설명 요청 목록
 # status 를 빼면 전체 최신순. 다음 페이지는 cursorRequestId=직전 nextCursorRequestId
 # totalCount 는 그 status 의 전체 건수. 커서와 limit 는 세지 않는다
 GET {{baseUrl}}/api/v1/admin/tags/profile-requests?limit=30
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{adminAccessToken}}
 
 ### 8b. 상업 태그 설명 승인
 # tagId 는 8a 항목으로 바꾼다. 승인 후 그 태그를 쓰면 설명이 보인다.
 POST {{baseUrl}}/api/v1/admin/tags/102/approve
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{adminAccessToken}}
 
 ### 8c. 상업 태그 설명 거절
 POST {{baseUrl}}/api/v1/admin/tags/102/reject
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{adminAccessToken}}
 Content-Type: application/json
 
@@ -117,9 +137,15 @@ Content-Type: application/json
 ### 8d. 상업 태그 설명 대기
 # 본문 없음. 최신 요청을 PENDING 으로. 승인으로 공개 중이면 설명을 숨긴다.
 POST {{baseUrl}}/api/v1/admin/tags/102/pending
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{adminAccessToken}}
 
 ### 9. 관리자 로그아웃
-# 이 관리자의 리프레시만 폐기한다. 회원 토큰은 그대로다.
+# 현재 관리자 로그인 세션만 폐기한다. 다른 기기/회원 세션은 유지한다.
 POST {{baseUrl}}/api/v1/admin/auth/logout
-Authorization: Bearer {{adminAccessToken}}
+X-BFF-Key: {{bffKey}}
+Content-Type: application/json
+
+{
+  "refreshToken": "{{adminRefreshToken}}"
+}

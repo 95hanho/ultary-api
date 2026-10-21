@@ -1,6 +1,8 @@
 package me._hanho.ultary.domain.dm;
 
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import me._hanho.ultary.domain.dm.dto.request.StartDmRequest;
+import me._hanho.ultary.domain.dm.dto.response.StartDmResponse;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -56,6 +58,13 @@ public class DmController {
 		log.info("[leave] userNo={} roomId={}", principal.getUserNo(), roomId);
 		dmService.leave(principal, roomId);
 		return ApiResponse.okEmpty("대화방 나가기 성공");
+	}
+
+	@PostMapping("/start")
+	public ApiResponse<StartDmResponse> start(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@RequestBody StartDmRequest request) {
+		return ApiResponse.ok(dmService.start(principal, request), "첫 메시지 전송 성공");
 	}
 
 	@PostMapping("/{roomId}/viewing")

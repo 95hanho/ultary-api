@@ -1,4 +1,6 @@
 @baseUrl = http://localhost:9377
+# 로컬 서버 환경변수의 공유 키. 실제 값을 이 파일에 커밋하지 않는다.
+@bffKey = {{$processEnv BFF_INTERNAL_KEY}}
 @accessToken = {{socialLogin.response.body.$.data.accessToken}}
 @feedId = {{createFeed.response.body.$.data.feedId}}
 @commentId = {{createComment.response.body.$.data.feedCommentId}}
@@ -10,6 +12,7 @@
 ### 0. 소셜 로그인 (시드 user 101)
 # @name socialLogin
 POST {{baseUrl}}/api/v1/auth/login
+X-BFF-Key: {{bffKey}}
 Content-Type: application/json
 
 {
@@ -19,19 +22,23 @@ Content-Type: application/json
 
 ### 0b. 시드 게시글 상세 (feed 101)
 GET {{baseUrl}}/api/v1/feeds/101
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 0b-guest. PUBLIC 단건 게스트 조회 (Authorization 없이 · spring-auth-api.md)
 GET {{baseUrl}}/api/v1/feeds/101
+X-BFF-Key: {{bffKey}}
 
 ### 0c. 시드 게시글 상세 (feed 102 — user 102 작성, 이웃)
 GET {{baseUrl}}/api/v1/feeds/102
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 1. 게시글 등록 (시드 file/pet/tag ID 사용)
 # 게시글 작성은 AI 승인 후 저장. 부적절 400 AI_CONTENT_BLOCKED, 검사 장애 503 AI_CHECK_UNAVAILABLE 및 사유. 실패 시 게시글 미생성.
 # @name createFeed
 POST {{baseUrl}}/api/v1/feeds
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -63,12 +70,14 @@ Content-Type: application/json
 
 ### 2. 게시글 상세
 GET {{baseUrl}}/api/v1/feeds/{{feedId}}
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 3. 게시글 수정 (content·visibility, 선택 mediaTags·tagIds)
 # 사진 태그는 GET 상세의 media[].feedMediaId를 사용. mediaTags 생략은 유지, 항목의 mentions=[]는 해당 사진 태그 삭제.
 # content 변경 시에도 모더레이션. clearContent / visibility만이면 검사 생략
 PATCH {{baseUrl}}/api/v1/feeds/{{feedId}}
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -79,39 +88,48 @@ Content-Type: application/json
 
 ### 4a. 좋아요
 POST {{baseUrl}}/api/v1/feeds/{{feedId}}/like
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 4b. 좋아요한 사람 목록
 GET {{baseUrl}}/api/v1/feeds/{{feedId}}/likers?limit=20
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 4c. 좋아요 취소
 DELETE {{baseUrl}}/api/v1/feeds/{{feedId}}/like
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 5a. 울타리 고정
 POST {{baseUrl}}/api/v1/feeds/{{feedId}}/pin
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 5b. 고정 해제
 DELETE {{baseUrl}}/api/v1/feeds/{{feedId}}/pin
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 5c. 나만 보는 저장
 POST {{baseUrl}}/api/v1/feeds/{{feedId}}/save
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 5d. 저장 해제
 DELETE {{baseUrl}}/api/v1/feeds/{{feedId}}/save
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 6. 공유 경로 힌트
 POST {{baseUrl}}/api/v1/feeds/{{feedId}}/share
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 7a. 댓글 작성 (@유저 / @펫 — 시드 nickname=울타리, mention_id=choco_01)
 # @name createComment
 POST {{baseUrl}}/api/v1/feeds/{{feedId}}/comments
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -126,18 +144,22 @@ Content-Type: application/json
 ### 7b. 댓글 목록 (댓글+답글 합 ≤10이면 replies 포함, 초과면 replies=null)
 # 각 댓글·포함 답글: likeCount, likedByMe, authorProfileFile(없으면 null)
 GET {{baseUrl}}/api/v1/feeds/{{feedId}}/comments?limit=50
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 7e. 댓글 좋아요 (시드 comment 101 또는 7a 생성분)
 POST {{baseUrl}}/api/v1/feeds/101/comments/101/like
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 7f. 댓글 좋아요 취소
 DELETE {{baseUrl}}/api/v1/feeds/101/comments/101/like
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 7c. 댓글 수정
 PATCH {{baseUrl}}/api/v1/feeds/{{feedId}}/comments/{{commentId}}
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -148,6 +170,7 @@ Content-Type: application/json
 ### 8a. 답글 작성 (@멘션)
 # @name createReply
 POST {{baseUrl}}/api/v1/feeds/{{feedId}}/comments/{{commentId}}/replies
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -160,18 +183,22 @@ Content-Type: application/json
 
 ### 8b. 답글 목록 (likeCount, likedByMe, authorProfileFile)
 GET {{baseUrl}}/api/v1/feeds/{{feedId}}/comments/{{commentId}}/replies?limit=50
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 8e. 답글 좋아요 (시드 reply 101)
 POST {{baseUrl}}/api/v1/feeds/101/comments/101/replies/101/like
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 8f. 답글 좋아요 취소
 DELETE {{baseUrl}}/api/v1/feeds/101/comments/101/replies/101/like
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 8c. 답글 수정
 PATCH {{baseUrl}}/api/v1/feeds/{{feedId}}/comments/{{commentId}}/replies/{{replyId}}
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -181,12 +208,15 @@ Content-Type: application/json
 
 ### 8d. 답글 삭제
 DELETE {{baseUrl}}/api/v1/feeds/{{feedId}}/comments/{{commentId}}/replies/{{replyId}}
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 7d. 댓글 삭제
 DELETE {{baseUrl}}/api/v1/feeds/{{feedId}}/comments/{{commentId}}
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 9. 게시글 삭제 (작성자 또는 COLLABORATOR 펫 보호자)
 DELETE {{baseUrl}}/api/v1/feeds/{{feedId}}
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}

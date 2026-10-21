@@ -1,4 +1,6 @@
 @baseUrl = http://localhost:9377
+# 로컬 서버 환경변수의 공유 키. 실제 값을 이 파일에 커밋하지 않는다.
+@bffKey = {{$processEnv BFF_INTERNAL_KEY}}
 @accessToken = {{socialLogin.response.body.$.data.accessToken}}
 
 # 로그인: user 101 (phone 01011112222 / Test1234!)
@@ -7,6 +9,7 @@
 ### 0. 소셜 로그인 (시드 user 101)
 # @name socialLogin
 POST {{baseUrl}}/api/v1/auth/login
+X-BFF-Key: {{bffKey}}
 Content-Type: application/json
 
 {
@@ -16,26 +19,32 @@ Content-Type: application/json
 
 ### 1. 안 읽은 알림 수 (하단 배지. 읽음 처리 없음)
 GET {{baseUrl}}/api/v1/notifications/unread-count
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 1b. 알림 목록 (페이지 진입. 조회 후 그때까지 안 읽은 알림을 읽음 처리)
 GET {{baseUrl}}/api/v1/notifications?limit=30
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 2. 단건 읽음
 PATCH {{baseUrl}}/api/v1/notifications/1/read
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 3. 전체 읽음
 POST {{baseUrl}}/api/v1/notifications/read-all
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 4. 알림 설정 조회 (없으면 전부 true)
 GET {{baseUrl}}/api/v1/settings/notifications
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 5. 알림 설정 변경 (넣은 필드만)
 PATCH {{baseUrl}}/api/v1/settings/notifications
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 

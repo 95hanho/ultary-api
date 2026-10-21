@@ -120,7 +120,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 		if (!"POST".equalsIgnoreCase(request.getMethod())) {
 			return false;
 		}
-		return "/api/v1/admin/auth/login".equals(path) || "/api/v1/admin/auth/refresh".equals(path);
+		return "/api/v1/admin/auth/login".equals(path) || "/api/v1/admin/auth/refresh".equals(path)
+				|| "/api/v1/admin/auth/logout".equals(path);
 	}
 
 	private String requestPath(HttpServletRequest request) {

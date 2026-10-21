@@ -1,4 +1,6 @@
 @baseUrl = http://localhost:9377
+# 로컬 서버 환경변수의 공유 키. 실제 값을 이 파일에 커밋하지 않는다.
+@bffKey = {{$processEnv BFF_INTERNAL_KEY}}
 @accessToken = {{socialLogin.response.body.$.data.accessToken}}
 @accessToken104 = {{socialLogin104.response.body.$.data.accessToken}}
 @neighborIdPending = 104
@@ -11,6 +13,7 @@
 ### 0. 소셜 로그인 (시드 user 101)
 # @name socialLogin
 POST {{baseUrl}}/api/v1/auth/login
+X-BFF-Key: {{bffKey}}
 Content-Type: application/json
 
 {
@@ -21,48 +24,59 @@ Content-Type: application/json
 ### 1. 다른 유저 울타리 (102 나리집사) — relationStatus=ACCEPTED
 # hasStory, hasUnviewed: 102 스토리를 내가 안 읽었으면 안읽음
 GET {{baseUrl}}/api/v1/users/102/ultary
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 1b. 102 펫 목록 (priority 오름차순. GET /pets 와 같은 항목)
 GET {{baseUrl}}/api/v1/users/102/pets
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 1c. 102 게시글 그리드 (PUBLIC. NEIGHBORS는 ACCEPTED일 때만)
 GET {{baseUrl}}/api/v1/users/102/feeds?limit=30
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 1d. 102가 울타리에 고정한 글 (101이 볼 수 있는 글만)
 GET {{baseUrl}}/api/v1/users/102/pinned-feeds?limit=30
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 1e. 102가 태그된 글 (102가 쓴 글 제외. 101이 볼 수 있는 글만)
 GET {{baseUrl}}/api/v1/users/102/tagged-feeds?limit=30
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 2. 다른 유저 울타리 (104 대기중) — PENDING_RECEIVED
 GET {{baseUrl}}/api/v1/users/104/ultary
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 3a. 내(101) 팔로우 목록 (FOLLOW = 102, 103)
 GET {{baseUrl}}/api/v1/users/101/neighbors?type=FOLLOW&limit=30
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 3b. 내(101) 팔로워 목록 (FOLLOWER = 105)
 GET {{baseUrl}}/api/v1/users/101/neighbors?type=FOLLOWER&limit=30
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 4a. 팔로우 (이미 내가 팔로우한 102는 CONFLICT. 공개 계정이면 첫 신청은 바로 ACCEPTED)
 POST {{baseUrl}}/api/v1/users/102/neighbors/request
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 4b. 맞팔 (105→101 ACCEPTED. 101이 105를 팔로우. followedBack=true)
 # 한 번 더 호출하면 NEIGHBOR_ALREADY_EXISTS
 POST {{baseUrl}}/api/v1/users/105/neighbors/request
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 5a. 대기 요청 수락 (104→101, neighborId=104) — 101이 수신자
 # @name acceptPending
 POST {{baseUrl}}/api/v1/neighbors/{{neighborIdPending}}/accept
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 5b. (선택) 거절 테스트용 — 시드 재실행 후 reject
@@ -76,19 +90,23 @@ Authorization: Bearer {{accessToken}}
 ### 7. 내가 차단한 사용자 (nickname, profileFile, blockedAt)
 # 해제는 7b. limit 기본 30, 최대 50
 GET {{baseUrl}}/api/v1/users/blocks?limit=30
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 7a. 차단
 POST {{baseUrl}}/api/v1/users/102/block
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 7b. 차단 해제
 DELETE {{baseUrl}}/api/v1/users/102/block
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 8. 요청자 측 로그인 (시드 user 104 nickname=대기중)
 # @name socialLogin104
 POST {{baseUrl}}/api/v1/auth/login
+X-BFF-Key: {{bffKey}}
 Content-Type: application/json
 
 {
@@ -102,4 +120,5 @@ Content-Type: application/json
 
 ### 9. 스토리 owners (101 팔로우 중 활성 스토리 → 103)
 GET {{baseUrl}}/api/v1/main/stories/owners
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}

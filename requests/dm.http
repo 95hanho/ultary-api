@@ -1,4 +1,6 @@
 @baseUrl = http://localhost:9377
+# 로컬 서버 환경변수의 공유 키. 실제 값을 이 파일에 커밋하지 않는다.
+@bffKey = {{$processEnv BFF_INTERNAL_KEY}}
 @accessToken = {{socialLogin.response.body.$.data.accessToken}}
 @dmRoomId = {{createRoom.response.body.$.data.dmRoomId}}
 
@@ -9,6 +11,7 @@
 ### 0. 소셜 로그인 (시드 user 101)
 # @name socialLogin
 POST {{baseUrl}}/api/v1/auth/login
+X-BFF-Key: {{bffKey}}
 Content-Type: application/json
 
 {
@@ -18,11 +21,13 @@ Content-Type: application/json
 
 ### 1. 대화방 목록
 GET {{baseUrl}}/api/v1/dm/rooms?limit=30
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 2. 대화방 생성 (팔로우 102. 이미 있으면 그 방)
 # @name createRoom
 POST {{baseUrl}}/api/v1/dm/rooms
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -32,6 +37,7 @@ Content-Type: application/json
 
 ### 3. 글 메시지
 POST {{baseUrl}}/api/v1/dm/rooms/{{dmRoomId}}/messages
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -41,6 +47,7 @@ Content-Type: application/json
 
 ### 4. 게시글 사진 공유 (feed 102의 두 번째 사진 + 글)
 POST {{baseUrl}}/api/v1/dm/rooms/{{dmRoomId}}/messages
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -52,6 +59,7 @@ Content-Type: application/json
 
 ### 5. 스토리 사진 공유 (story 102. 프로필 없이 사진만)
 POST {{baseUrl}}/api/v1/dm/rooms/{{dmRoomId}}/messages
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -62,15 +70,18 @@ Content-Type: application/json
 
 ### 6. 메시지 조회 (오래된 순. 조회하면 읽음)
 GET {{baseUrl}}/api/v1/dm/rooms/{{dmRoomId}}/messages?limit=30
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 7. 읽음
 POST {{baseUrl}}/api/v1/dm/rooms/{{dmRoomId}}/read
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 8. 이 방 보는 중 (약 10초마다 true. 나갈 때 false)
 # 둘 다 true인 동안 보낸 메시지는 바로 읽음. 20초 없으면 나간 것
 POST {{baseUrl}}/api/v1/dm/rooms/{{dmRoomId}}/viewing
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -80,6 +91,7 @@ Content-Type: application/json
 
 ### 9. 입력 중 (멈추면 false. 4초 안에 true가 없어도 멈춤)
 POST {{baseUrl}}/api/v1/dm/rooms/{{dmRoomId}}/typing
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -89,25 +101,31 @@ Content-Type: application/json
 
 ### 10. 피드 공유 대상 (최근 DM → 내 스토리/피드 태그 → 나를 스토리/피드 태그 → 최근 팔로우/팔로워 → 기존 팔로우/팔로워)
 GET {{baseUrl}}/api/v1/dm/share-targets?limit=30
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 11. 펫 태그 또는 닉네임 검색 (앞 @ 선택, 대소문자 무시, limit 적용 전 검색)
 GET {{baseUrl}}/api/v1/dm/share-targets?limit=50&q=nabi
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 12. 앞 3순위만 변경 (나머지 4~9순위는 고정)
 GET {{baseUrl}}/api/v1/dm/share-targets?limit=50&priorityOrder=OWN_STORY_TAG,DM,OWN_FEED_TAG
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 
 ### 13. 스토리 언급 목록 (내 스토리 태그 1순위, 본인 펫 포함)
 GET {{baseUrl}}/api/v1/dm/share-targets?mode=STORY_TAG&limit=50
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 14. 사진 언급 목록 (내 피드 태그 1순위)
 GET {{baseUrl}}/api/v1/dm/share-targets?mode=FEED_TAG&limit=50
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 15. 대화 상대 목록 (최근 DM 1순위)
 GET {{baseUrl}}/api/v1/dm/share-targets?mode=DM&limit=50
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}

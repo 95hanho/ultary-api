@@ -1,4 +1,6 @@
 @baseUrl = http://localhost:9377
+# 로컬 서버 환경변수의 공유 키. 실제 값을 이 파일에 커밋하지 않는다.
+@bffKey = {{$processEnv BFF_INTERNAL_KEY}}
 @accessToken = {{socialLogin.response.body.$.data.accessToken}}
 @petId = {{createPet.response.body.$.data.petId}}
 
@@ -8,6 +10,7 @@
 ### 0. 소셜 로그인 (시드 user 101)
 # @name socialLogin
 POST {{baseUrl}}/api/v1/auth/login
+X-BFF-Key: {{bffKey}}
 Content-Type: application/json
 
 {
@@ -17,10 +20,12 @@ Content-Type: application/json
 
 ### 0b. 시드 펫 목록 (choco_01, mung_01)
 GET {{baseUrl}}/api/v1/pets
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 0c. 시드 펫 수정 (petId=101) — name·mentionId 제외
 PATCH {{baseUrl}}/api/v1/pets/101
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -32,6 +37,7 @@ Content-Type: application/json
 ### 1. 반려동물 등록 (시드 choco_01과 충돌 방지 → pet_http_01)
 # @name createPet
 POST {{baseUrl}}/api/v1/pets
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -49,10 +55,12 @@ Content-Type: application/json
 ### 2. 내 반려동물 목록
 # priority 오름차순 (1이 먼저). 같은 값이면 petId 오름차순
 GET {{baseUrl}}/api/v1/pets
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 3a. 반려동물 수정 — bio 등 (name·mentionId 제외)
 PATCH {{baseUrl}}/api/v1/pets/{{petId}}
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -64,10 +72,12 @@ Content-Type: application/json
 
 ### 3b. mention_id 변경 가능 여부
 GET {{baseUrl}}/api/v1/pets/{{petId}}/mention-id/change-availability
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 3c. mention_id 변경 (생성·변경 후 30일 쿨다운 — 생성 직후면 실패 예상)
 PATCH {{baseUrl}}/api/v1/pets/{{petId}}/mention-id
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -78,6 +88,7 @@ Content-Type: application/json
 ### 4. 프로필 이미지 연결 (시드 fileId=120 post.jpg)
 # 이전 프로필 파일은 다른 펫·피드·스토리·태그에 없으면 is_deleted=1, deleted_at 설정
 PATCH {{baseUrl}}/api/v1/pets/{{petId}}
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -87,6 +98,7 @@ Content-Type: application/json
 
 ### 5. 프로필 이미지 제거
 PATCH {{baseUrl}}/api/v1/pets/{{petId}}
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -96,8 +108,10 @@ Content-Type: application/json
 
 ### 6. 반려동물 삭제 (생성분만 — 시드 101·102는 건드리지 않음)
 DELETE {{baseUrl}}/api/v1/pets/{{petId}}
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 7. 삭제 후 목록보기 (시드 2마리만 남아야 함)
 GET {{baseUrl}}/api/v1/pets
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}

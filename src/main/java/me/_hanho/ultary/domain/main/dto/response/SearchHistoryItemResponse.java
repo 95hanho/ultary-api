@@ -27,6 +27,8 @@ public class SearchHistoryItemResponse {
 	/** type=TAG: 태그. type=USER면 null */
 	private Long tagId;
 	private String hashtag;
+	/** type=TAG: 조회자에게 보이는 태그 게시글 수. USER면 null */
+	private Long feedCount;
 
 	private LocalDateTime searchedAt;
 }

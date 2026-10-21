@@ -1,4 +1,6 @@
 @baseUrl = http://localhost:9377
+# 로컬 서버 환경변수의 공유 키. 실제 값을 이 파일에 커밋하지 않는다.
+@bffKey = {{$processEnv BFF_INTERNAL_KEY}}
 @accessToken = {{loginSeed.response.body.$.data.accessToken}}
 @refreshToken = {{loginSeed.response.body.$.data.refreshToken}}
 @phoneAuthToken = {{phone.response.body.$.data.phoneAuthToken}}
@@ -13,6 +15,7 @@
 ### 1a. 소셜 로그인 (Google · 신규 가입 포함) — FE/BFF가 OAuth 후 실제 providerUserId 전달
 # @name socialLogin
 POST {{baseUrl}}/api/v1/auth/social/login
+X-BFF-Key: {{bffKey}}
 Content-Type: application/json
 
 {
@@ -24,6 +27,7 @@ Content-Type: application/json
 
 ### 1b. 소셜 로그인 (Kakao · 신규)
 POST {{baseUrl}}/api/v1/auth/social/login
+X-BFF-Key: {{bffKey}}
 Content-Type: application/json
 
 {
@@ -35,6 +39,7 @@ Content-Type: application/json
 ### 1c. 시드 user 101 로그인 (비밀번호)
 # @name loginSeed
 POST {{baseUrl}}/api/v1/auth/login
+X-BFF-Key: {{bffKey}}
 Content-Type: application/json
 
 {
@@ -45,14 +50,17 @@ Content-Type: application/json
 ### 2. Me
 # googleLinked, kakaoLinked 로 소셜 연동 여부 확인
 GET {{baseUrl}}/api/v1/auth/me
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 3a. 닉네임 변경 가능 여부
 GET {{baseUrl}}/api/v1/auth/me/nickname/change-availability
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 3b. 닉네임 변경 (생성·변경 후 7일 쿨다운)
 PATCH {{baseUrl}}/api/v1/auth/me/nickname
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -63,6 +71,7 @@ Content-Type: application/json
 ### 3c. 회원정보 변경 (닉네임 제외 · 시드 지역)
 # name: 현재 이름이 비어 있을 때만 최초 등록. 이미 있으면 400 NAME_ALREADY_SET
 PATCH {{baseUrl}}/api/v1/auth/me
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -76,6 +85,7 @@ Content-Type: application/json
 ### 4. Refresh
 # @name refresh
 POST {{baseUrl}}/api/v1/auth/refresh
+X-BFF-Key: {{bffKey}}
 Content-Type: application/json
 
 {
@@ -86,6 +96,7 @@ Content-Type: application/json
 # 마이페이지 UX: GET /api/auth/social/kakao?intent=link&returnUrl=/settings/mypage
 # 응답 data 는 MeResponse (googleLinked·kakaoLinked)
 POST {{baseUrl}}/api/v1/auth/social/link
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -99,12 +110,14 @@ Content-Type: application/json
 # 비밀번호 없고 소셜 하나뿐이면 400 CANNOT_UNLINK_LAST_LOGIN
 # 응답 data 는 MeResponse
 DELETE {{baseUrl}}/api/v1/auth/social/unlink?provider=KAKAO
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 7. 휴대폰 인증 요청 (회원가입. 이미 가입된 번호면 409 PHONE_ALREADY_USED)
 # purpose 생략 = SIGNUP. 회원정보 변경은 purpose=PROFILE + Bearer. 비밀번호 재설정은 purpose=PASSWORD
 # @name phone
 POST {{baseUrl}}/api/v1/auth/phone
+X-BFF-Key: {{bffKey}}
 Content-Type: application/json
 
 {
@@ -114,6 +127,7 @@ Content-Type: application/json
 ### 8. 휴대폰 인증 확인 (서버 로그의 code 확인)
 # @name phoneVerify
 POST {{baseUrl}}/api/v1/auth/phone/verify
+X-BFF-Key: {{bffKey}}
 Content-Type: application/json
 
 {
@@ -123,9 +137,11 @@ Content-Type: application/json
 
 ### 9. 닉네임 중복확인
 GET {{baseUrl}}/api/v1/auth/nickname/check?nickname=폰가입유저
+X-BFF-Key: {{bffKey}}
 
 ### 10. 회원가입 (휴대폰 + 비밀번호)
 POST {{baseUrl}}/api/v1/auth/signup
+X-BFF-Key: {{bffKey}}
 Content-Type: application/json
 
 {
@@ -140,6 +156,7 @@ Content-Type: application/json
 # (= 11b와 동일 API) POST /api/v1/auth/login
 # @name login
 POST {{baseUrl}}/api/v1/auth/login
+X-BFF-Key: {{bffKey}}
 Content-Type: application/json
 
 {
@@ -150,6 +167,7 @@ Content-Type: application/json
 ### 11b. 로그인 (phone + password) — seed · 숫자만
 # (= 11a와 동일 API) POST /api/v1/auth/login
 POST {{baseUrl}}/api/v1/auth/login
+X-BFF-Key: {{bffKey}}
 Content-Type: application/json
 
 {
@@ -159,6 +177,7 @@ Content-Type: application/json
 
 ### 11b-2. 로그인 (phone 하이픈) — 서버 정규화 후 200
 POST {{baseUrl}}/api/v1/auth/login
+X-BFF-Key: {{bffKey}}
 Content-Type: application/json
 
 {
@@ -169,6 +188,7 @@ Content-Type: application/json
 ### 12. 비밀번호 변경/설정 토큰 (비로그인 · 휴대폰 인증 완료 후)
 # @name passwordToken
 POST {{baseUrl}}/api/v1/auth/password/token
+X-BFF-Key: {{bffKey}}
 Content-Type: application/json
 
 {
@@ -178,6 +198,7 @@ Content-Type: application/json
 
 ### 13a. 비밀번호 변경/설정 (비로그인 · passwordChangeToken)
 PUT {{baseUrl}}/api/v1/auth/password
+X-BFF-Key: {{bffKey}}
 Content-Type: application/json
 
 {
@@ -188,6 +209,7 @@ Content-Type: application/json
 ### 13b. 비밀번호 변경/설정 (로그인 상태)
 # 이미 비밀번호가 있으면 currentPassword 필수 / 소셜만 쓰면 currentPassword 생략 가능
 PUT {{baseUrl}}/api/v1/auth/password/me
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -198,8 +220,14 @@ Content-Type: application/json
 
 ### 14. Logout
 POST {{baseUrl}}/api/v1/auth/logout
-Authorization: Bearer {{accessToken}}
+X-BFF-Key: {{bffKey}}
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
 
 ### 15. 회원탈퇴
 DELETE {{baseUrl}}/api/v1/auth/me
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}

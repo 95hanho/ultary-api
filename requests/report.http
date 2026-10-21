@@ -1,4 +1,6 @@
 @baseUrl = http://localhost:9377
+# 로컬 서버 환경변수의 공유 키. 실제 값을 이 파일에 커밋하지 않는다.
+@bffKey = {{$processEnv BFF_INTERNAL_KEY}}
 @accessToken = {{socialLogin.response.body.$.data.accessToken}}
 
 # 시드 user 101로 로그인. 본인 글은 신고할 수 없다.
@@ -7,6 +9,7 @@
 ### 0. 소셜 로그인 (시드 user 101)
 # @name socialLogin
 POST {{baseUrl}}/api/v1/auth/login
+X-BFF-Key: {{bffKey}}
 Content-Type: application/json
 
 {
@@ -16,6 +19,7 @@ Content-Type: application/json
 
 ### 1. 유저 신고
 POST {{baseUrl}}/api/v1/reports
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -27,6 +31,7 @@ Content-Type: application/json
 
 ### 2. 게시글 신고
 POST {{baseUrl}}/api/v1/reports
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -38,6 +43,7 @@ Content-Type: application/json
 
 ### 3. 댓글 신고
 POST {{baseUrl}}/api/v1/reports
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -49,6 +55,7 @@ Content-Type: application/json
 
 ### 4. 답글 신고
 POST {{baseUrl}}/api/v1/reports
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -60,4 +67,5 @@ Content-Type: application/json
 
 ### 5. 신고 취소 (신고요청만. reportId는 접수 응답)
 DELETE {{baseUrl}}/api/v1/reports/1
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}

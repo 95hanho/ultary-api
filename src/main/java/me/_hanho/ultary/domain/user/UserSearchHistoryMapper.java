@@ -22,6 +22,8 @@ public interface UserSearchHistoryMapper {
 			@Param("cursorHistoryId") Long cursorHistoryId,
 			@Param("limit") int limit);
 
+	long countRecent(@Param("viewerUserNo") Long viewerUserNo);
+
 	int upsertUser(
 			@Param("userNo") Long userNo,
 			@Param("targetUserNo") Long targetUserNo);

@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 import javax.crypto.SecretKey;
 
@@ -54,13 +55,17 @@ public class JwtTokenProvider {
 	}
 
 	public String createRefreshToken(Long ownerNo, TokenOwnerType ownerType) {
+		return createRefreshToken(ownerNo, ownerType, null);
+	}
+
+	public String createRefreshToken(Long ownerNo, TokenOwnerType ownerType, String sessionId) {
 		return createToken(
 				String.valueOf(ownerNo),
 				ownerType,
 				JwtTokenType.REFRESH,
 				jwtProperties.getSecret().getRefresh(),
 				refreshLifetimeSeconds(),
-				null);
+				sessionId == null ? null : Map.of("sessionId", sessionId));
 	}
 
 	public String createPhoneAuthToken(String phone) {
@@ -178,6 +183,7 @@ public class JwtTokenProvider {
 		Date expiresAt = new Date(now.getTime() + (expirationSeconds * 1000));
 
 		var builder = Jwts.builder()
+				.setId(UUID.randomUUID().toString())
 				.setSubject(subject)
 				.claim(CLAIM_TOKEN_TYPE, tokenType.name())
 				.setIssuedAt(now)

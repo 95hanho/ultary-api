@@ -3,13 +3,45 @@
 
 <mapper namespace="me._hanho.ultary.domain.auth.TokenMapper">
 
+	<sql id="rotationColumns">
+		token_id, owner_type, user_no, admin_no, session_id, logged_in_at, connect_ip, connect_agent,
+		refresh_token, expires_at, is_revoked, revoked_at, replaced_by_token_id, rotated_at, created_at, updated_at,
+		(rotated_at &gt;= DATE_SUB(NOW(), INTERVAL 20 SECOND)) AS rotation_retry_allowed
+	</sql>
+
+	<select id="lockUserForRefresh" resultType="long">
+		SELECT user_no FROM ultary_user WHERE user_no = #{userNo} FOR UPDATE
+	</select>
+	<select id="lockAdminForRefresh" resultType="long">
+		SELECT admin_no FROM ultary_admin WHERE admin_no = #{adminNo} FOR UPDATE
+	</select>
+	<select id="findUserTokenForUpdate" resultType="me._hanho.ultary.domain.auth.model.Token" flushCache="true" useCache="false">
+		SELECT <include refid="rotationColumns"/> FROM ultary_token
+		WHERE owner_type = 'USER' AND user_no = #{userNo} AND refresh_token = #{refreshToken}
+		AND expires_at &gt; NOW() LIMIT 1 FOR UPDATE
+	</select>
+	<select id="findAdminTokenForUpdate" resultType="me._hanho.ultary.domain.auth.model.Token" flushCache="true" useCache="false">
+		SELECT <include refid="rotationColumns"/> FROM ultary_token
+		WHERE owner_type = 'ADMIN' AND admin_no = #{adminNo} AND refresh_token = #{refreshToken}
+		AND expires_at &gt; NOW() LIMIT 1 FOR UPDATE
+	</select>
+	<select id="findTokenByIdForUpdate" resultType="me._hanho.ultary.domain.auth.model.Token" flushCache="true" useCache="false">
+		SELECT <include refid="rotationColumns"/> FROM ultary_token
+		WHERE token_id = #{tokenId} AND expires_at &gt; NOW() FOR UPDATE
+	</select>
+	<update id="completeRotation">
+		UPDATE ultary_token SET is_revoked = 1, revoked_at = NOW(), rotated_at = NOW(),
+		replaced_by_token_id = #{replacementId}
+		WHERE token_id = #{tokenId} AND is_revoked = 0
+	</update>
+
 	<insert id="insert" useGeneratedKeys="true" keyProperty="tokenId" keyColumn="token_id"> INSERT
-		INTO ultary_token ( owner_type, user_no, admin_no, connect_ip, connect_agent, refresh_token,
-		expires_at, is_revoked ) VALUES ( #{ownerType}, #{userNo}, #{adminNo}, #{connectIp},
+		INTO ultary_token ( owner_type, user_no, admin_no, session_id, logged_in_at, connect_ip, connect_agent, refresh_token,
+		expires_at, is_revoked ) VALUES ( #{ownerType}, #{userNo}, #{adminNo}, #{sessionId}, #{loggedInAt}, #{connectIp},
 		#{connectAgent}, #{refreshToken}, #{expiresAt}, 0 ) </insert>
 
 	<select id="findValidUserRefreshToken" resultType="me._hanho.ultary.domain.auth.model.Token">
-		SELECT token_id, owner_type, user_no, admin_no, connect_ip, connect_agent, refresh_token,
+		SELECT token_id, owner_type, user_no, admin_no, session_id, logged_in_at, connect_ip, connect_agent, refresh_token,
 		expires_at, is_revoked, revoked_at, created_at, updated_at FROM ultary_token WHERE
 		owner_type = 'USER' AND user_no = #{userNo} AND refresh_token = #{refreshToken} AND
 		is_revoked = 0 AND expires_at &gt; NOW() LIMIT 1 </select>
@@ -21,12 +53,22 @@
 		owner_type = 'USER' AND user_no = #{userNo} AND is_revoked = 0 </update>
 
 	<select id="findValidAdminRefreshToken" resultType="me._hanho.ultary.domain.auth.model.Token">
-		SELECT token_id, owner_type, user_no, admin_no, connect_ip, connect_agent, refresh_token,
+		SELECT token_id, owner_type, user_no, admin_no, session_id, logged_in_at, connect_ip, connect_agent, refresh_token,
 		expires_at, is_revoked, revoked_at, created_at, updated_at FROM ultary_token WHERE
 		owner_type = 'ADMIN' AND admin_no = #{adminNo} AND refresh_token = #{refreshToken} AND
 		is_revoked = 0 AND expires_at &gt; NOW() LIMIT 1 </select>
 
 	<update id="revokeAllByAdminNo"> UPDATE ultary_token SET is_revoked = 1, revoked_at = NOW() WHERE
 		owner_type = 'ADMIN' AND admin_no = #{adminNo} AND is_revoked = 0 </update>
+
+	<update id="revokeUserSession">
+		UPDATE ultary_token SET is_revoked = 1, revoked_at = NOW()
+		WHERE owner_type = 'USER' AND user_no = #{userNo} AND session_id = #{sessionId} AND is_revoked = 0
+	</update>
+
+	<update id="revokeAdminSession">
+		UPDATE ultary_token SET is_revoked = 1, revoked_at = NOW()
+		WHERE owner_type = 'ADMIN' AND admin_no = #{adminNo} AND session_id = #{sessionId} AND is_revoked = 0
+	</update>
 
 </mapper>

@@ -1,4 +1,6 @@
 @baseUrl = http://localhost:9377
+# 로컬 서버 환경변수의 공유 키. 실제 값을 이 파일에 커밋하지 않는다.
+@bffKey = {{$processEnv BFF_INTERNAL_KEY}}
 @accessToken = {{socialLogin.response.body.$.data.accessToken}}
 
 # 시드: user 101 / feed 101~103 / CDN file 110~141 / story 101~104 / pet choco_01·mung_01
@@ -7,6 +9,7 @@
 ### 0. 소셜 로그인 (시드 user 101)
 # @name socialLogin
 POST {{baseUrl}}/api/v1/auth/login
+X-BFF-Key: {{bffKey}}
 Content-Type: application/json
 
 {
@@ -17,33 +20,40 @@ Content-Type: application/json
 ### 1. 마이울타리 정보 조회 (hasStory, hasUnviewed, petCount, feedCount 등)
 # 스토리 버튼: hasStory=false 없음 / hasUnviewed=true 안읽음 / 둘 다 아니면 다 읽음. 기준은 로그인한 나
 GET {{baseUrl}}/api/v1/my-ultary
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 2. MY 게시글 그리드 (시드 feed 101)
 GET {{baseUrl}}/api/v1/my-ultary/feeds?limit=30
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 3. MY 게시글 상세 (시드 feedId=101)
 GET {{baseUrl}}/api/v1/my-ultary/feeds/101
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 4. 고정 게시글 그리드 (시드: 101이 feed 102를 울타리에 고정)
 GET {{baseUrl}}/api/v1/my-ultary/pinned-feeds?limit=30
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 4b. 나만 보는 저장 (시드: 101이 feed 103 저장)
 GET {{baseUrl}}/api/v1/my-ultary/saved-feeds?limit=30
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 5. 태그된 게시글 그리드
 # 다른 사람 글만. 시드: user 102의 feed 102에 pet 101 멘션. 내 글 feed 101은 빠짐
 GET {{baseUrl}}/api/v1/my-ultary/tagged-feeds?limit=30
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 6a. 소개글 변경
 # 프로필 사진은 유저 컬럼이 아님. 사진 있는 펫 중 priority가 가장 높은 펫 사진.
 # 바꾸려면 requests/pet.http 의 profileFileId / priority
 PATCH {{baseUrl}}/api/v1/my-ultary/bio
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -53,6 +63,7 @@ Content-Type: application/json
 
 ### 6b. 소개글 삭제
 PATCH {{baseUrl}}/api/v1/my-ultary/bio
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -62,11 +73,13 @@ Content-Type: application/json
 
 ### 8a. 내 스토리 목록 (시드 story 101)
 GET {{baseUrl}}/api/v1/my-ultary/stories
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 8b. 스토리 등록 (이미지 — 시드 fileId=130)
 # @name createStory
 POST {{baseUrl}}/api/v1/my-ultary/stories
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -78,6 +91,7 @@ Content-Type: application/json
 
 ### 8c. 스토리 등록 (이미지 추가 — 시드 fileId=121; CDN 시드에 VIDEO 없음)
 POST {{baseUrl}}/api/v1/my-ultary/stories
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
@@ -89,4 +103,5 @@ Content-Type: application/json
 
 ### 8d. 스토리 삭제
 DELETE {{baseUrl}}/api/v1/my-ultary/stories/{{createStory.response.body.$.data.storyId}}
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}

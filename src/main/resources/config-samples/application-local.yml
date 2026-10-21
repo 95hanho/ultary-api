@@ -1,8 +1,8 @@
+# 로컬 설정 템플릿 → ../application-local.yml.
 spring:
   config:
     activate:
       on-profile: local
-
   # ==============================
   # DB 설정 (MariaDB + p6spy) - Local
   # ==============================
@@ -26,3 +26,10 @@ spring:
   servlet:
     multipart:
       location: ${UPLOAD_DIR:D:/files/ultary}
+
+# BFF_INTERNAL_KEY는 FE .env.local과 동일한 값으로 설정한다.
+# BFF server authentication (private configuration)
+security:
+  bff:
+    shared-key: ${BFF_INTERNAL_KEY:}
+    require-https: false

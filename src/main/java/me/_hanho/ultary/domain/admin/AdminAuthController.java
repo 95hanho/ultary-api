@@ -1,6 +1,5 @@
 package me._hanho.ultary.domain.admin;
 
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -15,7 +14,6 @@ import me._hanho.ultary.common.response.ApiResponse;
 import me._hanho.ultary.domain.admin.dto.request.AdminLoginRequest;
 import me._hanho.ultary.domain.auth.dto.request.RefreshTokenRequest;
 import me._hanho.ultary.domain.auth.dto.response.TokenResponse;
-import me._hanho.ultary.security.principal.AdminPrincipal;
 
 /**
  * 관리자 인증은 회원 토큰과 비밀키가 다르다.
@@ -47,9 +45,9 @@ public class AdminAuthController {
 	}
 
 	@PostMapping("/logout")
-	public ApiResponse<Void> logout(@AuthenticationPrincipal AdminPrincipal principal) {
+	public ApiResponse<Void> logout(@Valid @RequestBody RefreshTokenRequest request) {
 		log.info("[adminLogout]");
-		adminAuthService.logout(principal);
+		adminAuthService.logout(request);
 		return ApiResponse.okEmpty("관리자 로그아웃 성공");
 	}
 }

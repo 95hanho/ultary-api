@@ -19,9 +19,10 @@ import me._hanho.ultary.domain.auth.TokenMapper;
 import me._hanho.ultary.domain.auth.dto.request.RefreshTokenRequest;
 import me._hanho.ultary.domain.auth.dto.response.TokenResponse;
 import me._hanho.ultary.domain.auth.model.Token;
+import me._hanho.ultary.domain.auth.support.TokenSessionSupport;
+import me._hanho.ultary.domain.auth.support.TokenRotationSupport;
 import me._hanho.ultary.security.jwt.JwtTokenProvider;
 import me._hanho.ultary.security.jwt.TokenOwnerType;
-import me._hanho.ultary.security.principal.AdminPrincipal;
 
 @Slf4j
 @Service
@@ -30,6 +31,7 @@ public class AdminAuthService {
 
 	private final AdminMapper adminMapper;
 	private final TokenMapper tokenMapper;
+	private final TokenRotationSupport tokenRotation;
 	private final JwtTokenProvider jwtTokenProvider;
 	private final PasswordEncoder passwordEncoder;
 
@@ -59,7 +61,7 @@ public class AdminAuthService {
 		}
 
 		Long adminNo = jwtTokenProvider.getSubjectAsLong(claims);
-		Token storedToken = tokenMapper.findValidAdminRefreshToken(adminNo, request.getRefreshToken());
+		Token storedToken = tokenRotation.lockAdminToken(adminNo, request.getRefreshToken());
 		if (storedToken == null) {
 			throw new BusinessException(ErrorCode.INVALID_TOKEN);
 		}
@@ -72,32 +74,50 @@ public class AdminAuthService {
 			throw new BusinessException(ErrorCode.UNAUTHORIZED);
 		}
 
-		tokenMapper.revokeByTokenId(storedToken.getTokenId());
+		if (Boolean.TRUE.equals(storedToken.getIsRevoked())) {
+			return tokenRotation.replay(tokenRotation.activeSuccessor(storedToken));
+		}
 		log.info("[adminRefresh] adminNo={}", adminNo);
-		return issueTokens(admin, httpRequest);
+		return issueTokens(admin, httpRequest, storedToken);
 	}
 
 	@Transactional
-	public void logout(AdminPrincipal principal) {
-		if (principal == null) {
-			throw new BusinessException(ErrorCode.UNAUTHORIZED);
+	public void logout(RefreshTokenRequest request) {
+		Claims claims = jwtTokenProvider.parseRefreshToken(request.getRefreshToken());
+		if (jwtTokenProvider.getOwnerType(claims) != TokenOwnerType.ADMIN) {
+			throw new BusinessException(ErrorCode.INVALID_TOKEN);
 		}
-		tokenMapper.revokeAllByAdminNo(principal.getAdminNo());
-		log.info("[adminLogout] adminNo={}", principal.getAdminNo());
+		Long adminNo = jwtTokenProvider.getSubjectAsLong(claims);
+		Token token = tokenRotation.lockAdminToken(adminNo, request.getRefreshToken());
+		if (token == null) return;
+		if (Boolean.TRUE.equals(token.getIsRevoked())) {
+			if (token.getReplacedByTokenId() == null || !Boolean.TRUE.equals(token.getRotationRetryAllowed())) return;
+			token = tokenRotation.successorForLogout(token);
+			if (token == null) return;
+		}
+		if (StringUtils.hasText(token.getSessionId())) {
+			tokenMapper.revokeAdminSession(adminNo, token.getSessionId());
+		} else {
+			tokenMapper.revokeByTokenId(token.getTokenId());
+		}
+		log.info("[adminLogout] adminNo={}", adminNo);
 	}
 
 	private TokenResponse issueTokens(Admin admin, HttpServletRequest httpRequest) {
-		String accessToken = jwtTokenProvider.createAdminAccessToken(admin.getAdminNo());
-		String refreshToken = jwtTokenProvider.createRefreshToken(admin.getAdminNo(), TokenOwnerType.ADMIN);
+		return issueTokens(admin, httpRequest, null);
+	}
 
-		Token token = new Token();
+	private TokenResponse issueTokens(Admin admin, HttpServletRequest httpRequest, Token previous) {
+		Token token = TokenSessionSupport.newToken(previous, httpRequest);
+		String accessToken = jwtTokenProvider.createAdminAccessToken(admin.getAdminNo());
+		String refreshToken = jwtTokenProvider.createRefreshToken(admin.getAdminNo(), TokenOwnerType.ADMIN, token.getSessionId());
+
 		token.setOwnerType(TokenOwnerType.ADMIN.name());
 		token.setAdminNo(admin.getAdminNo());
-		token.setConnectIp(resolveClientIp(httpRequest));
-		token.setConnectAgent(trimAgent(httpRequest.getHeader("User-Agent")));
 		token.setRefreshToken(refreshToken);
 		token.setExpiresAt(LocalDateTime.now().plusSeconds(jwtTokenProvider.refreshLifetimeSeconds()));
 		tokenMapper.insert(token);
+		if (previous != null) tokenRotation.complete(previous, token);
 
 		return TokenResponse.builder()
 				.accessToken(accessToken)
@@ -107,18 +127,4 @@ public class AdminAuthService {
 				.build();
 	}
 
-	private String resolveClientIp(HttpServletRequest request) {
-		String forwarded = request.getHeader("X-Forwarded-For");
-		if (forwarded != null && !forwarded.isBlank()) {
-			return forwarded.split(",")[0].trim();
-		}
-		return request.getRemoteAddr();
-	}
-
-	private String trimAgent(String userAgent) {
-		if (userAgent == null) {
-			return null;
-		}
-		return userAgent.length() > 200 ? userAgent.substring(0, 200) : userAgent;
-	}
 }

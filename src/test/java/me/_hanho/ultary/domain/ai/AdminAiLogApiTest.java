@@ -19,7 +19,8 @@ import me._hanho.ultary.domain.ai.model.AiRequestLog;
 import me._hanho.ultary.security.jwt.JwtTokenProvider;
 
 /** Exercises the real admin JWT filter and MariaDB mapper; fixtures roll back. */
-@SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT, properties="ai.moderation.worker-enabled=false")
+@SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT, properties={
+        "ai.moderation.worker-enabled=false", "security.bff.shared-key=integration-test-bff-key-not-for-production"})
 @Transactional
 class AdminAiLogApiTest {
     @Autowired WebApplicationContext context;
@@ -29,6 +30,7 @@ class AdminAiLogApiTest {
     @Autowired org.mybatis.spring.SqlSessionTemplate sqlSession;
     @Autowired JwtTokenProvider tokens;
     @Autowired ObjectMapper json;
+    @Autowired me._hanho.ultary.security.bff.BffSecurityProperties bff;
     MockMvc mvc;
     Long user, first, second, success;
     int originalFailureCount;
@@ -37,7 +39,8 @@ class AdminAiLogApiTest {
 
     @BeforeEach void fixture() {
         originalFailureCount = jdbc.queryForObject("SELECT COUNT(*) FROM ultary_ai_request_log WHERE status='FAILED'", Integer.class);
-        mvc = MockMvcBuilders.webAppContextSetup(context).addFilters(security).build();
+        mvc = MockMvcBuilders.webAppContextSetup(context).addFilters(security)
+                .defaultRequest(get("/").header("X-BFF-Key", bff.getSharedKey())).build();
         jdbc.update("INSERT INTO ultary_user(nickname) VALUES(?)", "ailog" + UUID.randomUUID().toString().substring(0, 12));
         user = jdbc.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
         jdbc.update("INSERT INTO ultary_admin(login_id,password) VALUES(?,?)", "ailog-" + UUID.randomUUID(), "unused-test-password");

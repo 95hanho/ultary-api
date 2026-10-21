@@ -96,9 +96,9 @@ public class AuthController {
 	}
 
 	@PostMapping("/logout")
-	public ApiResponse<Void> logout(@AuthenticationPrincipal UserPrincipal principal) {
+	public ApiResponse<Void> logout(@Valid @RequestBody RefreshTokenRequest request) {
 		log.info("[logout]");
-		authService.logout(principal);
+		authService.logout(request);
 		return ApiResponse.okEmpty("로그아웃 성공");
 	}
 

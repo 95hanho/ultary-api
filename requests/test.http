@@ -1,4 +1,6 @@
 @baseUrl = http://localhost:9377
+# 로컬 서버 환경변수의 공유 키. 실제 값을 이 파일에 커밋하지 않는다.
+@bffKey = {{$processEnv BFF_INTERNAL_KEY}}
 @accessToken = {{socialLogin.response.body.$.data.accessToken}}
 
 # local 프로필 전용 (/api/v1/test/**). prod 빌드·prod 프로필에서는 빈 미등록 → 404
@@ -6,6 +8,7 @@
 ### 0. 소셜 로그인 (시드 user 101 — 읽음 초기화용 토큰)
 # @name socialLogin
 POST {{baseUrl}}/api/v1/auth/login
+X-BFF-Key: {{bffKey}}
 Content-Type: application/json
 
 {
@@ -17,6 +20,7 @@ Content-Type: application/json
 # 시드 평문: Test1234! → DB에는 {noop}Test1234! 또는 아래 encode 결과
 # @name encodePassword
 POST {{baseUrl}}/api/v1/test/password/encode
+X-BFF-Key: {{bffKey}}
 Content-Type: application/json
 
 {
@@ -25,6 +29,7 @@ Content-Type: application/json
 
 ### 1b. 규칙 위반 예시 (400 예상)
 POST {{baseUrl}}/api/v1/test/password/encode
+X-BFF-Key: {{bffKey}}
 Content-Type: application/json
 
 {
@@ -34,21 +39,25 @@ Content-Type: application/json
 ### 2. 내 스토리 읽음 전부 초기화 (local + Bearer)
 # FE: development에서만 호출. 응답 deletedCount = 지운 ultary_story_view 행 수
 DELETE {{baseUrl}}/api/v1/test/story-views
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 3. 닉네임 변경 쿨다운 초기화 (local + Bearer)
 # nickname_changed_at = 올해 1월 1일 00:00. 7일이 지난 것으로 봐서 PATCH /auth/me/nickname 가능
 POST {{baseUrl}}/api/v1/test/nickname-cooldown
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 4. 펫 멘션 ID 변경 쿨다운 초기화 (local + Bearer)
 # mention_id_changed_at = 올해 1월 1일 00:00. 30일이 지난 것으로 봐서 PATCH /pets/{petId}/mention-id 가능
 # 시드 user 101 펫: 101. 화면의 펫 id로 바꿔 호출
 POST {{baseUrl}}/api/v1/test/pets/101/mention-id-cooldown
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
 ### 5. 액세스·리프레시 토큰 초기화 (local + Bearer)
 # ultary_token 의 내 리프레시 행을 모두 폐기. 응답 revokedCount
 # 액세스 JWT는 DB에 없다. 호출 후 브라우저의 access/refresh 쿠키를 지워야 로그아웃된다
 DELETE {{baseUrl}}/api/v1/test/tokens
+X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}

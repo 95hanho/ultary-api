@@ -25,6 +25,8 @@ import me._hanho.ultary.domain.dm.dto.request.CreateDmRoomRequest;
 import me._hanho.ultary.domain.dm.dto.request.DmTypingRequest;
 import me._hanho.ultary.domain.dm.dto.request.DmViewingRequest;
 import me._hanho.ultary.domain.dm.dto.request.SendDmMessageRequest;
+import me._hanho.ultary.domain.dm.dto.request.StartDmRequest;
+import me._hanho.ultary.domain.dm.dto.response.StartDmResponse;
 import me._hanho.ultary.domain.dm.dto.response.DmMessageListResponse;
 import me._hanho.ultary.domain.dm.dto.response.DmMessageResponse;
 import me._hanho.ultary.domain.dm.dto.response.DmRoomItemResponse;
@@ -124,6 +126,16 @@ public class DmService {
 		dmMapper.leave(room.getDmRoomId(), principal.getUserNo());
 		presence.leave(principal.getUserNo(), room.getDmRoomId());
 		log.info("[leave] userNo={} roomId={}", principal.getUserNo(), roomId);
+	}
+
+	/** 첫 전송이 실패하면 새 방 생성과 기존 방 재입장도 함께 롤백한다. */
+	@Transactional
+	public StartDmResponse start(UserPrincipal principal, StartDmRequest request) {
+		CreateDmRoomRequest roomRequest = new CreateDmRoomRequest();
+		roomRequest.setTargetUserNo(request == null ? null : request.getTargetUserNo());
+		DmRoomItemResponse room = createRoom(principal, roomRequest);
+		DmMessageResponse message = send(principal, room.getDmRoomId(), request);
+		return new StartDmResponse(requireRoomItem(principal.getUserNo(), room.getDmRoomId()), message);
 	}
 
 	@Transactional

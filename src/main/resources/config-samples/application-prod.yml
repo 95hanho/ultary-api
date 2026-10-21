@@ -1,3 +1,5 @@
+# 운영 설정 템플릿 → ../application-prod.yml.
+
 spring:
   config:
     activate:
@@ -25,3 +27,15 @@ spring:
   servlet:
     multipart:
       location: ${UPLOAD_DIR:/path/to/ultary}
+# BFF_INTERNAL_KEY는 FE .env.production과 동일한 값으로 설정한다.
+# BFF server authentication (private configuration)
+security:
+  bff:
+    shared-key: ${BFF_INTERNAL_KEY:}
+    require-https: true
+    # TLS를 종료하는 신뢰 프록시의 실제 peer IP/CIDR. 비우면 전달 헤더를 신뢰하지 않는다.
+    trusted-proxies: ${BFF_TRUSTED_PROXIES:}
+
+server:
+  # 임의의 Forwarded 헤더로 request.isSecure()가 바뀌지 않도록 한다.
+  forward-headers-strategy: none

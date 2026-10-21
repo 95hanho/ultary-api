@@ -18,5 +18,6 @@ public class SearchHistoryRow {
 	private Integer profileFileId;
 	private Long targetTagId;
 	private String hashtag;
+	private Long feedCount;
 	private LocalDateTime searchedAt;
 }
