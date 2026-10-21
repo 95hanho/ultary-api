@@ -7,6 +7,10 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Arrays;
+import java.util.Locale;
 
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -39,6 +43,7 @@ import me._hanho.ultary.domain.feed.model.FeedMedia;
 import me._hanho.ultary.domain.file.FileService;
 import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
 import me._hanho.ultary.domain.neighbor.NeighborService;
+import me._hanho.ultary.domain.pet.PetMapper;
 import me._hanho.ultary.domain.story.StoryService;
 import me._hanho.ultary.domain.user.UserBlockMapper;
 import me._hanho.ultary.domain.ws.RealtimePush;
@@ -65,6 +70,7 @@ public class DmService {
 	private final FileService fileService;
 	private final RealtimePush realtimePush;
 	private final DmPresence presence;
+	private final PetMapper petMapper;
 
 	@Transactional(readOnly = true)
 	public DmRoomListResponse listRooms(UserPrincipal principal, Integer limit) {
@@ -483,15 +489,32 @@ public class DmService {
 	}
 
 	@Transactional(readOnly = true)
-	public DmShareTargetListResponse shareTargets(UserPrincipal principal, Integer limit) {
-		List<ShareTargetRow> rows = dmMapper.findShareCandidates(principal.getUserNo());
+	public DmShareTargetListResponse shareTargets(UserPrincipal principal, Integer limit, String query, String priorityOrder) {
+		return shareTargets(principal, limit, query, priorityOrder, "SHARE");
+	}
+
+	@Transactional(readOnly = true)
+	public DmShareTargetListResponse shareTargets(UserPrincipal principal, Integer limit, String query, String priorityOrder, String mode) {
+		if (!Set.of("SHARE", "DM", "STORY_TAG", "FEED_TAG").contains(mode)) {
+			throw new BusinessException(ErrorCode.INVALID_INPUT, "지원하지 않는 목록 모드입니다.");
+		}
+		boolean tagging = "STORY_TAG".equals(mode) || "FEED_TAG".equals(mode);
+		String defaultOrder = switch (mode) {
+			case "STORY_TAG" -> "OWN_STORY_TAG,DM,OWN_FEED_TAG";
+			case "FEED_TAG" -> "OWN_FEED_TAG,DM,OWN_STORY_TAG";
+			default -> null;
+		};
+		List<String> order = sharePriorityOrder(StringUtils.hasText(priorityOrder) ? priorityOrder : defaultOrder);
+		String term = query == null ? "" : query.trim().replaceFirst("^@+", "").toLowerCase(Locale.ROOT);
 		LocalDateTime cutoff = LocalDateTime.now().minusMonths(1);
+		List<ShareTargetRow> rows = dmMapper.findShareCandidates(principal.getUserNo(), cutoff, term, tagging);
 		List<RankedTarget> ranked = new ArrayList<>();
 		for (ShareTargetRow row : rows) {
 			if (row.getUserNo() == null) {
 				continue;
 			}
-			RankedTarget target = rank(row, cutoff);
+			RankedTarget target = tagging && row.getUserNo().equals(principal.getUserNo())
+					? new RankedTarget(row, 10, cutoff) : rank(row, cutoff, order);
 			if (target != null) {
 				ranked.add(target);
 			}
@@ -509,6 +532,16 @@ public class DmService {
 			}
 		}
 		var files = fileService.findSummaries(fileIds);
+		Map<Long, List<String>> petTags = new HashMap<>();
+		Map<Long, List<DmShareTargetItemResponse.PetChoice>> petChoices = new HashMap<>();
+		List<Long> userNos = ranked.subList(0, size).stream().map(t -> t.row().getUserNo()).toList();
+		if (!userNos.isEmpty()) {
+			for (var pet : petMapper.findActiveMentions(userNos)) {
+				petTags.computeIfAbsent(pet.getUserNo(), key -> new ArrayList<>()).add(pet.getMentionId());
+				petChoices.computeIfAbsent(pet.getUserNo(), key -> new ArrayList<>())
+						.add(new DmShareTargetItemResponse.PetChoice(pet.getPetId(), pet.getMentionId()));
+			}
+		}
 		List<DmShareTargetItemResponse> items = new ArrayList<>();
 		for (int i = 0; i < size; i++) {
 			RankedTarget target = ranked.get(i);
@@ -516,6 +549,8 @@ public class DmService {
 			items.add(DmShareTargetItemResponse.builder()
 					.userNo(row.getUserNo())
 					.nickname(row.getNickname())
+					.petTags(petTags.getOrDefault(row.getUserNo(), List.of()))
+					.pets(petChoices.getOrDefault(row.getUserNo(), List.of()))
 					.profileFile(row.getProfileFileId() == null ? null : files.get(row.getProfileFileId()))
 					.dmRoomId(row.getDmRoomId())
 					.following(row.getFollowedAt() != null)
@@ -527,36 +562,43 @@ public class DmService {
 		return DmShareTargetListResponse.builder().items(items).build();
 	}
 
-	private RankedTarget rank(ShareTargetRow row, LocalDateTime cutoff) {
-		if (withinMonth(row.getLastMessageAt(), cutoff)) {
-			return new RankedTarget(row, 1, row.getLastMessageAt());
+	private static final List<String> DEFAULT_SHARE_PRIORITY = List.of("DM", "OWN_STORY_TAG", "OWN_FEED_TAG");
+
+	private List<String> sharePriorityOrder(String value) {
+		if (!StringUtils.hasText(value)) return DEFAULT_SHARE_PRIORITY;
+		List<String> order = Arrays.stream(value.split(",", -1)).map(String::trim).toList();
+		if (order.size() != 3 || !new HashSet<>(order).equals(new HashSet<>(DEFAULT_SHARE_PRIORITY))) {
+			throw new BusinessException(ErrorCode.INVALID_INPUT,
+					"priorityOrder는 DM,OWN_STORY_TAG,OWN_FEED_TAG를 중복 없이 지정해 주세요.");
 		}
+		return order;
+	}
+
+	private RankedTarget rank(ShareTargetRow row, LocalDateTime cutoff, List<String> order) {
+		for (int i = 0; i < order.size(); i++) {
+			LocalDateTime at = switch (order.get(i)) {
+				case "DM" -> row.getLastMessageAt();
+				case "OWN_STORY_TAG" -> row.getOwnStoryTagAt();
+				case "OWN_FEED_TAG" -> row.getOwnFeedTagAt();
+				default -> null;
+			};
+			if (withinMonth(at, cutoff)) return new RankedTarget(row, i + 1, at);
+		}
+		if (withinMonth(row.getTaggedInStoryAt(), cutoff)) return new RankedTarget(row, 4, row.getTaggedInStoryAt());
+		if (withinMonth(row.getTaggedInFeedAt(), cutoff)) return new RankedTarget(row, 5, row.getTaggedInFeedAt());
 		if (withinMonth(row.getFollowedAt(), cutoff)) {
-			return new RankedTarget(row, 2, row.getFollowedAt());
+			return new RankedTarget(row, 6, row.getFollowedAt());
 		}
 		if (withinMonth(row.getFollowerAt(), cutoff)) {
-			return new RankedTarget(row, 3, row.getFollowerAt());
+			return new RankedTarget(row, 7, row.getFollowerAt());
 		}
-		LocalDateTime activeAt = latest(row.getLastMessageAt(), row.getFollowedAt(), row.getFollowerAt());
-		if (activeAt == null) {
-			return null;
-		}
-		return new RankedTarget(row, 4, activeAt);
+		if (row.getFollowedAt() != null) return new RankedTarget(row, 8, row.getFollowedAt());
+		if (row.getFollowerAt() != null) return new RankedTarget(row, 9, row.getFollowerAt());
+		return null;
 	}
 
 	private static boolean withinMonth(LocalDateTime at, LocalDateTime cutoff) {
 		return at != null && !at.isBefore(cutoff);
-	}
-
-	private static LocalDateTime latest(LocalDateTime messageAt, LocalDateTime followedAt, LocalDateTime followerAt) {
-		LocalDateTime best = messageAt;
-		if (followedAt != null && (best == null || followedAt.isAfter(best))) {
-			best = followedAt;
-		}
-		if (followerAt != null && (best == null || followerAt.isAfter(best))) {
-			best = followerAt;
-		}
-		return best;
 	}
 
 	private record RankedTarget(ShareTargetRow row, int group, LocalDateTime activeAt) {

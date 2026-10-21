@@ -9,5 +9,6 @@ import lombok.Setter;
 public class PetMention {
 
 	private Long userNo;
+	private Long petId;
 	private String mentionId;
 }

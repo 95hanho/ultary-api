@@ -241,6 +241,7 @@
 
 	<select id="findActiveMentions" resultType="me._hanho.ultary.domain.pet.model.PetMention">
 		SELECT
+			pet_id AS petId,
 			user_no AS userNo,
 			mention_id AS mentionId
 		FROM ultary_pet

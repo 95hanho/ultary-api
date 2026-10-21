@@ -1,6 +1,7 @@
 package me._hanho.ultary.domain.dm;
 
 import java.util.List;
+import java.time.LocalDateTime;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -37,7 +38,9 @@ public interface DmMapper {
 
 	List<DmRoomRow> findRooms(@Param("userNo") Long userNo, @Param("limit") int limit);
 
-	List<ShareTargetRow> findShareCandidates(@Param("userNo") Long userNo);
+	List<ShareTargetRow> findShareCandidates(@Param("userNo") Long userNo,
+			@Param("cutoff") LocalDateTime cutoff, @Param("query") String query,
+			@Param("tagging") boolean tagging);
 
 	DmRoomRow findRoomRow(@Param("userNo") Long userNo, @Param("dmRoomId") Long dmRoomId);
 

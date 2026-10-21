@@ -15,6 +15,10 @@ public class ShareTargetRow {
 	private Long profileFileId;
 	private Long dmRoomId;
 	private LocalDateTime lastMessageAt;
+	private LocalDateTime ownStoryTagAt;
+	private LocalDateTime ownFeedTagAt;
+	private LocalDateTime taggedInStoryAt;
+	private LocalDateTime taggedInFeedAt;
 	/** 내가 그 사람을 팔로우한 시각. 없으면 null */
 	private LocalDateTime followedAt;
 	/** 그 사람이 나를 팔로우한 시각. 없으면 null */

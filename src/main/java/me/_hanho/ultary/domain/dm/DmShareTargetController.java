@@ -24,8 +24,11 @@ public class DmShareTargetController {
 	@GetMapping
 	public ApiResponse<DmShareTargetListResponse> list(
 			@AuthenticationPrincipal UserPrincipal principal,
-			@RequestParam(required = false) Integer limit) {
+			@RequestParam(required = false) Integer limit,
+			@RequestParam(required = false) String q,
+			@RequestParam(required = false) String priorityOrder,
+			@RequestParam(defaultValue = "SHARE") String mode) {
 		log.info("[shareTargets] userNo={} limit={}", principal.getUserNo(), limit);
-		return ApiResponse.ok(dmService.shareTargets(principal, limit), "공유 대상 조회 성공");
+		return ApiResponse.ok(dmService.shareTargets(principal, limit, q, priorityOrder, mode), "공유 대상 조회 성공");
 	}
 }

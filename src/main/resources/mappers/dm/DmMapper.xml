@@ -144,97 +144,90 @@
 		LIMIT #{limit}
 	</select>
 
+	<!-- Photo tags and collaborator tags both identify the pet owner. -->
+	<sql id="shareFeedTags">
+		SELECT f.user_no AS author, p.user_no AS target, fp.created_at AS tagged_at
+		FROM ultary_feed_pet fp
+		JOIN ultary_feed f ON f.feed_id = fp.feed_id AND f.is_deleted = 0
+		JOIN ultary_pet p ON p.pet_id = fp.pet_id AND p.is_deleted = 0
+		WHERE fp.created_at &gt;= #{cutoff} AND (f.user_no = #{userNo} OR p.user_no = #{userNo})
+		UNION ALL
+		SELECT f.user_no, p.user_no, fm.created_at
+		FROM ultary_feed_media_mention fm
+		JOIN ultary_feed_media m ON m.feed_media_id = fm.feed_media_id
+		JOIN ultary_feed f ON f.feed_id = m.feed_id AND f.is_deleted = 0
+		JOIN ultary_pet p ON p.pet_id = fm.pet_id AND p.is_deleted = 0
+		WHERE fm.created_at &gt;= #{cutoff} AND (f.user_no = #{userNo} OR p.user_no = #{userNo})
+	</sql>
+
 	<select id="findShareCandidates" resultType="me._hanho.ultary.domain.dm.model.ShareTargetRow">
-		SELECT
-			u.user_no AS userNo,
-			u.nickname AS nickname,
-			(
-				SELECT rp.profile_file_id
-				FROM ultary_pet rp
-				WHERE rp.user_no = u.user_no
-				  AND rp.is_deleted = 0
-				  AND rp.profile_file_id IS NOT NULL
-				ORDER BY rp.priority ASC, rp.pet_id ASC
-				LIMIT 1
-			) AS profileFileId,
-			dm.dm_room_id AS dmRoomId,
-			dm.last_message_at AS lastMessageAt,
-			mine.followed_at AS followedAt,
-			theirs.follower_at AS followerAt
+		SELECT u.user_no AS userNo, u.nickname,
+			(SELECT p.profile_file_id FROM ultary_pet p
+			 WHERE p.user_no = u.user_no AND p.is_deleted = 0 AND p.profile_file_id IS NOT NULL
+			 ORDER BY p.priority, p.pet_id LIMIT 1) AS profileFileId,
+			r.dm_room_id AS dmRoomId,
+			MAX(CASE WHEN e.kind = 'DM' THEN e.at END) AS lastMessageAt,
+			MAX(CASE WHEN e.kind = 'OWN_STORY' THEN e.at END) AS ownStoryTagAt,
+			MAX(CASE WHEN e.kind = 'OWN_FEED' THEN e.at END) AS ownFeedTagAt,
+			MAX(CASE WHEN e.kind = 'IN_STORY' THEN e.at END) AS taggedInStoryAt,
+			MAX(CASE WHEN e.kind = 'IN_FEED' THEN e.at END) AS taggedInFeedAt,
+			MAX(CASE WHEN e.kind = 'FOLLOW' THEN e.at END) AS followedAt,
+			MAX(CASE WHEN e.kind = 'FOLLOWER' THEN e.at END) AS followerAt
 		FROM (
-			SELECT IF(r.user_low = #{userNo}, r.user_high, r.user_low) AS peer_user_no
-			FROM ultary_dm_room r
-			INNER JOIN ultary_dm_message m ON m.dm_room_id = r.dm_room_id
+			<if test="tagging">
+				SELECT #{userNo} AS peer, 'SELF' AS kind, #{cutoff} AS at
+				UNION ALL
+			</if>
+			SELECT IF(r.user_low = #{userNo}, r.user_high, r.user_low) AS peer,
+				'DM' AS kind, MAX(m.created_at) AS at
+			FROM ultary_dm_room r JOIN ultary_dm_message m ON m.dm_room_id = r.dm_room_id
 			WHERE r.user_low = #{userNo} OR r.user_high = #{userNo}
-			UNION
-			SELECT receiver_user_no
-			FROM ultary_neighbor
-			WHERE requester_user_no = #{userNo}
-			  AND status = 'ACCEPTED'
-			UNION
-			SELECT requester_user_no
-			FROM ultary_neighbor
-			WHERE receiver_user_no = #{userNo}
-			  AND status = 'ACCEPTED'
-			  AND followed_back = 1
-			UNION
-			SELECT requester_user_no
-			FROM ultary_neighbor
-			WHERE receiver_user_no = #{userNo}
-			  AND status = 'ACCEPTED'
-			UNION
-			SELECT receiver_user_no
-			FROM ultary_neighbor
-			WHERE requester_user_no = #{userNo}
-			  AND status = 'ACCEPTED'
-			  AND followed_back = 1
-		) peers
-		INNER JOIN ultary_user u
-			ON u.user_no = peers.peer_user_no
-			AND u.withdrawal_status = 'ACTIVE'
-		LEFT JOIN (
-			SELECT
-				IF(r.user_low = #{userNo}, r.user_high, r.user_low) AS peer_user_no,
-				r.dm_room_id,
-				MAX(m.created_at) AS last_message_at
-			FROM ultary_dm_room r
-			INNER JOIN ultary_dm_message m ON m.dm_room_id = r.dm_room_id
-			WHERE r.user_low = #{userNo} OR r.user_high = #{userNo}
-			GROUP BY IF(r.user_low = #{userNo}, r.user_high, r.user_low), r.dm_room_id
-		) dm ON dm.peer_user_no = u.user_no
-		LEFT JOIN (
-			SELECT receiver_user_no AS peer_user_no, COALESCE(accepted_at, requested_at) AS followed_at
-			FROM ultary_neighbor
-			WHERE requester_user_no = #{userNo}
-			  AND status = 'ACCEPTED'
+			GROUP BY r.dm_room_id, r.user_low, r.user_high
 			UNION ALL
-			SELECT requester_user_no, COALESCE(followed_back_at, accepted_at, requested_at)
-			FROM ultary_neighbor
-			WHERE receiver_user_no = #{userNo}
-			  AND status = 'ACCEPTED'
-			  AND followed_back = 1
-		) mine ON mine.peer_user_no = u.user_no
-		LEFT JOIN (
-			SELECT requester_user_no AS peer_user_no, COALESCE(accepted_at, requested_at) AS follower_at
-			FROM ultary_neighbor
-			WHERE receiver_user_no = #{userNo}
-			  AND status = 'ACCEPTED'
+			SELECT IF(s.user_no = #{userNo}, p.user_no, s.user_no),
+				IF(s.user_no = #{userNo}, 'OWN_STORY', 'IN_STORY'), sm.created_at
+			FROM ultary_story_mention sm
+			JOIN ultary_story s ON s.story_id = sm.story_id AND s.is_deleted = 0
+			JOIN ultary_pet p ON p.pet_id = sm.pet_id AND p.is_deleted = 0
+			WHERE sm.created_at &gt;= #{cutoff} AND (s.user_no = #{userNo} OR p.user_no = #{userNo})
 			UNION ALL
-			SELECT receiver_user_no, COALESCE(followed_back_at, accepted_at, requested_at)
-			FROM ultary_neighbor
-			WHERE requester_user_no = #{userNo}
-			  AND status = 'ACCEPTED'
-			  AND followed_back = 1
-		) theirs ON theirs.peer_user_no = u.user_no
-		WHERE NOT EXISTS (
-			SELECT 1
-			FROM ultary_user_block b
-			WHERE b.is_deleted = 0
-			  AND (
-					(b.blocker_user_no = #{userNo} AND b.blocked_user_no = u.user_no)
-					OR (b.blocked_user_no = #{userNo} AND b.blocker_user_no = u.user_no)
-			  )
-		)
+			SELECT IF(t.author = #{userNo}, t.target, t.author),
+				IF(t.author = #{userNo}, 'OWN_FEED', 'IN_FEED'), t.tagged_at
+			FROM (<include refid="shareFeedTags"/>) t
+			UNION ALL
+			SELECT receiver_user_no, 'FOLLOW', COALESCE(accepted_at, requested_at)
+			FROM ultary_neighbor WHERE requester_user_no = #{userNo} AND status = 'ACCEPTED'
+			UNION ALL
+			SELECT requester_user_no, 'FOLLOW', COALESCE(followed_back_at, accepted_at, requested_at)
+			FROM ultary_neighbor WHERE receiver_user_no = #{userNo} AND status = 'ACCEPTED' AND followed_back = 1
+			UNION ALL
+			SELECT requester_user_no, 'FOLLOWER', COALESCE(accepted_at, requested_at)
+			FROM ultary_neighbor WHERE receiver_user_no = #{userNo} AND status = 'ACCEPTED'
+			UNION ALL
+			SELECT receiver_user_no, 'FOLLOWER', COALESCE(followed_back_at, accepted_at, requested_at)
+			FROM ultary_neighbor WHERE requester_user_no = #{userNo} AND status = 'ACCEPTED' AND followed_back = 1
+		) e
+		JOIN ultary_user u ON u.user_no = e.peer AND u.withdrawal_status = 'ACTIVE'
+		LEFT JOIN ultary_dm_room r ON
+			r.user_low = LEAST(#{userNo}, u.user_no) AND r.user_high = GREATEST(#{userNo}, u.user_no)
+		WHERE 1 = 1
+		<choose>
+			<when test="tagging">
+				AND EXISTS (SELECT 1 FROM ultary_pet tp WHERE tp.user_no = u.user_no AND tp.is_deleted = 0)
+				AND (u.user_no = #{userNo} OR NOT EXISTS (
+					SELECT 1 FROM ultary_user_privacy pr WHERE pr.user_no = u.user_no AND pr.allow_tag = 0))
+			</when>
+			<otherwise>AND u.user_no != #{userNo}</otherwise>
+		</choose>
+		AND NOT EXISTS (SELECT 1 FROM ultary_user_block b WHERE b.is_deleted = 0 AND
+			((b.blocker_user_no = #{userNo} AND b.blocked_user_no = u.user_no)
+			OR (b.blocked_user_no = #{userNo} AND b.blocker_user_no = u.user_no)))
+		<if test="query != null and query != ''">
+			AND (LOCATE(LOWER(#{query}), LOWER(u.nickname)) &gt; 0 OR EXISTS (
+				SELECT 1 FROM ultary_pet sp WHERE sp.user_no = u.user_no AND sp.is_deleted = 0
+				AND LOCATE(LOWER(#{query}), LOWER(sp.mention_id)) &gt; 0))
+		</if>
+		GROUP BY u.user_no, u.nickname, r.dm_room_id
 	</select>
 
 	<select id="findRoomRow" resultType="me._hanho.ultary.domain.dm.model.DmRoomRow">

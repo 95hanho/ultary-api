@@ -87,6 +87,27 @@ Content-Type: application/json
   "typing": true
 }
 
-### 10. 피드 공유 대상 (한 달 DM → 내 팔로우 → 팔로워 → 나머지 최신순)
+### 10. 피드 공유 대상 (최근 DM → 내 스토리/피드 태그 → 나를 스토리/피드 태그 → 최근 팔로우/팔로워 → 기존 팔로우/팔로워)
 GET {{baseUrl}}/api/v1/dm/share-targets?limit=30
+Authorization: Bearer {{accessToken}}
+
+### 11. 펫 태그 또는 닉네임 검색 (앞 @ 선택, 대소문자 무시, limit 적용 전 검색)
+GET {{baseUrl}}/api/v1/dm/share-targets?limit=50&q=nabi
+Authorization: Bearer {{accessToken}}
+
+### 12. 앞 3순위만 변경 (나머지 4~9순위는 고정)
+GET {{baseUrl}}/api/v1/dm/share-targets?limit=50&priorityOrder=OWN_STORY_TAG,DM,OWN_FEED_TAG
+Authorization: Bearer {{accessToken}}
+
+
+### 13. 스토리 언급 목록 (내 스토리 태그 1순위, 본인 펫 포함)
+GET {{baseUrl}}/api/v1/dm/share-targets?mode=STORY_TAG&limit=50
+Authorization: Bearer {{accessToken}}
+
+### 14. 사진 언급 목록 (내 피드 태그 1순위)
+GET {{baseUrl}}/api/v1/dm/share-targets?mode=FEED_TAG&limit=50
+Authorization: Bearer {{accessToken}}
+
+### 15. 대화 상대 목록 (최근 DM 1순위)
+GET {{baseUrl}}/api/v1/dm/share-targets?mode=DM&limit=50
 Authorization: Bearer {{accessToken}}
