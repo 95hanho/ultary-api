@@ -10,6 +10,7 @@ import me._hanho.ultary.domain.file.model.FileMeta;
 
 @Mapper
 public interface FileMapper {
+	boolean hasPublicReference(@Param("fileId") Long fileId);
 
 	FileMeta findActiveByFileId(@Param("fileId") Long fileId);
 

@@ -22,6 +22,7 @@ import me._hanho.ultary.domain.feed.model.FeedSave;
 
 @Mapper
 public interface FeedMapper {
+	int countPublicByUserNo(@Param("userNo") Long userNo);
 
 	int insertFeed(Feed feed);
 

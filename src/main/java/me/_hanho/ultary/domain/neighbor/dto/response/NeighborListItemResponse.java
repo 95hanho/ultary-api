@@ -21,6 +21,8 @@ public class NeighborListItemResponse {
 	/** FOLLOW(내가 팔로우) | FOLLOWER(상대가 팔로우) */
 	private String listType;
 	private boolean hasStory;
+	/** 조회자가 볼 수 있는 스토리 중 미열람 스토리가 있으면 true */
+	private boolean hasUnviewed;
 	/** 그 유저 펫 mentionId. @ 없음. priority 순. 없으면 빈 배열 */
 	private List<String> petTags;
 	/** 로그인한 조회자가 이 유저를 팔로우 중이면 true */

@@ -21,6 +21,9 @@ public class SearchHistoryItemResponse {
 	private String nickname;
 	private Integer profileFileId;
 	private FileSummaryResponse profileFile;
+	/** 현재 조회자가 볼 수 있는 스토리 유무·미열람 여부 */
+	private boolean hasStory;
+	private boolean hasUnviewed;
 	/** type=USER: 펫 멘션(@ 없음). type=TAG면 [] */
 	private List<String> petTags;
 

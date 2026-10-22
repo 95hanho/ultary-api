@@ -24,6 +24,7 @@ import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
 import me._hanho.ultary.domain.myultary.dto.request.UpdateMyBioRequest;
 import me._hanho.ultary.domain.myultary.dto.response.FeedGridItemResponse;
 import me._hanho.ultary.domain.myultary.dto.response.MyUltaryProfileResponse;
+import me._hanho.ultary.domain.myultary.dto.response.PublicUltaryResponse;
 import me._hanho.ultary.domain.neighbor.NeighborMapper;
 import me._hanho.ultary.domain.pet.PetMapper;
 import me._hanho.ultary.domain.pet.PetService;
@@ -175,7 +176,27 @@ public class MyUltaryService {
 		storyService.delete(principal, storyId);
 	}
 
-	private List<FeedGridItemResponse> toGridItems(List<Feed> feeds) {
+	/** Guest read model. Never use a member principal or return member-only fields. */
+    @Transactional(readOnly = true)
+    public PublicUltaryResponse getPublicProfile(String nickname) {
+        User user = userMapper.findActiveByNickname(nickname);
+        if (user == null || privacyService.isPrivateAccount(user.getUserNo())) {
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+        }
+        Long owner = user.getUserNo();
+        var pets = petMapper.findActiveByUserNo(owner).stream().map(pet ->
+            new PublicUltaryResponse.PublicPet(
+                pet.getPetId(), pet.getName(), pet.getMentionId(), pet.getGender(), pet.getBio(),
+                pet.getBirthday(), fileService.findSummary(pet.getProfileFileId()))).toList();
+        return new PublicUltaryResponse(
+            owner, user.getNickname(), user.getBio(), neighborMapper.countAcceptedAsRequester(owner),
+            neighborMapper.countAcceptedAsReceiver(owner), feedMapper.countPublicByUserNo(owner), pets,
+            toGridItems(feedMapper.findVisibleByOwner(owner, null, MAX_LIMIT)),
+            toGridItems(feedMapper.findPinnedVisibleByOwner(owner, null, MAX_LIMIT)),
+            toGridItems(feedMapper.findTaggedVisibleByOwner(owner, null, MAX_LIMIT)));
+    }
+
+    private List<FeedGridItemResponse> toGridItems(List<Feed> feeds) {
 		if (feeds == null || feeds.isEmpty()) {
 			return List.of();
 		}

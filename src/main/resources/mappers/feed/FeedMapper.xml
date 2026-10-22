@@ -1221,4 +1221,7 @@
 		ORDER BY feed_comment_mention_id ASC
 	</select>
 
+    <select id="countPublicByUserNo" resultType="int">
+        SELECT COUNT(*) FROM ultary_feed WHERE user_no = #{userNo} AND is_deleted = 0 AND visibility = 'PUBLIC'
+    </select>
 </mapper>

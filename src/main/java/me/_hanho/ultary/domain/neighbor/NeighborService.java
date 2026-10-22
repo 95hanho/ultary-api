@@ -149,6 +149,7 @@ public class NeighborService {
 				: new HashSet<>(neighborMapper.findFollowedUserNos(me, userNos));
 		for (NeighborListRow row : rows) {
 			Long profileId = row.getProfileFileId() == null ? null : row.getProfileFileId().longValue();
+			boolean hasStory = storyService.hasVisibleStory(me, row.getUserNo());
 			result.add(NeighborListItemResponse.builder()
 					.neighborId(row.getNeighborId())
 					.userNo(row.getUserNo())
@@ -157,7 +158,8 @@ public class NeighborService {
 					.profileFile(profileId == null ? null : files.get(profileId))
 					.status(row.getStatus())
 					.listType(row.getListType())
-					.hasStory(storyService.hasVisibleStory(principal.getUserNo(), row.getUserNo()))
+					.hasStory(hasStory)
+					.hasUnviewed(hasStory && storyService.hasUnviewedStory(row.getUserNo(), me))
 					.petTags(petTags.getOrDefault(row.getUserNo(), List.of()))
 					.following(followed.contains(row.getUserNo()))
 					.build());

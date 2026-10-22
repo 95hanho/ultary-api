@@ -144,7 +144,12 @@ public class FileService {
 	}
 
 	@Transactional(readOnly = true)
-	public FileMeta requireActive(Long fileId) {
+	public void assertPublicContent(Long fileId) {
+        if (!fileMapper.hasPublicReference(fileId)) throw new BusinessException(ErrorCode.FILE_NOT_FOUND);
+    }
+
+    @Transactional(readOnly = true)
+    public FileMeta requireActive(Long fileId) {
 		FileMeta meta = fileMapper.findActiveByFileId(fileId);
 		if (meta == null) {
 			throw new BusinessException(ErrorCode.FILE_NOT_FOUND);

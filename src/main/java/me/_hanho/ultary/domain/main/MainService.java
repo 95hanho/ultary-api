@@ -192,7 +192,7 @@ public class MainService {
 		SearchHistoryRow row = userSearchHistoryMapper.findByUserPair(principal.getUserNo(), targetUserNo);
 		log.info("[saveRecentSearch] userNo={} targetUserNo={}", principal.getUserNo(), targetUserNo);
 		return toHistoryItem(
-				row,
+				principal.getUserNo(), row,
 				fileService.findSummary(row.getProfileFileId()),
 				petTagsByUser(List.of(row.getTargetUserNo())).getOrDefault(row.getTargetUserNo(), List.of()));
 	}
@@ -206,7 +206,7 @@ public class MainService {
 		SearchHistoryRow row = userSearchHistoryMapper.findByTagPair(principal.getUserNo(), tagId);
 		log.info("[saveRecentSearch] userNo={} tagId={} hashtag={}",
 				principal.getUserNo(), tagId, tag.getHashtag());
-		return toHistoryItem(row, null, List.of());
+		return toHistoryItem(principal.getUserNo(), row, null, List.of());
 	}
 
 	/** 스토리 @·사진 태그 모달의 최근 펫. 검색 최근 울타리와 별도 */
@@ -302,7 +302,7 @@ public class MainService {
 		Map<Long, List<String>> petTags = petTagsByUser(userNos);
 		List<SearchHistoryItemResponse> items = rows.stream()
 				.map(row -> toHistoryItem(
-						row,
+						principal.getUserNo(), row,
 						row.getProfileFileId() == null
 								? null
 								: files.get(row.getProfileFileId().longValue()),
@@ -372,8 +372,9 @@ public class MainService {
 	}
 
 	private SearchHistoryItemResponse toHistoryItem(
-			SearchHistoryRow row, FileSummaryResponse profileFile, List<String> petTags) {
+			Long viewerUserNo, SearchHistoryRow row, FileSummaryResponse profileFile, List<String> petTags) {
 		boolean tag = "TAG".equals(row.getHistoryType()) || row.getTargetTagId() != null;
+		boolean hasStory = !tag && storyService.hasVisibleStory(viewerUserNo, row.getTargetUserNo());
 		return SearchHistoryItemResponse.builder()
 				.userSearchHistoryId(row.getUserSearchHistoryId())
 				.type(tag ? "TAG" : "USER")
@@ -381,6 +382,8 @@ public class MainService {
 				.nickname(tag ? null : row.getNickname())
 				.profileFileId(tag ? null : row.getProfileFileId())
 				.profileFile(tag ? null : profileFile)
+				.hasStory(hasStory)
+				.hasUnviewed(hasStory && storyService.hasUnviewedStory(row.getTargetUserNo(), viewerUserNo))
 				.petTags(tag ? List.of() : (petTags == null ? List.of() : petTags))
 				.tagId(tag ? row.getTargetTagId() : null)
 				.hashtag(tag ? row.getHashtag() : null)
@@ -405,11 +408,11 @@ public class MainService {
 		List<FeedResponse> feeds = Collections.emptyList();
 
 		if (all || "USER".equals(searchType)) {
-			users = toSearchUsers(userMapper.searchActiveByNickname(
+			users = toSearchUsers(principal.getUserNo(), userMapper.searchActiveByNickname(
 					principal.getUserNo(), query, resolved));
 		}
 		if ("MENTION".equals(searchType)) {
-			users = toSearchUsers(userMapper.searchActiveByPetMention(
+			users = toSearchUsers(principal.getUserNo(), userMapper.searchActiveByPetMention(
 					principal.getUserNo(), query, resolved));
 		}
 		if (all || "PET".equals(searchType)) {
@@ -468,7 +471,7 @@ public class MainService {
 		return toGridItems(feedMapper.findVisibleByTag(principal.getUserNo(), tagId, pageSize));
 	}
 
-	private List<MainSearchUserItem> toSearchUsers(List<User> userRows) {
+	private List<MainSearchUserItem> toSearchUsers(Long viewerUserNo, List<User> userRows) {
 		if (userRows == null || userRows.isEmpty()) {
 			return List.of();
 		}
@@ -485,12 +488,15 @@ public class MainService {
 				.map(u -> {
 					Integer profileFileId = profileByUser.get(u.getUserNo());
 					Long profileId = profileFileId == null ? null : profileFileId.longValue();
+					boolean hasStory = storyService.hasVisibleStory(viewerUserNo, u.getUserNo());
 					return MainSearchUserItem.builder()
 							.userNo(u.getUserNo())
 							.nickname(u.getNickname())
 							.profileFileId(profileFileId)
 							.profileFile(profileId == null ? null : files.get(profileId))
 							.petTags(petTags.getOrDefault(u.getUserNo(), List.of()))
+							.hasStory(hasStory)
+							.hasUnviewed(hasStory && storyService.hasUnviewedStory(u.getUserNo(), viewerUserNo))
 							.bio(u.getBio())
 							.build();
 				})

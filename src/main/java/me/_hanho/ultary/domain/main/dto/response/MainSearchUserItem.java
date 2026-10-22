@@ -14,6 +14,9 @@ public class MainSearchUserItem {
 	private String nickname;
 	private Integer profileFileId;
 	private FileSummaryResponse profileFile;
+	/** 현재 조회자가 볼 수 있는 스토리 유무·미열람 여부 */
+	private boolean hasStory;
+	private boolean hasUnviewed;
 	/** 그 유저 펫의 mentionId. @ 없음. priority 순. 없으면 빈 배열 */
 	private List<String> petTags;
 	private String bio;

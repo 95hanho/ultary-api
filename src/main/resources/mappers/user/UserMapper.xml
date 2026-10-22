@@ -242,4 +242,9 @@
 		  AND withdrawal_status = 'ACTIVE'
 	</update>
 
+	<select id="findActiveByNickname" resultType="me._hanho.ultary.domain.user.model.User">
+        SELECT <include refid="userColumns"/> FROM ultary_user
+        WHERE nickname = #{nickname} AND withdrawal_status = 'ACTIVE'
+        LIMIT 1
+    </select>
 </mapper>

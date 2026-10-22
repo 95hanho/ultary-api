@@ -101,4 +101,18 @@
 			   WHERE file_id = #{fileId})
 	</select>
 
+    <select id="hasPublicReference" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1 FROM ultary_pet p
+            JOIN ultary_user u ON u.user_no = p.user_no AND u.withdrawal_status = 'ACTIVE'
+            LEFT JOIN ultary_user_privacy v ON v.user_no = u.user_no
+            WHERE p.profile_file_id = #{fileId} AND p.is_deleted = 0 AND COALESCE(v.private_account, 0) = 0
+        ) OR EXISTS (
+            SELECT 1 FROM ultary_feed_media m
+            JOIN ultary_feed f ON f.feed_id = m.feed_id AND f.is_deleted = 0 AND f.visibility = 'PUBLIC'
+            JOIN ultary_user u ON u.user_no = f.user_no AND u.withdrawal_status = 'ACTIVE'
+            LEFT JOIN ultary_user_privacy v ON v.user_no = u.user_no
+            WHERE (m.file_id = #{fileId} OR m.thumbnail_file_id = #{fileId}) AND COALESCE(v.private_account, 0) = 0
+        )
+    </select>
 </mapper>

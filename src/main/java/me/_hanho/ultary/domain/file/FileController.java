@@ -54,7 +54,8 @@ public class FileController {
 	public ResponseEntity<Resource> content(
 			@AuthenticationPrincipal UserPrincipal principal,
 			@PathVariable Long fileId) {
-		log.info("[content] fileId={} userNo={}", fileId, principal.getUserNo());
+		if (principal == null) fileService.assertPublicContent(fileId);
+		log.info("[content] fileId={} guest={}", fileId, principal == null);
 		FileMeta meta = fileService.requireActive(fileId);
 		Resource resource = fileService.getContent(fileId);
 		MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
@@ -66,6 +67,7 @@ public class FileController {
 			}
 		}
 		return ResponseEntity.ok()
+				.header(HttpHeaders.CACHE_CONTROL, principal == null ? "no-store" : "private, max-age=3600")
 				.header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + meta.getStoreName() + "\"")
 				.contentType(mediaType)
 				.body(resource);

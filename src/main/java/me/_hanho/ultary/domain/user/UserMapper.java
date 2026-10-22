@@ -14,6 +14,8 @@ public interface UserMapper {
 
 	User findActiveByUserNo(@Param("userNo") Long userNo);
 
+	User findActiveByNickname(@Param("nickname") String nickname);
+
 	/** 탈퇴 포함. 로그인에서 탈퇴 계정을 구분할 때 */
 	User findByUserNo(@Param("userNo") Long userNo);
 
