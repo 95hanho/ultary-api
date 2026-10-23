@@ -32,4 +32,5 @@ public class AiRequestLog {
 	private Long latencyMs;
 	private Integer httpStatus;
 	private String errorCode;
+    private String inspectionContent;
 }

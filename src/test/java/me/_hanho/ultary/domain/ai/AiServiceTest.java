@@ -43,6 +43,7 @@ class AiServiceTest {
         assertThat(c.getValue().getAttemptNo()).isEqualTo(1);
         assertThat(c.getValue().getErrorMessage()).isEqualTo("Response deadline exceeded");
         assertThat(c.getValue().getPrompt()).doesNotContain("hello");
+        assertThat(c.getValue().getInspectionContent()).isEqualTo("hello");
     }
     @Test void emptyCaptionRequiresNoExternalCall() {
         var j=job();j.setContent(null);assertThat(service.moderate(j).safe()).isTrue();verify(client,never()).generateJson(anyString(),anyString());
@@ -52,7 +53,16 @@ class AiServiceTest {
         when(client.generateJson(anyString(),anyString())).thenReturn("{\"hashtags\":[\"dog\",\"#walk\",\"dog\",\"invalid!!\"]}");
         assertThat(service.recommendHashtags(101L,"walk")).containsExactly("dog","walk");
         when(client.generateJson(anyString(),anyString())).thenThrow(new GeminiClient.GeminiException("GEMINI_TIMEOUT"));
-        assertThat(service.recommendHashtags(101L,"walk")).isEmpty();
+        assertThatThrownBy(() -> service.recommendHashtags(101L,"walk"))
+            .isInstanceOf(me._hanho.ultary.common.exception.BusinessException.class).hasMessageContaining("잠시 사용할 수 없습니다");
+        verify(client,times(4)).generateJson(anyString(),anyString());
+    }
+    @Test void recommendationCanRecoverOnTheThirdAttempt() {
+        when(client.isEnabled()).thenReturn(true);
+        when(client.generateJson(anyString(),anyString())).thenThrow(new GeminiClient.GeminiException("GEMINI_TIMEOUT"))
+            .thenThrow(new GeminiClient.GeminiException("GEMINI_TIMEOUT")).thenReturn("{\"hashtags\":[\"dog\"]}");
+        assertThat(service.recommendHashtags(101L,"walk")).containsExactly("dog");
+        verify(client,times(3)).generateJson(anyString(),anyString());
     }
 
     @Test void feedCreationRejectsUnsafeTextWithAReasonAndKeepsTheInspectionLog() {
@@ -79,6 +89,15 @@ class AiServiceTest {
         assertThat(row.getValue().getStatus()).isEqualTo("FAILED");
     }
 
+    @Test void updateFailureLogRetainsTheEditedTextAndFeedIdentity() {
+        when(client.generateJson(anyString(),anyString())).thenThrow(new GeminiClient.GeminiException("GEMINI_TIMEOUT"));
+        assertThatThrownBy(() -> service.assertFeedUpdateAllowed(101L,120L,"edited draft"))
+            .isInstanceOf(me._hanho.ultary.common.exception.BusinessException.class);
+        var row=ArgumentCaptor.forClass(AiRequestLog.class);verify(logs).write(row.capture());
+        assertThat(row.getValue().getInspectionContent()).isEqualTo("edited draft");
+        assertThat(row.getValue().getTargetId()).isEqualTo(120L);
+        assertThat(row.getValue().getModerationJobId()).isNull();
+    }
     @Test void feedCreationAllowsApprovedContent() {
         when(client.generateJson(anyString(),anyString())).thenReturn("{\"safe\":true}");
         assertThatCode(() -> service.assertFeedCreationAllowed(101L,"content")).doesNotThrowAnyException();

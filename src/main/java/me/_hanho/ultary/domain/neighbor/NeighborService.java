@@ -61,7 +61,7 @@ public class NeighborService {
 	private final NotificationService notificationService;
 	private final ReportService reportService;
 
-	/** 울타리 조회와 같다. 없는 유저 404, 상대가 나를 차단하면 403 */
+	/** 차단당한 조회자에게는 존재 여부를 노출하지 않는다. */
 	@Transactional(readOnly = true)
 	public void assertCanViewUltary(UserPrincipal principal, Long targetUserNo) {
 		requireActiveUser(targetUserNo);
@@ -69,7 +69,7 @@ public class NeighborService {
 			return;
 		}
 		if (userBlockMapper.findActiveByPair(targetUserNo, principal.getUserNo()) != null) {
-			throw new BusinessException(ErrorCode.USER_BLOCKED);
+			throw new BusinessException(ErrorCode.USER_NOT_FOUND);
 		}
 	}
 
@@ -81,7 +81,7 @@ public class NeighborService {
 		boolean blockedByMe = userBlockMapper.findActiveByPair(me, targetUserNo) != null;
 		boolean blockedMe = userBlockMapper.findActiveByPair(targetUserNo, me) != null;
 		if (blockedMe) {
-			throw new BusinessException(ErrorCode.USER_BLOCKED);
+			throw new BusinessException(ErrorCode.USER_NOT_FOUND);
 		}
 
 		Neighbor neighbor = neighborMapper.findByPairKey(pairKey(me, targetUserNo));
@@ -122,7 +122,7 @@ public class NeighborService {
 		requireActiveUser(targetUserNo);
 		Long me = principal.getUserNo();
 		if (userBlockMapper.findActiveByPair(targetUserNo, me) != null) {
-			throw new BusinessException(ErrorCode.USER_BLOCKED);
+			throw new BusinessException(ErrorCode.USER_NOT_FOUND);
 		}
 
 		int resolvedLimit = resolveLimit(limit);
@@ -130,6 +130,7 @@ public class NeighborService {
 		List<NeighborListRow> rows = "FOLLOWER".equals(listType)
 				? neighborMapper.findAcceptedNeighbors(targetUserNo, resolvedLimit)
 				: neighborMapper.findAcceptedResidents(targetUserNo, resolvedLimit);
+		rows = rows.stream().filter(row -> userBlockMapper.findActiveByPair(row.getUserNo(), me) == null).toList();
 
 		List<NeighborListItemResponse> result = new ArrayList<>();
 		Set<Long> profileIds = new HashSet<>();

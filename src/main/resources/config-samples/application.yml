@@ -134,3 +134,6 @@ security:
     # 실제 키는 Git에 넣지 않는다. 양쪽 서버 환경변수에 동일한 32자 이상 난수를 설정한다.
     shared-key: ${BFF_INTERNAL_KEY:}
     require-https: false
+auth:
+  phone:
+    demo-mode: ${PHONE_AUTH_DEMO_MODE:false}

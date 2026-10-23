@@ -22,6 +22,11 @@ import me._hanho.ultary.domain.feed.model.FeedSave;
 
 @Mapper
 public interface FeedMapper {
+    Feed findReportedFeed(@Param("reportId") Long reportId);
+    List<FeedComment> findReportComments(@Param("reportId") Long reportId, @Param("feedId") Long feedId);
+    List<FeedReply> findReportReplies(@Param("reportId") Long reportId, @Param("commentId") Long commentId);
+    List<FeedComment> findVisibleComments(@Param("feedId") Long feedId, @Param("limit") int limit, @Param("viewerUserNo") Long viewerUserNo);
+    List<FeedReply> findVisibleReplies(@Param("commentId") Long commentId, @Param("limit") int limit, @Param("viewerUserNo") Long viewerUserNo);
 	int countPublicByUserNo(@Param("userNo") Long userNo);
 
 	int insertFeed(Feed feed);

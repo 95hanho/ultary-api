@@ -17,6 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.exception.BusinessException;
 import me._hanho.ultary.common.exception.ErrorCode;
 import me._hanho.ultary.domain.ai.ModerationQueue;
+import me._hanho.ultary.domain.story.StoryService;
 import me._hanho.ultary.domain.neighbor.NeighborService;
 import me._hanho.ultary.domain.settings.PrivacyService;
 import me._hanho.ultary.domain.notification.NotificationService;
@@ -56,6 +57,7 @@ import me._hanho.ultary.domain.pet.model.Pet;
 import me._hanho.ultary.domain.tag.TagMapper;
 import me._hanho.ultary.domain.tag.model.Tag;
 import me._hanho.ultary.domain.user.UserMapper;
+import me._hanho.ultary.domain.user.UserBlockMapper;
 import me._hanho.ultary.domain.user.model.User;
 import me._hanho.ultary.security.principal.UserPrincipal;
 
@@ -71,18 +73,20 @@ public class FeedService {
 	private static final Set<String> VIDEO_EXTENSIONS = Set.of("mp4", "webm", "mov");
 
 	private final FeedMapper feedMapper;
+	private final StoryService storyService;
 	private final FileService fileService;
 	private final PetMapper petMapper;
 	private final PetService petService;
 	private final TagMapper tagMapper;
 	private final UserMapper userMapper;
+	private final UserBlockMapper userBlockMapper;
 	private final NeighborService neighborService;
 	private final NotificationService notificationService;
 	private final PrivacyService privacyService;
 	private final ModerationQueue moderationQueue;
 	private final ReportService reportService;
 
-	/** Persistence after synchronous approval by FeedCreationService. */
+	/** Persist the feed and its durable inspection job together. */
 	@Transactional
 	public FeedResponse create(UserPrincipal principal, CreateFeedRequest request) {
 		if (request.getMedia() == null || request.getMedia().isEmpty()) {
@@ -111,6 +115,31 @@ public class FeedService {
 	public FeedResponse getDetail(UserPrincipal principal, Long feedId) {
 		Long viewerUserNo = principal == null ? null : principal.getUserNo();
 		return toResponse(requireVisible(feedId, viewerUserNo), viewerUserNo);
+	}
+
+	/** 관리자 신고 전용 원문 조회. 일반 사용자 컨트롤러에서는 호출하지 않는다. */
+	@Transactional(readOnly = true)
+	public FeedResponse getReportedFeed(Long reportId) {
+		Feed feed = feedMapper.findReportedFeed(reportId);
+		if (feed == null) throw new BusinessException(ErrorCode.FEED_NOT_FOUND);
+		User author = userMapper.findByUserNo(feed.getUserNo());
+		List<FeedMedia> media = feedMapper.findMediaByFeedId(feed.getFeedId());
+		Map<Long, Integer> profiles = petService.representativeProfileFileIds(List.of(feed.getUserNo()));
+		Set<Long> ids = new HashSet<>();
+		profiles.values().stream().filter(java.util.Objects::nonNull).forEach(id -> ids.add(id.longValue()));
+		for (FeedMedia slot : media) {
+			if (slot.getFileId() != null) ids.add(slot.getFileId());
+			if (slot.getThumbnailFileId() != null) ids.add(slot.getThumbnailFileId());
+		}
+		return toResponse(feed, null, author, media, fileService.findSummaries(ids), profiles, Map.of());
+	}
+
+	@Transactional(readOnly = true)
+	public List<FeedCommentResponse> getReportedComments(Long reportId, Long feedId) {
+		return feedMapper.findReportComments(reportId, feedId).stream().map(comment -> {
+			List<FeedReply> replies = feedMapper.findReportReplies(reportId, comment.getFeedCommentId());
+			return toCommentResponse(comment, true, null, Set.of(), null, replies, Map.of(), Map.of());
+		}).toList();
 	}
 
 	@Transactional(readOnly = true)
@@ -158,7 +187,7 @@ public class FeedService {
 
 	@Transactional
 	public FeedResponse update(UserPrincipal principal, Long feedId, UpdateFeedRequest request) {
-		var previous = moderationQueue.lock("FEED", feedId, feedId);
+		moderationQueue.lock("FEED", feedId, feedId);
 		requireAuthor(feedId, principal.getUserNo());
 
 		Feed patch = new Feed();
@@ -178,7 +207,7 @@ public class FeedService {
 		}
 		if (request.getContent() != null || Boolean.TRUE.equals(request.getClearContent())) {
 			String content = Boolean.TRUE.equals(request.getClearContent()) ? null : blankToNull(request.getContent());
-			moderationQueue.enqueue("FEED", feedId, feedId, principal.getUserNo(), previous.getContent(), content, false);
+			moderationQueue.approveUpdatedFeed(feedId, content);
 		}
 		if (request.getMediaTags() != null && replacePhotoTags(feedId, principal.getUserNo(), request.getMediaTags())) {
 			notificationService.syncFeedTags(feedId);
@@ -307,7 +336,7 @@ public class FeedService {
 	@Transactional(readOnly = true)
 	public List<FeedCommentResponse> getComments(UserPrincipal principal, Long feedId, Integer limit) {
 		requireVisible(feedId, principal.getUserNo());
-		List<FeedComment> comments = feedMapper.findActiveComments(feedId, resolveLimit(limit));
+		List<FeedComment> comments = feedMapper.findVisibleComments(feedId, resolveLimit(limit), principal.getUserNo());
 		int totalThreadCount = feedMapper.countActiveCommentsAndReplies(feedId);
 		boolean embedReplies = totalThreadCount <= INLINE_REPLY_THRESHOLD;
 		Long viewerUserNo = principal.getUserNo();
@@ -319,7 +348,7 @@ public class FeedService {
 		for (FeedComment comment : comments) {
 			collectProfileId(profileIds, comment.getAuthorProfileFileId());
 			if (embedReplies) {
-				List<FeedReply> replyRows = feedMapper.findActiveReplies(comment.getFeedCommentId(), MAX_LIST_LIMIT);
+				List<FeedReply> replyRows = feedMapper.findVisibleReplies(comment.getFeedCommentId(), MAX_LIST_LIMIT, viewerUserNo);
 				repliesByComment.put(comment.getFeedCommentId(), replyRows);
 				for (FeedReply reply : replyRows) {
 					collectProfileId(profileIds, reply.getAuthorProfileFileId());
@@ -449,7 +478,10 @@ public class FeedService {
 			UserPrincipal principal, Long feedId, Long commentId, Integer limit) {
 		requireVisible(feedId, principal.getUserNo());
 		requireComment(feedId, commentId);
-		List<FeedReply> replies = feedMapper.findActiveReplies(commentId, resolveLimit(limit));
+		if (userBlockMapper.findActiveEitherWay(principal.getUserNo(), requireComment(feedId, commentId).getUserNo()) != null) {
+			throw new BusinessException(ErrorCode.FEED_COMMENT_NOT_FOUND);
+		}
+		List<FeedReply> replies = feedMapper.findVisibleReplies(commentId, resolveLimit(limit), principal.getUserNo());
 		Set<Long> likedReplyIds = activeLikedReplyIds(
 				replies.stream().map(FeedReply::getFeedReplyId).toList(),
 				principal.getUserNo());
@@ -744,9 +776,17 @@ public class FeedService {
 	}
 
 	private void replaceCaptionTags(Long feedId, List<Long> tagIds) {
+		replaceCaptionTags(feedId, tagIds, true);
+	}
+
+	private void replaceCaptionTags(Long feedId, List<Long> tagIds, boolean validateNewTags) {
 		Set<Long> before = new HashSet<>(feedMapper.findTagIdsByFeedId(feedId));
 		Set<Long> desired = new HashSet<>(tagIds);
-		for (Long tagId : desired) if (tagMapper.findActiveByTagId(tagId) == null) throw new BusinessException(ErrorCode.TAG_NOT_FOUND);
+		for (Long tagId : desired) {
+			Tag tag = tagMapper.findActiveByTagId(tagId);
+			if (tag == null) throw new BusinessException(ErrorCode.TAG_NOT_FOUND);
+			if (validateNewTags && !before.contains(tagId)) assertTagUsable(tag);
+		}
 		for (Long tagId : before) if (!desired.contains(tagId) && feedMapper.removeFeedTag(feedId, tagId) > 0) tagMapper.decrementUseCount(tagId);
 		for (Long tagId : desired) if (!before.contains(tagId)) { feedMapper.restoreOrInsertFeedTag(feedId, tagId); tagMapper.incrementUseCount(tagId); }
 	}
@@ -760,7 +800,8 @@ public class FeedService {
 			Tag tag = tagMapper.findActiveByHashtag(matcher.group(1));
 			if (tag != null) tags.add(tag.getTagId());
 		}
-		replaceCaptionTags(feedId, new ArrayList<>(tags));
+		// 관리자 거절 이후라도 마지막 승인 본문에 있던 연결을 복구하는 것은 신규 사용이 아니다.
+		replaceCaptionTags(feedId, new ArrayList<>(tags), false);
 	}
 
 	private void insertPets(Long feedId, Long userNo, List<CreateFeedRequest.PetItem> pets) {
@@ -803,6 +844,7 @@ public class FeedService {
 			if (tag == null) {
 				throw new BusinessException(ErrorCode.TAG_NOT_FOUND);
 			}
+			assertTagUsable(tag);
 			feedMapper.insertFeedTag(feedId, tagId);
 			tagMapper.incrementUseCount(tagId);
 		}
@@ -818,6 +860,10 @@ public class FeedService {
 			return "VIDEO";
 		}
 		return "IMAGE";
+	}
+
+	private void assertTagUsable(Tag tag) {
+		if ("REJECTED".equals(tag.getProfileStatus()) || "COMMERCIAL".equals(tag.getPurpose()) && !"APPROVED".equals(tag.getProfileStatus())) throw new BusinessException(ErrorCode.TAG_NOT_APPROVED);
 	}
 
 	private String normalizeVisibility(String visibility) {
@@ -863,6 +909,14 @@ public class FeedService {
 				throw new BusinessException(ErrorCode.FEED_NOT_FOUND);
 			}
 			return feed;
+		}
+		if (!feed.getUserNo().equals(viewerUserNo)
+				&& userBlockMapper.findActiveByPair(feed.getUserNo(), viewerUserNo) != null) {
+			throw new BusinessException(ErrorCode.FEED_NOT_FOUND);
+		}
+		if (!feed.getUserNo().equals(viewerUserNo)
+				&& userBlockMapper.findActiveEitherWay(viewerUserNo, feed.getUserNo()) != null) {
+			throw new BusinessException(ErrorCode.USER_BLOCKED);
 		}
 		if ("PRIVATE".equals(audience) && !feed.getUserNo().equals(viewerUserNo)) {
 			throw new BusinessException(ErrorCode.FEED_NOT_FOUND);
@@ -1004,6 +1058,8 @@ public class FeedService {
 				.feedId(feed.getFeedId())
 				.userNo(feed.getUserNo())
 				.authorNickname(author != null ? author.getNickname() : null)
+				.authorHasStory(viewerUserNo != null && storyService.hasVisibleStory(viewerUserNo, feed.getUserNo()))
+				.authorHasUnviewedStory(viewerUserNo != null && storyService.hasVisibleStory(viewerUserNo, feed.getUserNo()) && storyService.hasUnviewedStory(feed.getUserNo(), viewerUserNo))
 				.authorProfileFile(authorProfileFileId == null
 						? null
 						: files.get(authorProfileFileId.longValue()))
@@ -1109,6 +1165,9 @@ public class FeedService {
 			List<FeedReply> preloadedReplies,
 			Map<Long, MyReportResponse> myCommentReports,
 			Map<Long, MyReportResponse> myReplyReports) {
+		if (viewerUserNo != null && userBlockMapper.findActiveByPair(comment.getUserNo(), viewerUserNo) != null) {
+			throw new BusinessException(ErrorCode.FEED_COMMENT_NOT_FOUND);
+		}
 		AuthorProfile author = resolveAuthor(
 				comment.getUserNo(),
 				comment.getAuthorNickname(),
@@ -1119,7 +1178,7 @@ public class FeedService {
 		if (embedReplies) {
 			List<FeedReply> replyRows = preloadedReplies != null
 					? preloadedReplies
-					: feedMapper.findActiveReplies(comment.getFeedCommentId(), MAX_LIST_LIMIT);
+					: feedMapper.findVisibleReplies(comment.getFeedCommentId(), MAX_LIST_LIMIT, viewerUserNo);
 			Set<Long> likedReplyIds = activeLikedReplyIds(
 					replyRows.stream().map(FeedReply::getFeedReplyId).toList(),
 					viewerUserNo);
@@ -1138,6 +1197,8 @@ public class FeedService {
 				.feedId(comment.getFeedId())
 				.userNo(comment.getUserNo())
 				.authorNickname(author.nickname())
+				.authorHasStory(viewerUserNo != null && storyService.hasVisibleStory(viewerUserNo, comment.getUserNo()))
+				.authorHasUnviewedStory(viewerUserNo != null && storyService.hasVisibleStory(viewerUserNo, comment.getUserNo()) && storyService.hasUnviewedStory(comment.getUserNo(), viewerUserNo))
 				.authorProfileFile(author.profileFile())
 				.content(comment.getContent())
 				.likeCount(comment.getLikeCount() == null ? 0 : comment.getLikeCount())
@@ -1169,6 +1230,9 @@ public class FeedService {
 			Set<Long> likedReplyIds,
 			Map<Long, FileSummaryResponse> profiles,
 			Map<Long, MyReportResponse> myReplyReports) {
+		if (viewerUserNo != null && userBlockMapper.findActiveByPair(reply.getUserNo(), viewerUserNo) != null) {
+			throw new BusinessException(ErrorCode.FEED_REPLY_NOT_FOUND);
+		}
 		AuthorProfile author = resolveAuthor(
 				reply.getUserNo(),
 				reply.getAuthorNickname(),
@@ -1185,6 +1249,8 @@ public class FeedService {
 				.feedCommentId(reply.getFeedCommentId())
 				.userNo(reply.getUserNo())
 				.authorNickname(author.nickname())
+				.authorHasStory(viewerUserNo != null && storyService.hasVisibleStory(viewerUserNo, reply.getUserNo()))
+				.authorHasUnviewedStory(viewerUserNo != null && storyService.hasVisibleStory(viewerUserNo, reply.getUserNo()) && storyService.hasUnviewedStory(reply.getUserNo(), viewerUserNo))
 				.authorProfileFile(author.profileFile())
 				.content(reply.getContent())
 				.likeCount(reply.getLikeCount() == null ? 0 : reply.getLikeCount())

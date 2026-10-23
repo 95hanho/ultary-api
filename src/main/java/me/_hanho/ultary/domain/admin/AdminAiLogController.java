@@ -31,4 +31,12 @@ public class AdminAiLogController {
     public ApiResponse<AdminAiLogResponse> detail(@PathVariable Long aiRequestId) {
         return ApiResponse.ok(service.detail(aiRequestId), "AI 요청 로그 상세 조회 성공");
     }
+
+    public record ReviewRequest(String status) {}
+    @PostMapping("/{aiRequestId}/review")
+    public ApiResponse<AdminAiLogResponse> review(@PathVariable Long aiRequestId,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal me._hanho.ultary.security.principal.AdminPrincipal principal,
+            @RequestBody ReviewRequest request) {
+        return ApiResponse.ok(service.review(aiRequestId, principal.getAdminNo(), request.status()));
+    }
 }

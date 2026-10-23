@@ -8,6 +8,7 @@ import lombok.Setter;
 @Getter
 @Setter
 public class RejectTagProfileRequest {
+	private Long requestId;
 
 	@Size(max = 500, message = "거절 멘트는 500자 이하여야 합니다.")
 	private String rejectMessage;

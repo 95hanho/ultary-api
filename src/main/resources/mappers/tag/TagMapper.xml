@@ -89,6 +89,7 @@
 		SELECT <include refid="tagColumns"/>
 		FROM ultary_tag
 		WHERE is_deleted = 0
+		  AND ((purpose = 'USER' AND profile_status &lt;&gt; 'REJECTED') OR profile_status = 'APPROVED')
 		  AND <include refid="creatorNotSuspended"/>
 		  AND (
 			hashtag LIKE CONCAT('%', #{q}, '%')
@@ -124,6 +125,7 @@
 		SELECT <include refid="tagColumns"/>
 		FROM ultary_tag
 		WHERE is_deleted = 0
+		  AND ((purpose = 'USER' AND profile_status &lt;&gt; 'REJECTED') OR profile_status = 'APPROVED')
 		  AND <include refid="creatorNotSuspended"/>
 		<if test="q != null and q != ''">
 			AND (
@@ -198,6 +200,9 @@
 		r.tag_profile_request_id,
 		r.tag_id,
 		t.hashtag,
+		(SELECT COUNT(DISTINCT ft.feed_id) FROM ultary_feed_tag ft
+		 JOIN ultary_feed f ON f.feed_id = ft.feed_id
+		 WHERE ft.tag_id = r.tag_id AND ft.is_deleted = 0 AND f.is_deleted = 0) AS feed_count,
 		r.requester_user_no,
 		u.nickname AS requester_nickname,
 		r.title,
@@ -207,6 +212,7 @@
 		r.reject_message,
 		r.reviewed_by_admin_id,
 		r.reviewed_at,
+		r.status_changed_at,
 		r.created_at,
 		r.updated_at
 	</sql>
@@ -241,7 +247,8 @@
 
 	<update id="reviewProfileRequest">
 		UPDATE ultary_tag_profile_request
-		SET status = #{status},
+		SET status_changed_at = IF(status &lt;&gt; #{status}, NOW(), status_changed_at),
+			status = #{status},
 			reject_message = #{rejectMessage},
 			reviewed_by_admin_id = #{adminNo},
 			reviewed_at = NOW()
@@ -250,7 +257,8 @@
 
 	<update id="reopenProfileRequest">
 		UPDATE ultary_tag_profile_request
-		SET status = 'PENDING',
+		SET status_changed_at = IF(status &lt;&gt; 'PENDING', NOW(), status_changed_at),
+			status = 'PENDING',
 			reject_message = NULL,
 			reviewed_by_admin_id = NULL,
 			reviewed_at = NULL,
@@ -383,7 +391,7 @@
 	<update id="markCommercialRequested">
 		UPDATE ultary_tag
 		SET purpose = 'COMMERCIAL',
-			profile_status = IF(profile_status = 'APPROVED', 'APPROVED', 'PENDING'),
+			profile_status = 'PENDING',
 			updated_at = NOW()
 		WHERE tag_id = #{tagId}
 		  AND is_deleted = 0
@@ -403,7 +411,7 @@
 
 	<update id="markProfileRejected">
 		UPDATE ultary_tag
-		SET profile_status = IF(profile_status = 'APPROVED', 'APPROVED', 'REJECTED'),
+		SET purpose = 'USER', profile_status = 'REJECTED',
 			updated_at = NOW()
 		WHERE tag_id = #{tagId}
 		  AND is_deleted = 0
@@ -411,11 +419,10 @@
 
 	<update id="hidePublishedProfile">
 		UPDATE ultary_tag
-		SET profile_status = 'PENDING',
+		SET purpose = 'COMMERCIAL', profile_status = 'PENDING',
 			updated_at = NOW()
 		WHERE tag_id = #{tagId}
 		  AND is_deleted = 0
-		  AND profile_status = 'APPROVED'
 	</update>
 
 	<update id="decrementUseCount">

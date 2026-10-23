@@ -79,6 +79,8 @@ public class AuthService {
 	private final FileService fileService;
 	private final PetService petService;
 	private final SecureRandom secureRandom = new SecureRandom();
+    @org.springframework.beans.factory.annotation.Value("${auth.phone.demo-mode:false}")
+    private boolean phoneDemoMode;
 
 	/**
 	 * FE/BFF가 소셜 OAuth로 확보한 providerUserId로 DB 조회/가입 후 JWT 발급.
@@ -420,11 +422,11 @@ public class AuthService {
 		long ttlSeconds = jwtProperties.getExpiration().getPhoneauth();
 
 		phoneAuthCodeStore.save(phone, code, ttlSeconds);
-		// TODO: SMS 연동. 로컬 확인용으로 인증번호 로그 출력
-		log.info("[phoneAuth] phone={}, code={}", PhoneRules.maskForLog(phone), code);
+		// 실제 SMS 발송 연동 전 데모 모드에서만 응답에 인증번호를 제공한다.
+		log.info("[phoneAuth] phone={} demo={}", PhoneRules.maskForLog(phone), phoneDemoMode);
 
 		String phoneAuthToken = jwtTokenProvider.createPhoneAuthToken(phone);
-		return PhoneAuthResponse.builder().phoneAuthToken(phoneAuthToken).build();
+		return PhoneAuthResponse.builder().phoneAuthToken(phoneAuthToken).demoCode(phoneDemoMode ? code : null).build();
 	}
 
 	/**

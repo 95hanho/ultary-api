@@ -15,7 +15,7 @@
 			used_token_count,
 			status,
 			error_message, moderation_job_id, target_type, target_id, content_version,
-			attempt_no, latency_ms, http_status, error_code
+			attempt_no, latency_ms, http_status, error_code, inspection_content
 		) VALUES (
 			#{userNo},
 			#{featureType},
@@ -27,12 +27,13 @@
 			#{usedTokenCount},
 			#{status},
 			#{errorMessage}, #{moderationJobId}, #{targetType}, #{targetId}, #{contentVersion},
-			#{attemptNo}, #{latencyMs}, #{httpStatus}, #{errorCode}
+			#{attemptNo}, #{latencyMs}, #{httpStatus}, #{errorCode}, #{inspectionContent}
 		)
 	</insert>
 
     <select id="countFailed" resultType="int">
-        SELECT COUNT(*) FROM ultary_ai_request_log WHERE status = 'FAILED'
+        SELECT COUNT(*) FROM ultary_ai_request_log l LEFT JOIN ultary_ai_moderation_job j ON j.job_id=l.moderation_job_id
+        WHERE l.status = 'FAILED' AND (j.job_id IS NULL OR j.admin_review_status='PENDING')
     </select>
 
     <sql id="adminColumns">
@@ -40,13 +41,14 @@
         l.moderation_job_id, l.content_version, l.attempt_no, l.model_name, l.status,
         l.error_code, l.error_message, l.latency_ms, l.http_status, l.created_at,
         j.status AS job_status, j.result_action, j.attempt_count AS job_attempt_count,
-        j.next_attempt_at
+        j.next_attempt_at, j.admin_review_status, j.admin_reviewed_at, COALESCE(j.content, l.inspection_content) AS inspection_content
     </sql>
 
     <sql id="adminFilters">
             <if test="status != null">AND l.status = #{status}</if>
             <if test="featureType != null">AND l.feature_type = #{featureType}</if>
-            <if test="targetType != null">AND l.target_type = #{targetType}</if>
+            <choose><when test="targetType == 'MODERATION'">AND l.target_type IN ('FEED','COMMENT','REPLY')</when>
+            <when test="targetType != null">AND l.target_type = #{targetType}</when></choose>
             <if test="targetId != null">AND l.target_id = #{targetId}</if>
             <if test="errorCode != null">AND l.error_code = #{errorCode}</if>
             <if test="userNo != null">AND l.user_no = #{userNo}</if>

@@ -66,7 +66,7 @@ public class FeedController {
 			@PathVariable Long feedId,
 			@Valid @RequestBody UpdateFeedRequest request) {
 		log.info("[update] feedId={}", feedId);
-		return ApiResponse.ok(feedService.update(principal, feedId, request), "게시글 수정 성공");
+		return ApiResponse.ok(feedCreationService.update(principal, feedId, request), "게시글 수정 성공");
 	}
 
 	@DeleteMapping("/{feedId}")

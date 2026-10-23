@@ -24,7 +24,7 @@ import me._hanho.ultary.domain.ai.model.ModerationJob;
 
 /**
  * Gemini 비즈니스 호출. 원문·API Key는 DB에 넣지 않는다.
- * 추천은 동기 fallback, 게시글 작성은 동기 검사, 수정·댓글·답글은 DB 작업자로 검사한다.
+ * 추천은 총 3회 동기 시도, 게시글·댓글·답글은 DB 작업자로 검사한다.
  */
 @Slf4j
 @Service
@@ -43,13 +43,15 @@ public class AiService {
 	private final AiLogService aiLogService;
 
 	/**
-	 * 게시글 내용 기반 해시태그 추천. 실패·비활성·빈 입력이면 empty.
-	 * 호출자가 DB fallback 한다.
+	 * 태그 추천은 총 3회 시도하고 최종 실패는 서비스 오류로 전달한다.
+	 * 정상 응답이 빈 목록일 때만 호출자가 DB 추천으로 보완한다.
 	 */
 	public List<String> recommendHashtags(Long userNo, String content) {
-		if (!StringUtils.hasText(content) || !geminiClient.isEnabled()) {
+		if (!StringUtils.hasText(content)) {
 			return List.of();
 		}
+		if (!geminiClient.isEnabled()) throw new BusinessException(ErrorCode.AI_CHECK_UNAVAILABLE, "서버 오류로 태그 추천을 잠시 사용할 수 없습니다. 불편을 드려 죄송합니다. 잠시 후 다시 시도해 주세요.");
+		for (int attempt = 1; attempt <= 3; attempt++) {
 		long started = System.currentTimeMillis();
 		try {
 			String json = geminiClient.generateJson(
@@ -71,15 +73,24 @@ public class AiService {
 					null,
 					"FAILED", code,
 					truncate("latencyMs=" + (System.currentTimeMillis() - started), RESULT_SUMMARY_MAX));
-			return List.of();
+			if (attempt == 3) throw new BusinessException(ErrorCode.AI_CHECK_UNAVAILABLE, "서버 오류로 태그 추천을 잠시 사용할 수 없습니다. 불편을 드려 죄송합니다. 잠시 후 다시 시도해 주세요.");
 		}
+		}
+		throw new IllegalStateException("Recommendation attempts exhausted");
 	}
 
 	/** New feed creation waits for a verdict; provider failure is a service error. */
 	public void assertFeedCreationAllowed(Long userNo, String content) {
+        assertFeedAllowed(userNo, null, content, "CREATE");
+    }
+    public void assertFeedUpdateAllowed(Long userNo, Long feedId, String content) {
+        assertFeedAllowed(userNo, feedId, content, "UPDATE");
+    }
+    private void assertFeedAllowed(Long userNo, Long feedId, String content, String operation) {
 		ModerationJob inspection = new ModerationJob();
 		inspection.setUserNo(userNo); inspection.setTargetType("FEED");
-		inspection.setOperation("CREATE"); inspection.setAttemptCount(1); inspection.setContent(content);
+		inspection.setFeedId(feedId); inspection.setTargetId(feedId);
+        inspection.setOperation(operation); inspection.setAttemptCount(1); inspection.setContent(content);
 		ModerationResult verdict;
 		try {
 			verdict = moderate(inspection);
@@ -89,8 +100,8 @@ public class AiService {
 		}
 		if (verdict.failed()) {
 			String reason = switch (verdict.errorCode()) {
-				case "GEMINI_TIMEOUT" -> "AI 검사 응답 시간이 초과되어 게시글이 등록되지 않았습니다. 잠시 후 다시 시도해 주세요.";
-				case "GEMINI_HTTP_429" -> "AI 검사 요청이 많아 게시글이 등록되지 않았습니다. 잠시 후 다시 시도해 주세요.";
+				case "GEMINI_TIMEOUT" -> "AI 검사 응답 시간이 초과되어 게시글이 저장되지 않았습니다. 잠시 후 다시 시도해 주세요.";
+				case "GEMINI_HTTP_429" -> "AI 검사 요청이 많아 게시글이 저장되지 않았습니다. 잠시 후 다시 시도해 주세요.";
 				default -> ErrorCode.AI_CHECK_UNAVAILABLE.getMessage();
 			};
 			throw new BusinessException(ErrorCode.AI_CHECK_UNAVAILABLE, reason);
@@ -107,7 +118,7 @@ public class AiService {
 				default -> "부적절한 표현";
 			};
 			throw new BusinessException(ErrorCode.AI_CONTENT_BLOCKED,
-					reason + "이 포함되어 게시글을 작성할 수 없습니다. 내용을 수정해 다시 시도해 주세요.");
+					reason + "이 포함되어 게시글을 작성·수정할 수 없습니다. 내용을 수정해 다시 시도해 주세요.");
 		}
 	}
 
@@ -140,6 +151,7 @@ public class AiService {
 		}
 		AiRequestLog row = new AiRequestLog();
 		row.setUserNo(job.getUserNo()); row.setTargetFeedId(job.getFeedId());
+        row.setInspectionContent(job.getContent());
 		row.setFeatureType("FEED".equals(job.getTargetType()) ? AiFeatureTypes.FEED_CAPTION : AiFeatureTypes.COMMENT_FILTER);
 		row.setModerationJobId(job.getJobId()); row.setTargetType(job.getTargetType()); row.setTargetId(job.getTargetId());
 		row.setContentVersion(job.getContentVersion()); row.setAttemptNo(job.getAttemptCount());

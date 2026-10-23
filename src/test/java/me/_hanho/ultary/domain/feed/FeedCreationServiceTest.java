@@ -24,23 +24,40 @@ class FeedCreationServiceTest {
         request.setMedia(List.of(new CreateFeedRequest.MediaItem()));
     }
 
-    @Test void savesOnlyAfterTheSynchronousCheckReturns() {
+    @Test void checksBeforeSaving() {
         FeedResponse saved = mock(FeedResponse.class);
         when(feeds.create(user,request)).thenReturn(saved);
         assertThat(service.create(user,request)).isSameAs(saved);
-        var order = inOrder(ai,feeds);
-        order.verify(ai).assertFeedCreationAllowed(101L,"draft");
+        verify(ai).assertFeedCreationAllowed(user.getUserNo(), "draft");
+        var order = inOrder(ai, feeds);
+        order.verify(ai).assertFeedCreationAllowed(user.getUserNo(), "draft");
         order.verify(feeds).create(user,request);
     }
 
-    @Test void neitherUnsafeVerdictsNorServiceFailuresSaveAFeed() {
-        for (ErrorCode error : new ErrorCode[]{ErrorCode.AI_CONTENT_BLOCKED,ErrorCode.AI_CHECK_UNAVAILABLE}) {
-            doThrow(new BusinessException(error)).when(ai).assertFeedCreationAllowed(101L,"draft");
-            assertThatThrownBy(() -> service.create(user,request)).isInstanceOf(BusinessException.class);
-        }
-        verifyNoInteractions(feeds);
+    @Test void persistenceErrorsAreStillReported() {
+        doThrow(new BusinessException(ErrorCode.FEED_MEDIA_REQUIRED)).when(feeds).create(user, request);
+        assertThatThrownBy(() -> service.create(user,request)).isInstanceOf(BusinessException.class);
+        verify(ai).assertFeedCreationAllowed(user.getUserNo(), "draft");
     }
 
+    @Test void unsafeContentIsNeverSaved() {
+        doThrow(new BusinessException(ErrorCode.AI_CONTENT_BLOCKED)).when(ai).assertFeedCreationAllowed(user.getUserNo(), "draft");
+        assertThatThrownBy(() -> service.create(user,request)).isInstanceOf(BusinessException.class);
+        verifyNoInteractions(feeds);
+    }
+    @Test void updatesInspectBeforeSavingAndUnsafeContentPreservesOriginal() {
+        var update = new me._hanho.ultary.domain.feed.dto.request.UpdateFeedRequest(); update.setContent("changed");
+        when(feeds.getDetail(user, 17L)).thenReturn(FeedResponse.builder().userNo(user.getUserNo()).content("original").build());
+        var controller = new FeedController(feeds, service);
+        controller.update(user,17L,update);
+        var order = inOrder(ai,feeds);
+        order.verify(ai).assertFeedUpdateAllowed(user.getUserNo(),17L,"changed");
+        order.verify(feeds).update(user,17L,update);
+        clearInvocations(feeds);
+        doThrow(new BusinessException(ErrorCode.AI_CONTENT_BLOCKED)).when(ai).assertFeedUpdateAllowed(user.getUserNo(),17L,"changed");
+        assertThatThrownBy(() -> service.update(user,17L,update)).isInstanceOf(BusinessException.class);
+        verify(feeds,never()).update(any(),any(),any());
+    }
     @Test void missingMediaDoesNotInvokeTheProvider() {
         request.setMedia(List.of());
         assertThatThrownBy(() -> service.create(user,request)).isInstanceOfSatisfying(BusinessException.class,

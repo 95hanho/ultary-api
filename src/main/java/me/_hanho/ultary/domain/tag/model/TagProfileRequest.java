@@ -13,6 +13,7 @@ public class TagProfileRequest {
 	private Long tagProfileRequestId;
 	private Long tagId;
 	private String hashtag;
+	private Integer feedCount;
 	private Long requesterUserNo;
 	private String requesterNickname;
 	private String title;
@@ -22,6 +23,7 @@ public class TagProfileRequest {
 	private String rejectMessage;
 	private Long reviewedByAdminId;
 	private LocalDateTime reviewedAt;
+	private LocalDateTime statusChangedAt;
 	private LocalDateTime createdAt;
 	private LocalDateTime updatedAt;
 }

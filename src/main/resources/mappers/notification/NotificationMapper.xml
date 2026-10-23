@@ -41,7 +41,7 @@
 		)
 		AND (n.type &lt;&gt; 'NEIGHBOR_REQUEST' OR n.neighbor_id IS NOT NULL)
 		AND (
-			n.type = 'AI_MODERATION' OR NOT EXISTS (
+			n.type IN ('AI_MODERATION','TAG_PROFILE_APPROVED','TAG_PROFILE_REJECTED') OR NOT EXISTS (
 				SELECT 1 FROM ultary_notification_setting s
 				WHERE s.user_no = n.receiver_user_no
 			)
@@ -65,6 +65,20 @@
 			)
 		)
 	</sql>
+
+	<!-- 상태 변경 직전, 같은 요청의 최근 2분 이내 심사 알림만 정리한다. 기존 고정 group_key도 포함. -->
+	<delete id="deleteRecentTagReview">
+		DELETE FROM ultary_notification
+		WHERE receiver_user_no = #{receiverUserNo}
+		  AND type IN ('TAG_PROFILE_APPROVED', 'TAG_PROFILE_REJECTED')
+		  AND created_at >= DATE_SUB(NOW(), INTERVAL 2 MINUTE)
+		  AND (
+			group_key = CONCAT('TAG_PROFILE_APPROVED:', #{requestId})
+			OR group_key LIKE CONCAT('TAG_PROFILE_APPROVED:', #{requestId}, ':%')
+			OR group_key = CONCAT('TAG_PROFILE_REJECTED:', #{requestId})
+			OR group_key LIKE CONCAT('TAG_PROFILE_REJECTED:', #{requestId}, ':%')
+		  )
+	</delete>
 
 	<insert id="upsert">
 		INSERT INTO ultary_notification (

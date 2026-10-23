@@ -38,7 +38,7 @@ class AdminAiLogApiTest {
     final String path = "/api/v1/admin/ai/logs";
 
     @BeforeEach void fixture() {
-        originalFailureCount = jdbc.queryForObject("SELECT COUNT(*) FROM ultary_ai_request_log WHERE status='FAILED'", Integer.class);
+        originalFailureCount = logs.countFailed();
         mvc = MockMvcBuilders.webAppContextSetup(context).addFilters(security)
                 .defaultRequest(get("/").header("X-BFF-Key", bff.getSharedKey())).build();
         jdbc.update("INSERT INTO ultary_user(nickname) VALUES(?)", "ailog" + UUID.randomUUID().toString().substring(0, 12));

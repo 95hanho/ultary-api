@@ -19,6 +19,16 @@ public class ModerationQueue {
         mapper.ensureState("FEED", id, content, true);
     }
 
+    public void approveUpdatedFeed(Long id, String content) {
+        mapper.ensureState("FEED", id, content, true);
+        ModerationState state = mapper.lockState("FEED", id);
+        state.setLatestVersion(state.getLatestVersion() + 1);
+        state.setApprovedVersion(state.getLatestVersion());
+        state.setApprovedContent(content);
+        state.setHasApproved(true);
+        mapper.saveState(state);
+    }
+
     public ModerationTarget lock(String kind, Long id, Long feedId) {
         if (!"FEED".equals(kind)) mapper.lockTarget("FEED", feedId);
         return mapper.lockTarget(kind, id);

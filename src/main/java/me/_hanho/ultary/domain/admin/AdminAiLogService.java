@@ -15,6 +15,7 @@ import me._hanho.ultary.domain.admin.dto.response.*;
 @Transactional(readOnly = true)
 public class AdminAiLogService {
     private final AiRequestLogMapper mapper;
+    private final me._hanho.ultary.domain.ai.ModerationTransactions moderationTransactions;
 
     public int countFailed() { return mapper.countFailed(); }
 
@@ -22,7 +23,7 @@ public class AdminAiLogService {
             String errorCode, Long userNo, Long moderationJobId, Long cursorAiRequestId, int limit) {
         status = option(status, Set.of("ALL", "PENDING", "SUCCESS", "FAILED"), "status");
         featureType = option(featureType, Set.of("FEED_CAPTION", "HASHTAG", "PET_PROFILE", "COMMENT_FILTER", "ALT_TEXT"), "featureType");
-        targetType = option(targetType, Set.of("FEED", "COMMENT", "REPLY"), "targetType");
+        targetType = option(targetType, Set.of("MODERATION", "FEED", "COMMENT", "REPLY"), "targetType");
         if (limit < 1 || limit > 100 || invalidId(userNo) || invalidId(targetId) || invalidId(moderationJobId) || invalidId(cursorAiRequestId)
                 || (errorCode != null && !errorCode.matches("[A-Z0-9_]{1,64}"))) {
             throw new BusinessException(ErrorCode.INVALID_INPUT);
@@ -41,6 +42,15 @@ public class AdminAiLogService {
         var row = mapper.findForAdmin(id);
         if (row == null) throw new BusinessException(ErrorCode.NOT_FOUND);
         return row;
+    }
+
+    @Transactional
+    public AdminAiLogResponse review(Long id, Long adminNo, String decision) {
+        if (decision == null || !Set.of("PENDING", "KEPT", "DELETED").contains(decision)) throw new BusinessException(ErrorCode.INVALID_INPUT);
+        var log = detail(id);
+        if (!"FAILED".equals(log.getStatus()) || log.getModerationJobId() == null) throw new BusinessException(ErrorCode.INVALID_INPUT, "검사 대상이 있는 오류 기록만 처리할 수 있습니다.");
+        moderationTransactions.review(log.getModerationJobId(), adminNo, decision);
+        return detail(id);
     }
 
     private boolean invalidId(Long value) { return value != null && value <= 0; }

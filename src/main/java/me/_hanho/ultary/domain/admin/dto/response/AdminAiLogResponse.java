@@ -4,7 +4,7 @@ import java.time.LocalDateTime;
 import lombok.Getter;
 import lombok.Setter;
 
-/** Operational metadata only; excludes content snapshots, prompts and provider bodies. */
+/** 관리자 운영 정보. 상세에서만 검사 본문을 포함하며 프롬프트·제공자 응답 원문은 제외한다. */
 @Getter
 @Setter
 public class AdminAiLogResponse {
@@ -29,4 +29,7 @@ public class AdminAiLogResponse {
     private String resultAction;
     private Integer jobAttemptCount;
     private LocalDateTime nextAttemptAt;
+    private String adminReviewStatus;
+    private LocalDateTime adminReviewedAt;
+    private String inspectionContent;
 }

@@ -16,6 +16,7 @@ import me._hanho.ultary.common.exception.ErrorCode;
 import me._hanho.ultary.common.response.ChangeAvailabilityResponse;
 import me._hanho.ultary.common.validation.IdentityChangeCooldown;
 import me._hanho.ultary.domain.ai.AiService;
+import me._hanho.ultary.domain.notification.NotificationService;
 import me._hanho.ultary.domain.file.FileService;
 import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
 import me._hanho.ultary.domain.tag.dto.request.ChangeTagHandleRequest;
@@ -46,9 +47,12 @@ public class TagService {
 	private final TagMapper tagMapper;
 	private final FileService fileService;
 	private final AiService aiService;
+	private final NotificationService notificationService;
 
 	@Transactional
 	public TagResponse create(UserPrincipal principal, CreateTagRequest request) {
+		Tag existing = tagMapper.findActiveByHashtag(request.getHashtag());
+		if (existing != null && ("REJECTED".equals(existing.getProfileStatus()) || "COMMERCIAL".equals(existing.getPurpose()) && !"APPROVED".equals(existing.getProfileStatus()))) throw new BusinessException(ErrorCode.TAG_NOT_APPROVED);
 		String handle = blankToNull(request.getHandle());
 		if (handle != null) {
 			ensureHandleAvailable(handle, null);
@@ -182,50 +186,64 @@ public class TagService {
 				.build();
 	}
 
-	/** 최신 요청을 승인한다. 대기·승인·거절 모두 다시 승인할 수 있다. */
+	/** 요청을 승인한다. requestId가 없으면 최신 요청을 처리한다. */
 	@Transactional
-	public TagProfileRequestResponse approveProfile(Long adminNo, Long tagId) {
-		TagProfileRequest latest = requireLatest(tagId);
+	public TagProfileRequestResponse approveProfile(Long adminNo, Long tagId) { return approveProfile(adminNo, tagId, null); }
+
+	@Transactional
+	public TagProfileRequestResponse approveProfile(Long adminNo, Long tagId, Long requestId) {
+		TagProfileRequest latest = reviewRequest(tagId, requestId);
 		if (tagMapper.reviewProfileRequest(latest.getTagProfileRequestId(), "APPROVED", adminNo, null) == 0) {
 			throw new BusinessException(ErrorCode.TAG_PROFILE_REQUEST_NOT_FOUND);
 		}
 		tagMapper.applyApprovedProfile(latest);
 		tagMapper.deleteImagesByTagId(tagId);
 		insertImages(tagId, tagMapper.findRequestImageFileIds(latest.getTagProfileRequestId()));
+		if (!"APPROVED".equals(latest.getStatus())) {
+			notificationService.removeRecentTagReview(latest.getRequesterUserNo(), latest.getTagProfileRequestId());
+			notificationService.notifyTagReview(latest.getRequesterUserNo(), latest.getTagProfileRequestId(), latest.getHashtag(), true);
+		}
 		log.info("[approveProfile] tagId={} requestId={} adminNo={}",
 				tagId, latest.getTagProfileRequestId(), adminNo);
 		return toRequestResponse(reloadRequest(latest.getTagProfileRequestId()));
 	}
 
-	/** 최신 요청을 거절한다. 이미 공개된 설명은 그대로 둔다. */
+	/** 요청을 거절하고 설명 없는 일반 태그로 되돌린다. 기존 게시글 연결은 유지한다. */
 	@Transactional
-	public TagProfileRequestResponse rejectProfile(Long adminNo, Long tagId, String rejectMessage) {
-		TagProfileRequest latest = requireLatest(tagId);
+	public TagProfileRequestResponse rejectProfile(Long adminNo, Long tagId, String rejectMessage) { return rejectProfile(adminNo, tagId, rejectMessage, null); }
+
+	@Transactional
+	public TagProfileRequestResponse rejectProfile(Long adminNo, Long tagId, String rejectMessage, Long requestId) {
+		TagProfileRequest latest = reviewRequest(tagId, requestId);
 		String message = blankToNull(rejectMessage);
 		if (tagMapper.reviewProfileRequest(latest.getTagProfileRequestId(), "REJECTED", adminNo, message) == 0) {
 			throw new BusinessException(ErrorCode.TAG_PROFILE_REQUEST_NOT_FOUND);
 		}
 		tagMapper.markProfileRejected(tagId);
+		if (!"REJECTED".equals(latest.getStatus())) {
+			notificationService.removeRecentTagReview(latest.getRequesterUserNo(), latest.getTagProfileRequestId());
+			notificationService.notifyTagReview(latest.getRequesterUserNo(), latest.getTagProfileRequestId(), latest.getHashtag(), false);
+		}
 		log.info("[rejectProfile] tagId={} requestId={} adminNo={}",
 				tagId, latest.getTagProfileRequestId(), adminNo);
 		return toRequestResponse(reloadRequest(latest.getTagProfileRequestId()));
 	}
 
 	/**
-	 * 최신 요청을 대기로 되돌린다.
-	 * 그 요청이 승인으로 공개 중이면 설명을 숨긴다.
-	 * 거절을 대기로 되돌릴 때 이전에 공개된 설명은 그대로 둔다.
+	 * 요청을 대기로 되돌리고 설명 공개와 신규 사용을 중단한다.
 	 */
 	@Transactional
-	public TagProfileRequestResponse reopenProfile(Long tagId) {
-		TagProfileRequest latest = requireLatest(tagId);
+	public TagProfileRequestResponse reopenProfile(Long tagId) { return reopenProfile(tagId, null); }
+
+	@Transactional
+	public TagProfileRequestResponse reopenProfile(Long tagId, Long requestId) {
+		TagProfileRequest latest = reviewRequest(tagId, requestId);
 		boolean wasApproved = "APPROVED".equals(latest.getStatus());
 		if (tagMapper.reopenProfileRequest(latest.getTagProfileRequestId()) == 0) {
 			throw new BusinessException(ErrorCode.TAG_PROFILE_REQUEST_NOT_FOUND);
 		}
-		if (wasApproved) {
-			tagMapper.hidePublishedProfile(tagId);
-		}
+		tagMapper.hidePublishedProfile(tagId);
+		if (!"PENDING".equals(latest.getStatus())) notificationService.removeRecentTagReview(latest.getRequesterUserNo(), latest.getTagProfileRequestId());
 		log.info("[reopenProfile] tagId={} requestId={} wasApproved={}",
 				tagId, latest.getTagProfileRequestId(), wasApproved);
 		return toRequestResponse(reloadRequest(latest.getTagProfileRequestId()));
@@ -281,7 +299,7 @@ public class TagService {
 			}
 			Tag existing = tagMapper.findActiveByHashtag(hashtag);
 			if (existing != null) {
-				result.add(toResponse(existing));
+				if (!"REJECTED".equals(existing.getProfileStatus()) && (!"COMMERCIAL".equals(existing.getPurpose()) || "APPROVED".equals(existing.getProfileStatus()))) result.add(toResponse(existing));
 			} else {
 				result.add(TagResponse.builder()
 						.tagId(null)
@@ -445,6 +463,14 @@ public class TagService {
 		}
 	}
 
+	private TagProfileRequest reviewRequest(Long tagId, Long requestId) {
+		if (requestId == null) return requireLatest(tagId);
+		requireActive(tagId);
+		TagProfileRequest row = tagMapper.findProfileRequestById(requestId);
+		if (row == null || !tagId.equals(row.getTagId())) throw new BusinessException(ErrorCode.TAG_PROFILE_REQUEST_NOT_FOUND);
+		return row;
+	}
+
 	public void ensureActive(Long tagId) {
 		requireActive(tagId);
 	}
@@ -515,6 +541,7 @@ public class TagService {
 				.requestId(row.getTagProfileRequestId())
 				.tagId(row.getTagId())
 				.hashtag(row.getHashtag())
+				.feedCount(row.getFeedCount() == null ? 0 : row.getFeedCount())
 				.requesterUserNo(row.getRequesterUserNo())
 				.requesterNickname(row.getRequesterNickname())
 				.title(row.getTitle())
@@ -526,6 +553,7 @@ public class TagService {
 				.rejectMessage(row.getRejectMessage())
 				.createdAt(row.getCreatedAt())
 				.reviewedAt(row.getReviewedAt())
+				.statusChangedAt(row.getStatusChangedAt())
 				.build();
 	}
 

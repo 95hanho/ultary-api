@@ -15,6 +15,7 @@ import me._hanho.ultary.domain.feed.FeedService;
 import me._hanho.ultary.domain.report.ReportService;
 import me._hanho.ultary.domain.report.dto.response.ReportPageResponse;
 import me._hanho.ultary.domain.report.dto.response.ReportResponse;
+import me._hanho.ultary.domain.report.dto.response.ReportFeedPreviewResponse;
 import me._hanho.ultary.domain.report.model.Report;
 import me._hanho.ultary.domain.tag.TagService;
 import me._hanho.ultary.domain.tag.dto.response.TagProfileRequestPageResponse;
@@ -46,16 +47,16 @@ public class AdminService {
 		return tagService.listProfileRequestsForAdmin(status, cursorRequestId, limit);
 	}
 
-	public TagProfileRequestResponse approveTag(Long adminNo, Long tagId) {
-		return tagService.approveProfile(adminNo, tagId);
+	public TagProfileRequestResponse approveTag(Long adminNo, Long tagId, Long requestId) {
+		return tagService.approveProfile(adminNo, tagId, requestId);
 	}
 
-	public TagProfileRequestResponse rejectTag(Long adminNo, Long tagId, String rejectMessage) {
-		return tagService.rejectProfile(adminNo, tagId, rejectMessage);
+	public TagProfileRequestResponse rejectTag(Long adminNo, Long tagId, String rejectMessage, Long requestId) {
+		return tagService.rejectProfile(adminNo, tagId, rejectMessage, requestId);
 	}
 
-	public TagProfileRequestResponse reopenTag(Long tagId) {
-		return tagService.reopenProfile(tagId);
+	public TagProfileRequestResponse reopenTag(Long tagId, Long requestId) {
+		return tagService.reopenProfile(tagId, requestId);
 	}
 
 	@Transactional
@@ -92,6 +93,37 @@ public class AdminService {
 
 	public ReportResponse getReport(Long reportId) {
 		return reportService.get(reportId);
+	}
+
+	@Transactional(readOnly = true)
+	public ReportFeedPreviewResponse reportPreview(Long reportId) {
+		reportService.requireExists(reportId);
+		var feed = feedService.getReportedFeed(reportId);
+		var tags = feed.getTagIds().stream().flatMap(id -> {
+			try { return java.util.stream.Stream.of(tagService.getDetail(id, null)); }
+			catch (BusinessException error) {
+				if (error.getErrorCode() == ErrorCode.TAG_NOT_FOUND) return java.util.stream.Stream.empty();
+				throw error;
+			}
+		}).toList();
+		return new ReportFeedPreviewResponse(
+				feed, feedService.getReportedComments(reportId, feed.getFeedId()), tags);
+	}
+
+	@Transactional(readOnly = true)
+	public void assertReportPreviewFile(Long reportId, Long fileId) {
+		var preview = reportPreview(reportId);
+		var files = new java.util.ArrayList<me._hanho.ultary.domain.file.dto.response.FileSummaryResponse>();
+		files.add(preview.feed().getAuthorProfileFile());
+		preview.feed().getMedia().forEach(media -> { files.add(media.getFile()); files.add(media.getThumbnailFile()); });
+		preview.comments().forEach(comment -> {
+			files.add(comment.getAuthorProfileFile());
+			comment.getReplies().forEach(reply -> files.add(reply.getAuthorProfileFile()));
+		});
+		preview.tags().forEach(tag -> files.addAll(tag.getImages()));
+		if (files.stream().noneMatch(file -> file != null && fileId.equals(file.getFileId()))) {
+			throw new BusinessException(ErrorCode.FILE_NOT_FOUND);
+		}
 	}
 
 	@Transactional

@@ -38,7 +38,7 @@ public class ModerationTransactions {
         ModerationJob job = mapper.lockJob(claimed.getJobId());
         if (job == null || !"PROCESSING".equals(job.getStatus()) || !Objects.equals(job.getClaimToken(), claimed.getClaimToken())) return;
         if (feed == null || feed.isDeleted() || target == null || target.isDeleted() || state == null
-                || !Objects.equals(target.getUserNo(), job.getUserNo())) {
+                || !Objects.equals(target.getUserNo(), job.getUserNo()) || !Objects.equals(target.getFeedId(), job.getFeedId())) {
             finish(job, "SKIPPED", null); return;
         }
         if ("REPLY".equals(job.getTargetType())) {
@@ -100,5 +100,41 @@ public class ModerationTransactions {
 
     private void finish(ModerationJob job, String status, String action) {
         job.setStatus(status); job.setResultAction(action); mapper.finishJob(job);
+    }
+
+    @Transactional
+    public void review(Long jobId, Long adminNo, String decision) {
+        var snapshot = mapper.findJob(jobId);
+        if (snapshot == null) throw new me._hanho.ultary.common.exception.BusinessException(me._hanho.ultary.common.exception.ErrorCode.NOT_FOUND);
+        var feed = mapper.lockTarget("FEED", snapshot.getFeedId());
+        var target = "FEED".equals(snapshot.getTargetType()) ? feed : mapper.lockTarget(snapshot.getTargetType(), snapshot.getTargetId());
+        var state = mapper.lockState(snapshot.getTargetType(), snapshot.getTargetId());
+        var job = mapper.lockJob(jobId);
+        if (decision.equals(job.getAdminReviewStatus())) return;
+        if (feed == null || feed.isDeleted() || target == null || target.isDeleted() || state == null
+                || !Objects.equals(target.getUserNo(), job.getUserNo()) || !Objects.equals(target.getFeedId(), job.getFeedId())
+                || !Objects.equals(state.getLatestVersion(), job.getContentVersion()) || !Objects.equals(target.getContent(), job.getContent())) {
+            throw new me._hanho.ultary.common.exception.BusinessException(me._hanho.ultary.common.exception.ErrorCode.INVALID_INPUT,
+                    "이미 수정되거나 삭제된 콘텐츠입니다. 최신 오류 기록을 확인해 주세요.");
+        }
+        if ("REPLY".equals(job.getTargetType())) {
+            var parent = mapper.lockTarget("COMMENT", target.getParentCommentId());
+            if (parent == null || parent.isDeleted()) throw new me._hanho.ultary.common.exception.BusinessException(me._hanho.ultary.common.exception.ErrorCode.NOT_FOUND);
+        }
+        if ("DELETED".equals(decision)) {
+            mapper.hide(job.getTargetType(), job.getTargetId());
+            switch (job.getTargetType()) {
+                case "FEED" -> notifications.removeByFeed(job.getFeedId());
+                case "COMMENT" -> { feedMapper.adjustCommentCount(job.getFeedId(), -1); notifications.removeCommentTree(job.getTargetId()); }
+                case "REPLY" -> notifications.removeReply(job.getTargetId());
+                default -> throw new IllegalStateException("Unknown moderation target");
+            }
+            if (!"FEED".equals(job.getTargetType())) notifications.syncFeedThread(job.getFeedId(), false);
+            realtime.pushModeration(job, "HIDDEN", "관리자 확인 후 숨김 처리되었습니다.");
+        } else if ("KEPT".equals(decision)) {
+            state.setApprovedVersion(job.getContentVersion()); state.setApprovedContent(job.getContent()); state.setHasApproved(true);
+            mapper.saveState(state);
+        }
+        mapper.reviewJob(jobId, decision, adminNo);
     }
 }

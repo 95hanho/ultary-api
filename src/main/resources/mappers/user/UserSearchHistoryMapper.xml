@@ -37,8 +37,7 @@
 					FROM ultary_user_block b
 					WHERE b.is_deleted = 0
 					  AND (
-						(b.blocker_user_no = #{viewerUserNo} AND b.blocked_user_no = h.target_user_no)
-						OR (b.blocker_user_no = h.target_user_no AND b.blocked_user_no = #{viewerUserNo})
+						b.blocker_user_no = h.target_user_no AND b.blocked_user_no = #{viewerUserNo}
 					  )
 				)
 			)

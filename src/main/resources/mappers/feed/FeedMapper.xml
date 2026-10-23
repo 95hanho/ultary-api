@@ -4,6 +4,36 @@
 		"https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="me._hanho.ultary.domain.feed.FeedMapper">
+	<!-- 관리자 신고 미리보기에서만 사용. 공개 범위와 조치 상태에 관계없이 신고의 원문을 조회한다. -->
+	<select id="findReportedFeed" resultType="me._hanho.ultary.domain.feed.model.Feed">
+		SELECT f.* FROM ultary_report r
+		LEFT JOIN ultary_feed_reply rp ON r.target_type = 'REPLY' AND rp.feed_reply_id = r.target_reply_id
+		LEFT JOIN ultary_feed_comment c ON c.feed_comment_id = CASE
+			WHEN r.target_type = 'COMMENT' THEN r.target_comment_id
+			WHEN r.target_type = 'REPLY' THEN rp.feed_comment_id END
+		JOIN ultary_feed f ON f.feed_id = CASE WHEN r.target_type = 'FEED' THEN r.target_feed_id ELSE c.feed_id END
+		WHERE r.report_id = #{reportId}
+	</select>
+	<select id="findReportComments" resultType="me._hanho.ultary.domain.feed.model.FeedComment">
+		SELECT c.*, u.nickname AS authorNickname,
+		 (SELECT p.profile_file_id FROM ultary_pet p WHERE p.user_no = c.user_no AND p.is_deleted = 0
+		  AND p.profile_file_id IS NOT NULL ORDER BY p.priority, p.pet_id LIMIT 1) AS authorProfileFileId
+		FROM ultary_feed_comment c LEFT JOIN ultary_user u ON u.user_no = c.user_no
+		JOIN ultary_report r ON r.report_id = #{reportId}
+		LEFT JOIN ultary_feed_reply rp ON r.target_type = 'REPLY' AND rp.feed_reply_id = r.target_reply_id
+		WHERE c.feed_id = #{feedId}
+		 AND (c.is_deleted = 0 OR c.feed_comment_id = r.target_comment_id OR c.feed_comment_id = rp.feed_comment_id)
+		ORDER BY c.created_at, c.feed_comment_id
+	</select>
+	<select id="findReportReplies" resultType="me._hanho.ultary.domain.feed.model.FeedReply">
+		SELECT rp.*, u.nickname AS authorNickname,
+		 (SELECT p.profile_file_id FROM ultary_pet p WHERE p.user_no = rp.user_no AND p.is_deleted = 0
+		  AND p.profile_file_id IS NOT NULL ORDER BY p.priority, p.pet_id LIMIT 1) AS authorProfileFileId
+		FROM ultary_feed_reply rp LEFT JOIN ultary_user u ON u.user_no = rp.user_no
+		JOIN ultary_report r ON r.report_id = #{reportId}
+		WHERE rp.feed_comment_id = #{commentId} AND (rp.is_deleted = 0 OR rp.feed_reply_id = r.target_reply_id)
+		ORDER BY rp.created_at, rp.feed_reply_id
+	</select>
 
 	<sql id="feedColumns">
 		feed_id,
@@ -841,6 +871,38 @@
 		LIMIT #{limit}
 	</select>
 
+	<select id="findVisibleComments" resultType="me._hanho.ultary.domain.feed.model.FeedComment">
+		SELECT
+			c.feed_comment_id,
+			c.feed_id,
+			c.user_no,
+			c.content,
+			c.like_count,
+			c.created_at,
+			c.updated_at,
+			c.is_deleted,
+			c.deleted_at,
+			u.nickname AS authorNickname,
+			(
+				SELECT rp.profile_file_id
+				FROM ultary_pet rp
+				WHERE rp.user_no = u.user_no
+				  AND rp.is_deleted = 0
+				  AND rp.profile_file_id IS NOT NULL
+				ORDER BY rp.priority ASC, rp.pet_id ASC
+				LIMIT 1
+			) AS authorProfileFileId
+		FROM ultary_feed_comment c
+		INNER JOIN ultary_user u ON u.user_no = c.user_no AND u.withdrawal_status = 'ACTIVE'
+		WHERE c.feed_id = #{feedId}
+		  AND c.is_deleted = 0
+		AND NOT EXISTS (SELECT 1 FROM ultary_user_block b WHERE b.is_deleted = 0 AND
+		  ((b.blocker_user_no = #{viewerUserNo} AND b.blocked_user_no = c.user_no)
+		   OR (b.blocker_user_no = c.user_no AND b.blocked_user_no = #{viewerUserNo})))
+		ORDER BY c.created_at ASC
+		LIMIT #{limit}
+	</select>
+
 	<select id="countActiveCommentsAndReplies" resultType="int">
 		SELECT
 			(
@@ -1001,6 +1063,38 @@
 		INNER JOIN ultary_user u ON u.user_no = r.user_no AND u.withdrawal_status = 'ACTIVE'
 		WHERE r.feed_comment_id = #{commentId}
 		  AND r.is_deleted = 0
+		ORDER BY r.created_at ASC
+		LIMIT #{limit}
+	</select>
+
+	<select id="findVisibleReplies" resultType="me._hanho.ultary.domain.feed.model.FeedReply">
+		SELECT
+			r.feed_reply_id,
+			r.feed_comment_id,
+			r.user_no,
+			r.content,
+			r.like_count,
+			r.created_at,
+			r.updated_at,
+			r.is_deleted,
+			r.deleted_at,
+			u.nickname AS authorNickname,
+			(
+				SELECT rp.profile_file_id
+				FROM ultary_pet rp
+				WHERE rp.user_no = u.user_no
+				  AND rp.is_deleted = 0
+				  AND rp.profile_file_id IS NOT NULL
+				ORDER BY rp.priority ASC, rp.pet_id ASC
+				LIMIT 1
+			) AS authorProfileFileId
+		FROM ultary_feed_reply r
+		INNER JOIN ultary_user u ON u.user_no = r.user_no AND u.withdrawal_status = 'ACTIVE'
+		WHERE r.feed_comment_id = #{commentId}
+		  AND r.is_deleted = 0
+		AND NOT EXISTS (SELECT 1 FROM ultary_user_block b WHERE b.is_deleted = 0 AND
+		  ((b.blocker_user_no = #{viewerUserNo} AND b.blocked_user_no = r.user_no)
+		   OR (b.blocker_user_no = r.user_no AND b.blocked_user_no = #{viewerUserNo})))
 		ORDER BY r.created_at ASC
 		LIMIT #{limit}
 	</select>

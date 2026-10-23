@@ -15,6 +15,8 @@ public interface NotificationMapper {
 
 	int upsert(NotificationUpsert row);
 
+	int deleteRecentTagReview(@Param("receiverUserNo") Long receiverUserNo, @Param("requestId") Long requestId);
+
 	int deleteByReceiverGroup(
 			@Param("receiverUserNo") Long receiverUserNo,
 			@Param("groupKey") String groupKey);

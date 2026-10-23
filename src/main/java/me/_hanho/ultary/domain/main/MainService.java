@@ -185,8 +185,8 @@ public class MainService {
 		if (target == null) {
 			throw new BusinessException(ErrorCode.USER_NOT_FOUND);
 		}
-		if (userBlockMapper.findActiveEitherWay(principal.getUserNo(), targetUserNo) != null) {
-			throw new BusinessException(ErrorCode.USER_BLOCKED);
+		if (userBlockMapper.findActiveByPair(targetUserNo, principal.getUserNo()) != null) {
+			throw new BusinessException(ErrorCode.USER_NOT_FOUND);
 		}
 		userSearchHistoryMapper.upsertUser(principal.getUserNo(), targetUserNo);
 		SearchHistoryRow row = userSearchHistoryMapper.findByUserPair(principal.getUserNo(), targetUserNo);
@@ -234,8 +234,8 @@ public class MainService {
 			throw new BusinessException(ErrorCode.PET_NOT_FOUND);
 		}
 		if (!principal.getUserNo().equals(pet.getUserNo())
-				&& userBlockMapper.findActiveEitherWay(principal.getUserNo(), pet.getUserNo()) != null) {
-			throw new BusinessException(ErrorCode.USER_BLOCKED);
+				&& userBlockMapper.findActiveByPair(pet.getUserNo(), principal.getUserNo()) != null) {
+			throw new BusinessException(ErrorCode.PET_NOT_FOUND);
 		}
 		userPetTagHistoryMapper.upsert(principal.getUserNo(), petId);
 		PetTagHistoryRow row = userPetTagHistoryMapper.findByPair(principal.getUserNo(), petId);

@@ -16,6 +16,8 @@ public class FeedReplyResponse {
 	private Long feedCommentId;
 	private Long userNo;
 	private String authorNickname;
+	private boolean authorHasStory;
+	private boolean authorHasUnviewedStory;
 	/** 작성자 프로필. 미등록·삭제 파일이면 null */
 	private FileSummaryResponse authorProfileFile;
 	private String content;

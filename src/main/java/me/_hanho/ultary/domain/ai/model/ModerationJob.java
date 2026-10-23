@@ -21,4 +21,5 @@ public class ModerationJob {
     private String lastError;
     private String resultAction;
     private int retryDelay;
+    private String adminReviewStatus;
 }

@@ -55,6 +55,18 @@ public class NotificationService {
 	private final FileService fileService;
 	private final RealtimePush realtimePush;
 
+	public void notifyTagReview(Long userNo, Long requestId, String hashtag, boolean approved) {
+		String type = approved ? "TAG_PROFILE_APPROVED" : "TAG_PROFILE_REJECTED";
+		notificationMapper.upsert(NotificationUpsert.builder().receiverUserNo(userNo).actorUserNo(userNo)
+				.type(type).content(hashtag).actorCount(1).hasComment(0).hasReply(0)
+				.groupKey(type + ":" + requestId + ":" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16)).markUnread(1).build());
+		pushUnread(userNo);
+	}
+
+	public void removeRecentTagReview(Long userNo, Long requestId) {
+		if (notificationMapper.deleteRecentTagReview(userNo, requestId) > 0) pushUnread(userNo);
+	}
+
 	/** 하단 배지. 읽음 처리하지 않는다 */
 	@Transactional(readOnly = true)
 	public NotificationUnreadCountResponse unreadCount(UserPrincipal principal) {
@@ -377,7 +389,8 @@ public class NotificationService {
 		return NotificationItemResponse.builder()
 				.notificationId(row.getNotificationId())
 				.type(row.getType())
-				.message("AI_MODERATION".equals(row.getType()) ? row.getContent()
+				.message(row.getType().startsWith("TAG_PROFILE_") ? "#" + row.getContent() + " 의 태그 요청이 " + ("TAG_PROFILE_APPROVED".equals(row.getType()) ? "수락되었습니다." : "거절되었습니다.")
+						: "AI_MODERATION".equals(row.getType()) ? row.getContent()
 						: message(row.getType(), row.getActorNickname(), actorCount, hasComment, hasReply, actorFollows))
 				.actorUserNo(row.getActorUserNo())
 				.actorNickname(row.getActorNickname())

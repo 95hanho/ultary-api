@@ -37,6 +37,7 @@ import me._hanho.ultary.domain.story.model.StoryMentionRow;
 import me._hanho.ultary.domain.story.model.StoryText;
 import me._hanho.ultary.domain.story.model.StoryOwnerRow;
 import me._hanho.ultary.domain.user.UserMapper;
+import me._hanho.ultary.domain.user.UserBlockMapper;
 import me._hanho.ultary.domain.user.model.User;
 import me._hanho.ultary.security.principal.UserPrincipal;
 
@@ -53,6 +54,7 @@ public class StoryService {
 	private final StoryMapper storyMapper;
 	private final FileService fileService;
 	private final UserMapper userMapper;
+	private final UserBlockMapper userBlockMapper;
 	private final PetService petService;
 	private final PetMapper petMapper;
 	private final NotificationService notificationService;
@@ -121,6 +123,7 @@ public class StoryService {
 		if (viewerUserNo != null && viewerUserNo.equals(ownerUserNo)) {
 			return true;
 		}
+		if (viewerUserNo != null && userBlockMapper.findActiveEitherWay(viewerUserNo, ownerUserNo) != null) return false;
 		String audience = privacyService.storyAudience(ownerUserNo);
 		if ("PRIVATE".equals(audience)) {
 			return false;
@@ -142,6 +145,7 @@ public class StoryService {
 		Long me = principal.getUserNo();
 		List<StoryOwnerRow> rows = storyMapper.findResidentOwnersWithActiveStories(me).stream()
 				.filter(row -> !me.equals(row.getUserNo()))
+				.filter(row -> hasVisibleStory(me, row.getUserNo()))
 				.toList();
 		StoryOwnerRow mine = storyMapper.findOwnActiveStoryOwner(me);
 		Set<Long> profileIds = new HashSet<>();
@@ -247,6 +251,9 @@ public class StoryService {
 	private void assertCanViewOwnerStories(Long viewerUserNo, Long ownerUserNo) {
 		if (viewerUserNo.equals(ownerUserNo)) {
 			return;
+		}
+		if (userBlockMapper.findActiveEitherWay(viewerUserNo, ownerUserNo) != null) {
+			throw new BusinessException(ErrorCode.STORY_NOT_FOUND);
 		}
 		String audience = privacyService.storyAudience(ownerUserNo);
 		if ("PUBLIC".equals(audience)) {

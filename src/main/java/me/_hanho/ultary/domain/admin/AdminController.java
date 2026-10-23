@@ -18,6 +18,7 @@ import me._hanho.ultary.domain.admin.dto.response.AdminMenuCountResponse;
 import me._hanho.ultary.domain.admin.dto.response.UserSuspendResponse;
 import me._hanho.ultary.domain.report.dto.response.ReportPageResponse;
 import me._hanho.ultary.domain.report.dto.response.ReportResponse;
+import me._hanho.ultary.domain.report.dto.response.ReportFeedPreviewResponse;
 import me._hanho.ultary.domain.tag.dto.response.TagProfileRequestPageResponse;
 import me._hanho.ultary.domain.tag.dto.response.TagProfileRequestResponse;
 import me._hanho.ultary.security.principal.AdminPrincipal;
@@ -30,6 +31,7 @@ import me._hanho.ultary.security.principal.AdminPrincipal;
 public class AdminController {
 
 	private final AdminService adminService;
+	private final me._hanho.ultary.domain.file.FileService fileService;
 
 	@GetMapping("/menu-counts")
 	public ApiResponse<AdminMenuCountResponse> menuCounts() {
@@ -50,9 +52,9 @@ public class AdminController {
 	@PostMapping("/tags/{tagId}/approve")
 	public ApiResponse<TagProfileRequestResponse> approveTag(
 			@AuthenticationPrincipal AdminPrincipal principal,
-			@PathVariable Long tagId) {
+			@PathVariable Long tagId, @RequestParam(required = false) Long requestId) {
 		log.info("[approveTag] tagId={}", tagId);
-		return ApiResponse.ok(adminService.approveTag(principal.getAdminNo(), tagId), "태그 설명 승인 성공");
+		return ApiResponse.ok(adminService.approveTag(principal.getAdminNo(), tagId, requestId), "태그 설명 승인 성공");
 	}
 
 	@PostMapping("/tags/{tagId}/reject")
@@ -63,14 +65,14 @@ public class AdminController {
 		log.info("[rejectTag] tagId={}", tagId);
 		String rejectMessage = request == null ? null : request.getRejectMessage();
 		return ApiResponse.ok(
-				adminService.rejectTag(principal.getAdminNo(), tagId, rejectMessage),
+				adminService.rejectTag(principal.getAdminNo(), tagId, rejectMessage, request == null ? null : request.getRequestId()),
 				"태그 설명 거절 성공");
 	}
 
 	@PostMapping("/tags/{tagId}/pending")
-	public ApiResponse<TagProfileRequestResponse> reopenTag(@PathVariable Long tagId) {
+	public ApiResponse<TagProfileRequestResponse> reopenTag(@PathVariable Long tagId, @RequestParam(required = false) Long requestId) {
 		log.info("[reopenTag] tagId={}", tagId);
-		return ApiResponse.ok(adminService.reopenTag(tagId), "태그 설명 대기 성공");
+		return ApiResponse.ok(adminService.reopenTag(tagId, requestId), "태그 설명 대기 성공");
 	}
 
 	@PostMapping("/users/{userNo}/suspend")
@@ -88,6 +90,25 @@ public class AdminController {
 	@GetMapping("/reports/{reportId}")
 	public ApiResponse<ReportResponse> report(@PathVariable Long reportId) {
 		return ApiResponse.ok(adminService.getReport(reportId));
+	}
+
+	@GetMapping("/reports/{reportId}/preview")
+	public ApiResponse<ReportFeedPreviewResponse> reportPreview(@PathVariable Long reportId) {
+		return ApiResponse.ok(adminService.reportPreview(reportId));
+	}
+
+	@GetMapping("/reports/{reportId}/files/{fileId}/content")
+	public org.springframework.http.ResponseEntity<org.springframework.core.io.Resource> reportPreviewFile(
+			@PathVariable Long reportId, @PathVariable Long fileId) {
+		adminService.assertReportPreviewFile(reportId, fileId);
+		var file = fileService.requireActive(fileId);
+		org.springframework.http.MediaType type = org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
+		if (file.getMimeType() != null) {
+			try { type = org.springframework.http.MediaType.parseMediaType(file.getMimeType()); }
+			catch (IllegalArgumentException ignored) { }
+		}
+		return org.springframework.http.ResponseEntity.ok().header("Cache-Control", "private, no-store")
+				.contentType(type).body(fileService.getContent(fileId));
 	}
 
 	@GetMapping("/reports")

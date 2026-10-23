@@ -44,6 +44,16 @@ class FeedServiceModerationTest {
     ModerationJob claim(int version) {return transactions.claim(job("COMMENT",comment,version));}
     ModerationResult unsafe() {return new ModerationResult(false,"ABUSE",null,null,false);}
 
+    @Test void synchronouslyApprovedEditCannotBeUndoneByAnOlderWorker() {
+        queue.enqueue("FEED",feed,feed,user,null,"fixture",true);
+        var old=transactions.claim(job("FEED",feed,1));
+        var request=new me._hanho.ultary.domain.feed.dto.request.UpdateFeedRequest();request.setContent("checked edit");
+        feeds.update(new UserPrincipal(user,"test"),feed,request);
+        transactions.complete(old,unsafe());
+        assertThat(jdbc.queryForObject("SELECT content FROM ultary_feed WHERE feed_id=?",String.class,feed)).isEqualTo("checked edit");
+        assertThat(mapper.lockState("FEED",feed).getApprovedContent()).isEqualTo("checked edit");
+        assertThat(mapper.findJob(old.getJobId()).getStatus()).isEqualTo("SUPERSEDED");
+    }
     @Test void saveReturnsWithADurablePendingJobBeforeAnyAiResult() {
         var request=new UpdateCommentRequest();request.setContent("changed");
         var response=feeds.updateComment(new UserPrincipal(user,"test"),feed,comment,request);

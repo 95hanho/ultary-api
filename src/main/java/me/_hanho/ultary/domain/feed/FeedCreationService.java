@@ -8,10 +8,11 @@ import me._hanho.ultary.common.exception.BusinessException;
 import me._hanho.ultary.common.exception.ErrorCode;
 import me._hanho.ultary.domain.ai.AiService;
 import me._hanho.ultary.domain.feed.dto.request.CreateFeedRequest;
+import me._hanho.ultary.domain.feed.dto.request.UpdateFeedRequest;
 import me._hanho.ultary.domain.feed.dto.response.FeedResponse;
 import me._hanho.ultary.security.principal.UserPrincipal;
 
-/** Wait for moderation before opening the atomic feed-write transaction. */
+/** Inspect before opening the content write transaction. */
 @Service
 @RequiredArgsConstructor
 public class FeedCreationService {
@@ -25,5 +26,14 @@ public class FeedCreationService {
         }
         ai.assertFeedCreationAllowed(principal.getUserNo(), request.getContent());
         return feeds.create(principal, request);
+    }
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public FeedResponse update(UserPrincipal principal, Long feedId, UpdateFeedRequest request) {
+        FeedResponse current = feeds.getDetail(principal, feedId);
+        if (!principal.getUserNo().equals(current.getUserNo())) throw new BusinessException(ErrorCode.FORBIDDEN);
+        String content = Boolean.TRUE.equals(request.getClearContent()) ? null
+                : request.getContent() != null ? request.getContent() : current.getContent();
+        ai.assertFeedUpdateAllowed(principal.getUserNo(), feedId, content);
+        return feeds.update(principal, feedId, request);
     }
 }

@@ -49,4 +49,9 @@
   </update>
   <update id="restoreContent">UPDATE <include refid="table"/> SET content=#{content},updated_at=NOW() WHERE <include refid="pk"/>=#{id} AND is_deleted=0</update>
   <update id="hide">UPDATE <include refid="table"/> SET is_deleted=1,deleted_at=NOW(),updated_at=NOW() WHERE <include refid="pk"/>=#{id} AND is_deleted=0</update>
+  <update id="reviewJob">
+    UPDATE ultary_ai_moderation_job SET admin_review_status=#{status}, admin_reviewed_at=NOW(), admin_reviewed_by=#{adminNo},
+      status='SKIPPED',result_action=CASE #{status} WHEN 'DELETED' THEN 'HIDDEN' WHEN 'KEPT' THEN 'ADMIN_KEPT' ELSE NULL END,
+      claim_token=NULL,lease_until=NULL,finished_at=NOW() WHERE job_id=#{id}
+  </update>
 </mapper>

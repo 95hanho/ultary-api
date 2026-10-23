@@ -33,3 +33,6 @@ security:
   bff:
     shared-key: ${BFF_INTERNAL_KEY:}
     require-https: false
+auth:
+  phone:
+    demo-mode: ${PHONE_AUTH_DEMO_MODE:true}
