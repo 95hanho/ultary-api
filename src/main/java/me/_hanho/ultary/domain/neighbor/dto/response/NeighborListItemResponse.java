@@ -20,6 +20,8 @@ public class NeighborListItemResponse {
 	private String status;
 	/** FOLLOW(내가 팔로우) | FOLLOWER(상대가 팔로우) */
 	private String listType;
+	/** 목록 주인과 상대가 서로 팔로우 중이면 true */
+	private boolean mutual;
 	private boolean hasStory;
 	/** 조회자가 볼 수 있는 스토리 중 미열람 스토리가 있으면 true */
 	private boolean hasUnviewed;

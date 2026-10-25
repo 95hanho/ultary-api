@@ -190,14 +190,15 @@
 			u.nickname AS nickname,
 			<include refid="listProfileFileId"/> AS profileFileId,
 			n.status AS status,
-			'FOLLOW' AS listType
+			'FOLLOW' AS listType,
+			n.followed_back AS mutual
 		FROM (
-			SELECT neighbor_id, receiver_user_no AS other_user_no, status, accepted_at AS sort_at
+			SELECT neighbor_id, receiver_user_no AS other_user_no, status, followed_back, accepted_at AS sort_at
 			FROM ultary_neighbor
 			WHERE requester_user_no = #{userNo}
 			  AND status = 'ACCEPTED'
 			UNION ALL
-			SELECT neighbor_id, requester_user_no, status, followed_back_at
+			SELECT neighbor_id, requester_user_no, status, followed_back, followed_back_at
 			FROM ultary_neighbor
 			WHERE receiver_user_no = #{userNo}
 			  AND status = 'ACCEPTED'
@@ -205,7 +206,7 @@
 		) n
 		INNER JOIN ultary_user u ON u.user_no = n.other_user_no
 			AND u.withdrawal_status = 'ACTIVE'
-		ORDER BY n.sort_at DESC, n.neighbor_id DESC
+		ORDER BY n.followed_back DESC, n.sort_at DESC, n.neighbor_id DESC
 		LIMIT #{limit}
 	</select>
 
@@ -216,14 +217,15 @@
 			u.nickname AS nickname,
 			<include refid="listProfileFileId"/> AS profileFileId,
 			n.status AS status,
-			'FOLLOWER' AS listType
+			'FOLLOWER' AS listType,
+			n.followed_back AS mutual
 		FROM (
-			SELECT neighbor_id, requester_user_no AS other_user_no, status, accepted_at AS sort_at
+			SELECT neighbor_id, requester_user_no AS other_user_no, status, followed_back, accepted_at AS sort_at
 			FROM ultary_neighbor
 			WHERE receiver_user_no = #{userNo}
 			  AND status = 'ACCEPTED'
 			UNION ALL
-			SELECT neighbor_id, receiver_user_no, status, followed_back_at
+			SELECT neighbor_id, receiver_user_no, status, followed_back, followed_back_at
 			FROM ultary_neighbor
 			WHERE requester_user_no = #{userNo}
 			  AND status = 'ACCEPTED'
@@ -231,7 +233,7 @@
 		) n
 		INNER JOIN ultary_user u ON u.user_no = n.other_user_no
 			AND u.withdrawal_status = 'ACTIVE'
-		ORDER BY n.sort_at DESC, n.neighbor_id DESC
+		ORDER BY n.followed_back DESC, n.sort_at DESC, n.neighbor_id DESC
 		LIMIT #{limit}
 	</select>
 

@@ -54,4 +54,18 @@
       status='SKIPPED',result_action=CASE #{status} WHEN 'DELETED' THEN 'HIDDEN' WHEN 'KEPT' THEN 'ADMIN_KEPT' ELSE NULL END,
       claim_token=NULL,lease_until=NULL,finished_at=NOW() WHERE job_id=#{id}
   </update>
+  <select id="countOtherDeletedJobs" resultType="int">
+    SELECT COUNT(*) FROM ultary_ai_moderation_job
+    WHERE target_type=#{kind} AND target_id=#{id} AND job_id != #{jobId} AND admin_review_status='DELETED'
+    FOR UPDATE
+  </select>
+  <select id="countDeletedReports" resultType="int">
+    SELECT COUNT(*) FROM ultary_report WHERE target_type=#{kind} AND status='DELETED'
+    AND <choose>
+      <when test="kind == 'FEED'">target_feed_id=#{id}</when>
+      <when test="kind == 'COMMENT'">target_comment_id=#{id}</when>
+      <otherwise>target_reply_id=#{id}</otherwise>
+    </choose>
+    FOR UPDATE
+  </select>
 </mapper>

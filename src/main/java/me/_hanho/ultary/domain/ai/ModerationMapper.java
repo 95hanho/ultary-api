@@ -20,5 +20,7 @@ public interface ModerationMapper {
     int finishJob(ModerationJob job);
     int restoreContent(@Param("kind") String kind, @Param("id") Long id, @Param("content") String content);
     int hide(@Param("kind") String kind, @Param("id") Long id);
+    int countOtherDeletedJobs(@Param("kind") String kind, @Param("id") Long id, @Param("jobId") Long jobId);
+    int countDeletedReports(@Param("kind") String kind, @Param("id") Long id);
     int reviewJob(@Param("id") Long id, @Param("status") String status, @Param("adminNo") Long adminNo);
 }

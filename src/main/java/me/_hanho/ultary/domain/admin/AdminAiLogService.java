@@ -21,19 +21,36 @@ public class AdminAiLogService {
 
     public AdminAiLogPageResponse list(String status, String featureType, String targetType, Long targetId,
             String errorCode, Long userNo, Long moderationJobId, Long cursorAiRequestId, int limit) {
+        return list(status, featureType, targetType, targetId, errorCode, userNo, moderationJobId, cursorAiRequestId, limit, null, null);
+    }
+
+    public AdminAiLogPageResponse list(String status, String featureType, String targetType, Long targetId,
+            String errorCode, Long userNo, Long moderationJobId, Long cursorAiRequestId, int limit, String phone, String email) {
         status = option(status, Set.of("ALL", "PENDING", "SUCCESS", "FAILED"), "status");
         featureType = option(featureType, Set.of("FEED_CAPTION", "HASHTAG", "PET_PROFILE", "COMMENT_FILTER", "ALT_TEXT"), "featureType");
-        targetType = option(targetType, Set.of("MODERATION", "FEED", "COMMENT", "REPLY"), "targetType");
+        targetType = option(targetType, Set.of("MODERATION", "FEED", "COMMENT", "REPLY", "HASHTAG"), "targetType");
+        phone = phone == null || phone.isBlank() ? null : phone.trim().replaceAll("[\\s-]", "");
+        email = email == null || email.isBlank() ? null : email.trim();
+        if ((phone != null && !phone.matches("[0-9]{1,20}")) || (email != null && email.length() > 254)) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT);
+        }
         if (limit < 1 || limit > 100 || invalidId(userNo) || invalidId(targetId) || invalidId(moderationJobId) || invalidId(cursorAiRequestId)
                 || (errorCode != null && !errorCode.matches("[A-Z0-9_]{1,64}"))) {
             throw new BusinessException(ErrorCode.INVALID_INPUT);
         }
+        Integer cursorPriority = null;
+        if (cursorAiRequestId != null) {
+            var cursor = mapper.findForAdmin(cursorAiRequestId);
+            if (cursor == null) throw new BusinessException(ErrorCode.INVALID_INPUT);
+            cursorPriority = "FAILED".equals(cursor.getStatus()) && cursor.getModerationJobId() != null
+                    && "PENDING".equals(cursor.getAdminReviewStatus()) ? 0 : 1;
+        }
         var rows = mapper.listForAdmin("ALL".equals(status) ? null : status, featureType, targetType, targetId,
-                errorCode, userNo, moderationJobId, cursorAiRequestId, limit + 1);
+                errorCode, userNo, moderationJobId, cursorAiRequestId, limit + 1, phone, email, cursorPriority);
         boolean hasMore = rows.size() > limit;
         var items = hasMore ? rows.subList(0, limit) : rows;
         int totalCount = mapper.countForAdmin("ALL".equals(status) ? null : status, featureType, targetType,
-                targetId, errorCode, userNo, moderationJobId);
+                targetId, errorCode, userNo, moderationJobId, phone, email);
         return new AdminAiLogPageResponse(items, hasMore ? items.get(items.size() - 1).getAiRequestId() : null, totalCount);
     }
 
@@ -41,6 +58,7 @@ public class AdminAiLogService {
         if (id == null || id <= 0) throw new BusinessException(ErrorCode.INVALID_INPUT);
         var row = mapper.findForAdmin(id);
         if (row == null) throw new BusinessException(ErrorCode.NOT_FOUND);
+        row.setAttempts(mapper.attemptsForAdmin(row.getModerationJobId(), id));
         return row;
     }
 

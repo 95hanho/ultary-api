@@ -10,6 +10,11 @@ import lombok.Setter;
 public class AdminAiLogResponse {
     private Long aiRequestId;
     private Long userNo;
+    private String userNickname;
+    private String userPhone;
+    private String userEmail;
+    private Integer attemptCount;
+    private java.util.List<AdminAiLogResponse> attempts;
     private String featureType;
     private Long targetFeedId;
     private String targetType;

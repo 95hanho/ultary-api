@@ -18,12 +18,15 @@ public interface AiRequestLogMapper {
             @Param("featureType") String featureType, @Param("targetType") String targetType, @Param("targetId") Long targetId,
             @Param("errorCode") String errorCode, @Param("userNo") Long userNo,
             @Param("moderationJobId") Long moderationJobId, @Param("cursorAiRequestId") Long cursorAiRequestId,
-            @Param("limit") int limit);
+            @Param("limit") int limit, @Param("phone") String phone, @Param("email") String email,
+            @Param("cursorPriority") Integer cursorPriority);
 
     AdminAiLogResponse findForAdmin(@Param("aiRequestId") Long aiRequestId);
+
+    List<AdminAiLogResponse> attemptsForAdmin(@Param("moderationJobId") Long moderationJobId, @Param("aiRequestId") Long aiRequestId);
 
     int countForAdmin(@Param("status") String status, @Param("featureType") String featureType,
             @Param("targetType") String targetType, @Param("targetId") Long targetId,
             @Param("errorCode") String errorCode, @Param("userNo") Long userNo,
-            @Param("moderationJobId") Long moderationJobId);
+            @Param("moderationJobId") Long moderationJobId, @Param("phone") String phone, @Param("email") String email);
 }

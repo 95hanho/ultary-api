@@ -39,8 +39,8 @@ import me._hanho.ultary.domain.auth.dto.response.TokenResponse;
 import me._hanho.ultary.domain.auth.model.SocialProvider;
 import me._hanho.ultary.domain.auth.model.Token;
 import me._hanho.ultary.domain.auth.support.PhoneAuthCodeStore;
-import me._hanho.ultary.domain.auth.support.TokenSessionSupport;
 import me._hanho.ultary.domain.auth.support.TokenRotationSupport;
+import me._hanho.ultary.domain.auth.support.TokenSessionSupport;
 import me._hanho.ultary.domain.file.FileService;
 import me._hanho.ultary.domain.pet.PetService;
 import me._hanho.ultary.domain.user.UserMapper;
@@ -79,8 +79,8 @@ public class AuthService {
 	private final FileService fileService;
 	private final PetService petService;
 	private final SecureRandom secureRandom = new SecureRandom();
-    @org.springframework.beans.factory.annotation.Value("${auth.phone.demo-mode:false}")
-    private boolean phoneDemoMode;
+	@org.springframework.beans.factory.annotation.Value("${auth.phone.demo-mode:true}")
+	private boolean phoneDemoMode;
 
 	/**
 	 * FE/BFF가 소셜 OAuth로 확보한 providerUserId로 DB 조회/가입 후 JWT 발급.
@@ -228,11 +228,14 @@ public class AuthService {
 		}
 		Long userNo = jwtTokenProvider.getSubjectAsLong(claims);
 		Token token = tokenRotation.lockUserToken(userNo, request.getRefreshToken());
-		if (token == null) return; // 이미 만료/해제된 세션의 로그아웃은 멱등 처리한다.
+		if (token == null)
+			return; // 이미 만료/해제된 세션의 로그아웃은 멱등 처리한다.
 		if (Boolean.TRUE.equals(token.getIsRevoked())) {
-			if (token.getReplacedByTokenId() == null || !Boolean.TRUE.equals(token.getRotationRetryAllowed())) return;
+			if (token.getReplacedByTokenId() == null || !Boolean.TRUE.equals(token.getRotationRetryAllowed()))
+				return;
 			token = tokenRotation.successorForLogout(token);
-			if (token == null) return;
+			if (token == null)
+				return;
 		}
 		if (StringUtils.hasText(token.getSessionId())) {
 			tokenMapper.revokeUserSession(userNo, token.getSessionId());
@@ -658,14 +661,16 @@ public class AuthService {
 	private TokenResponse issueTokens(User user, HttpServletRequest httpRequest, Token previous) {
 		Token token = TokenSessionSupport.newToken(previous, httpRequest);
 		String accessToken = jwtTokenProvider.createUserAccessToken(user.getUserNo());
-		String refreshToken = jwtTokenProvider.createRefreshToken(user.getUserNo(), TokenOwnerType.USER, token.getSessionId());
+		String refreshToken = jwtTokenProvider.createRefreshToken(user.getUserNo(), TokenOwnerType.USER,
+				token.getSessionId());
 
 		token.setOwnerType(TokenOwnerType.USER.name());
 		token.setUserNo(user.getUserNo());
 		token.setRefreshToken(refreshToken);
 		token.setExpiresAt(LocalDateTime.now().plusSeconds(jwtTokenProvider.refreshLifetimeSeconds()));
 		tokenMapper.insert(token);
-		if (previous != null) tokenRotation.complete(previous, token);
+		if (previous != null)
+			tokenRotation.complete(previous, token);
 
 		return TokenResponse.builder()
 				.accessToken(accessToken)

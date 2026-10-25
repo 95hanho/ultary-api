@@ -19,11 +19,10 @@ public class RealtimePush {
 	private final WsSessionRegistry registry;
 	private final NotificationMapper notificationMapper;
 
-	public void pushModeration(ModerationJob job, String action, String message) {
+	public void pushModeration(ModerationJob job, String action) {
 		afterCommit(() -> {
 			registry.broadcast(Map.of("type", "CONTENT_MODERATED", "jobId", job.getJobId(),
 					"targetType", job.getTargetType(), "targetId", job.getTargetId(), "feedId", job.getFeedId(), "action", action));
-			registry.send(job.getUserNo(), Map.of("type", "MODERATION_RESULT", "jobId", job.getJobId(), "message", message));
 		});
 	}
 

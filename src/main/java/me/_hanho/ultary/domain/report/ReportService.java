@@ -317,6 +317,7 @@ public class ReportService {
 		return ReportResponse.builder()
 				.reportId(report.getReportId())
 				.reporterUserNo(report.getReporterUserNo())
+				.reporterNickname(report.getReporterNickname())
 				.targetType(report.getTargetType())
 				.targetUserNo(report.getTargetUserNo())
 				.targetFeedId(report.getTargetFeedId())
@@ -337,10 +338,10 @@ public class ReportService {
 			return null;
 		}
 		int count = content.codePointCount(0, content.length());
-		if (count <= 10) {
+		if (count <= 30) {
 			return content;
 		}
-		return content.substring(0, content.offsetByCodePoints(0, 10)) + "...";
+		return content.substring(0, content.offsetByCodePoints(0, 30)) + "...";
 	}
 
 	private String normalize(String value) {

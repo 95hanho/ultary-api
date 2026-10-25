@@ -32,11 +32,13 @@
 	</insert>
 
     <select id="countFailed" resultType="int">
-        SELECT COUNT(*) FROM ultary_ai_request_log l LEFT JOIN ultary_ai_moderation_job j ON j.job_id=l.moderation_job_id
+        SELECT COUNT(DISTINCT CASE WHEN l.moderation_job_id IS NULL THEN CONCAT('log:',l.ai_request_id) ELSE CONCAT('job:',l.moderation_job_id) END) FROM ultary_ai_request_log l LEFT JOIN ultary_ai_moderation_job j ON j.job_id=l.moderation_job_id
         WHERE l.status = 'FAILED' AND (j.job_id IS NULL OR j.admin_review_status='PENDING')
     </select>
 
     <sql id="adminColumns">
+        u.nickname AS user_nickname, u.phone AS user_phone, u.email AS user_email,
+        CASE WHEN l.moderation_job_id IS NULL THEN 1 ELSE (SELECT COUNT(*) FROM ultary_ai_request_log a WHERE a.moderation_job_id=l.moderation_job_id) END AS attempt_count,
         l.ai_request_id, l.user_no, l.feature_type, l.target_feed_id, l.target_type, l.target_id,
         l.moderation_job_id, l.content_version, l.attempt_no, l.model_name, l.status,
         l.error_code, l.error_message, l.latency_ms, l.http_status, l.created_at,
@@ -48,33 +50,63 @@
             <if test="status != null">AND l.status = #{status}</if>
             <if test="featureType != null">AND l.feature_type = #{featureType}</if>
             <choose><when test="targetType == 'MODERATION'">AND l.target_type IN ('FEED','COMMENT','REPLY')</when>
+            <when test="targetType == 'HASHTAG'">AND l.feature_type = 'HASHTAG'</when>
             <when test="targetType != null">AND l.target_type = #{targetType}</when></choose>
             <if test="targetId != null">AND l.target_id = #{targetId}</if>
             <if test="errorCode != null">AND l.error_code = #{errorCode}</if>
             <if test="userNo != null">AND l.user_no = #{userNo}</if>
             <if test="moderationJobId != null">AND l.moderation_job_id = #{moderationJobId}</if>
+            <if test="phone != null">AND REPLACE(REPLACE(u.phone, '-', ''), ' ', '') = #{phone}</if>
+            <if test="email != null">AND u.email = #{email}</if>
+    </sql>
+
+    <sql id="groupedAdminIds">
+        SELECT MAX(l.ai_request_id) FROM ultary_ai_request_log l
+        LEFT JOIN ultary_user u ON u.user_no=l.user_no
+        <where><include refid="adminFilters"/></where>
+        GROUP BY l.moderation_job_id, CASE WHEN l.moderation_job_id IS NULL THEN l.ai_request_id ELSE 0 END
     </sql>
 
     <select id="countForAdmin" resultType="int">
-        SELECT COUNT(*) FROM ultary_ai_request_log l
-        <where><include refid="adminFilters"/></where>
+        SELECT COUNT(*) FROM (<include refid="groupedAdminIds"/>) grouped_logs
     </select>
+
+    <sql id="adminPriority">
+        CASE WHEN l.status='FAILED' AND l.moderation_job_id IS NOT NULL AND j.admin_review_status='PENDING' THEN 0 ELSE 1 END
+    </sql>
 
     <select id="listForAdmin" resultType="me._hanho.ultary.domain.admin.dto.response.AdminAiLogResponse">
         SELECT <include refid="adminColumns"/>
         FROM ultary_ai_request_log l
         LEFT JOIN ultary_ai_moderation_job j ON j.job_id = l.moderation_job_id
+        LEFT JOIN ultary_user u ON u.user_no=l.user_no
         <where>
-            <include refid="adminFilters"/>
-            <if test="cursorAiRequestId != null">AND l.ai_request_id &lt; #{cursorAiRequestId}</if>
+            l.ai_request_id IN (<include refid="groupedAdminIds"/>)
+            <if test="cursorAiRequestId != null">
+                AND (<include refid="adminPriority"/> &gt; #{cursorPriority}
+                    OR (<include refid="adminPriority"/> = #{cursorPriority} AND l.ai_request_id &lt; #{cursorAiRequestId}))
+            </if>
         </where>
-        ORDER BY l.ai_request_id DESC LIMIT #{limit}
+        ORDER BY <include refid="adminPriority"/> ASC, l.ai_request_id DESC LIMIT #{limit}
     </select>
 
     <select id="findForAdmin" resultType="me._hanho.ultary.domain.admin.dto.response.AdminAiLogResponse">
         SELECT <include refid="adminColumns"/>
         FROM ultary_ai_request_log l
         LEFT JOIN ultary_ai_moderation_job j ON j.job_id = l.moderation_job_id
+        LEFT JOIN ultary_user u ON u.user_no=l.user_no
         WHERE l.ai_request_id = #{aiRequestId}
+    </select>
+
+    <select id="attemptsForAdmin" resultType="me._hanho.ultary.domain.admin.dto.response.AdminAiLogResponse">
+        SELECT <include refid="adminColumns"/>
+        FROM ultary_ai_request_log l
+        LEFT JOIN ultary_ai_moderation_job j ON j.job_id=l.moderation_job_id
+        LEFT JOIN ultary_user u ON u.user_no=l.user_no
+        WHERE <choose>
+            <when test="moderationJobId != null">l.moderation_job_id=#{moderationJobId}</when>
+            <otherwise>l.ai_request_id=#{aiRequestId}</otherwise>
+        </choose>
+        ORDER BY l.ai_request_id ASC
     </select>
 </mapper>

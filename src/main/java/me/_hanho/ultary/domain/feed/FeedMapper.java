@@ -22,6 +22,9 @@ import me._hanho.ultary.domain.feed.model.FeedSave;
 
 @Mapper
 public interface FeedMapper {
+    Feed findAiLogFeed(@Param("aiRequestId") Long aiRequestId);
+    List<FeedComment> findAiLogComments(@Param("aiRequestId") Long aiRequestId, @Param("feedId") Long feedId);
+    List<FeedReply> findAiLogReplies(@Param("aiRequestId") Long aiRequestId, @Param("commentId") Long commentId);
     Feed findReportedFeed(@Param("reportId") Long reportId);
     List<FeedComment> findReportComments(@Param("reportId") Long reportId, @Param("feedId") Long feedId);
     List<FeedReply> findReportReplies(@Param("reportId") Long reportId, @Param("commentId") Long commentId);

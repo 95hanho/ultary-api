@@ -114,9 +114,17 @@ public class NotificationService {
 
 	/** Service decision notice: self actor, no feed FK, so hidden content cannot hide the notice. */
 	public void notifyModeration(Long userNo, Long jobId, String message) {
+		writeModerationNotice(userNo, "AI_MODERATION:" + jobId, message);
+	}
+
+	public void notifyModerationReview(Long userNo, Long jobId, String message) {
+		writeModerationNotice(userNo, "AI_MODERATION:" + jobId + ":" + java.util.UUID.randomUUID().toString().replace("-", ""), message);
+	}
+
+	private void writeModerationNotice(Long userNo, String groupKey, String message) {
 		notificationMapper.upsert(NotificationUpsert.builder().receiverUserNo(userNo).actorUserNo(userNo)
 				.type("AI_MODERATION").content(message).actorCount(1).hasComment(0).hasReply(0)
-				.groupKey("AI_MODERATION:" + jobId).markUnread(1).build());
+				.groupKey(groupKey).markUnread(1).build());
 		pushUnread(userNo);
 	}
 

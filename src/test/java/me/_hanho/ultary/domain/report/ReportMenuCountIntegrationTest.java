@@ -44,6 +44,8 @@ class ReportMenuCountIntegrationTest {
     }
 
     void fixtures(Long reporter, Long owner, boolean suspended) {
+        String reporterNickname = jdbc.queryForObject("SELECT nickname FROM ultary_user WHERE user_no=?", String.class, reporter);
+        String ownerNickname = jdbc.queryForObject("SELECT nickname FROM ultary_user WHERE user_no=?", String.class, owner);
         jdbc.update("INSERT INTO ultary_feed(user_no,content) VALUES(?,'fixture')", owner);
         Long feed = id();
         jdbc.update("INSERT INTO ultary_feed_comment(feed_id,user_no,content) VALUES(?,?,'fixture')", feed, owner);
@@ -57,6 +59,10 @@ class ReportMenuCountIntegrationTest {
                     reporter, types[i], i == 0 ? owner : null, i == 1 ? feed : null, i == 2 ? comment : null, i == 3 ? reply : null, statuses[i]);
             var report = reports.findAdminById(id());
             assertThat(report.isTargetSuspended()).isEqualTo(suspended);
+            assertThat(report.getReporterUserNo()).isEqualTo(reporter);
+            assertThat(report.getReporterNickname()).isEqualTo(reporterNickname);
+            assertThat(report.getTargetUserNo()).isEqualTo(owner);
+            assertThat(report.getTargetNickname()).isEqualTo(ownerNickname);
         }
         for (String closed : new String[]{"DELETED", "REJECTED", "SUSPENDED"}) {
             jdbc.update("INSERT INTO ultary_report(reporter_user_no,target_type,target_user_no,reason,status) VALUES(?,'USER',?,'SPAM',?)", reporter, owner, closed);

@@ -11,6 +11,8 @@ import me._hanho.ultary.domain.admin.dto.response.*;
 @RequiredArgsConstructor
 public class AdminAiLogController {
     private final AdminAiLogService service;
+    private final AdminAiLogPreviewService previews;
+    private final me._hanho.ultary.domain.file.FileService files;
 
     @GetMapping
     public ApiResponse<AdminAiLogPageResponse> list(
@@ -22,9 +24,11 @@ public class AdminAiLogController {
             @RequestParam(required = false) Long userNo,
             @RequestParam(required = false) Long moderationJobId,
             @RequestParam(required = false) Long cursorAiRequestId,
+            @RequestParam(required = false) String phone,
+            @RequestParam(required = false) String email,
             @RequestParam(defaultValue = "30") int limit) {
         return ApiResponse.ok(service.list(status, featureType, targetType, targetId, errorCode,
-                userNo, moderationJobId, cursorAiRequestId, limit), "AI 요청 로그 조회 성공");
+                userNo, moderationJobId, cursorAiRequestId, limit, phone, email), "AI 요청 로그 조회 성공");
     }
 
     @GetMapping("/{aiRequestId}")
@@ -33,6 +37,25 @@ public class AdminAiLogController {
     }
 
     public record ReviewRequest(String status) {}
+
+    @GetMapping("/{aiRequestId}/preview")
+    public ApiResponse<me._hanho.ultary.domain.report.dto.response.ReportFeedPreviewResponse> preview(@PathVariable Long aiRequestId) {
+        return ApiResponse.ok(previews.preview(aiRequestId));
+    }
+
+    @GetMapping("/{aiRequestId}/files/{fileId}/content")
+    public org.springframework.http.ResponseEntity<org.springframework.core.io.Resource> previewFile(
+            @PathVariable Long aiRequestId, @PathVariable Long fileId) {
+        previews.assertPreviewFile(aiRequestId, fileId);
+        var file = files.requireActive(fileId);
+        org.springframework.http.MediaType type = org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
+        if (file.getMimeType() != null) {
+            try { type = org.springframework.http.MediaType.parseMediaType(file.getMimeType()); }
+            catch (IllegalArgumentException ignored) { }
+        }
+        return org.springframework.http.ResponseEntity.ok().header("Cache-Control", "private, no-store")
+                .contentType(type).body(files.getContent(fileId));
+    }
     @PostMapping("/{aiRequestId}/review")
     public ApiResponse<AdminAiLogResponse> review(@PathVariable Long aiRequestId,
             @org.springframework.security.core.annotation.AuthenticationPrincipal me._hanho.ultary.security.principal.AdminPrincipal principal,

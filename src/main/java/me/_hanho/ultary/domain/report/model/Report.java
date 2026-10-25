@@ -12,6 +12,7 @@ public class Report {
 
 	private Long reportId;
 	private Long reporterUserNo;
+	private String reporterNickname;
 	/** USER | FEED | COMMENT | REPLY */
 	private String targetType;
 	private Long targetUserNo;

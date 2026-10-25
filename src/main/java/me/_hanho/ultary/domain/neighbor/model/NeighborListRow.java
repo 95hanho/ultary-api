@@ -14,4 +14,5 @@ public class NeighborListRow {
 	private Integer profileFileId;
 	private String status;
 	private String listType;
+	private boolean mutual;
 }

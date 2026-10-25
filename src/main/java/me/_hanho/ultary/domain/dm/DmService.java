@@ -394,9 +394,10 @@ public class DmService {
 			collectFileIds(row, fileIds);
 		}
 		var files = fileService.findSummaries(fileIds);
+		var authorStories = new java.util.HashMap<Long, SharedAuthorStory>();
 		List<DmMessageResponse> items = new ArrayList<>();
 		for (DmMessageRow row : rows) {
-			items.add(toMessage(row, me, files));
+			items.add(toMessage(row, me, files, authorStories));
 		}
 		return items;
 	}
@@ -404,22 +405,25 @@ public class DmService {
 	private DmMessageResponse toMessage(DmMessageRow row, Long me) {
 		Set<Long> fileIds = new HashSet<>();
 		collectFileIds(row, fileIds);
-		return toMessage(row, me, fileService.findSummaries(fileIds));
+		return toMessage(row, me, fileService.findSummaries(fileIds), new java.util.HashMap<>());
 	}
 
 	private DmMessageResponse toMessage(
-			DmMessageRow row, Long me, java.util.Map<Long, FileSummaryResponse> files) {
+			DmMessageRow row, Long me, java.util.Map<Long, FileSummaryResponse> files,
+			java.util.Map<Long, SharedAuthorStory> authorStories) {
 		return DmMessageResponse.builder()
 				.dmMessageId(row.getDmMessageId())
 				.senderUserNo(row.getSenderUserNo())
 				.fromMe(me.equals(row.getSenderUserNo()))
 				.body(StringUtils.hasText(row.getBody()) ? row.getBody().trim() : null)
 				.createdAt(row.getCreatedAt())
-				.share(toShare(row, files))
+				.share(toShare(row, me, files, authorStories))
 				.build();
 	}
 
-	private DmShareResponse toShare(DmMessageRow row, java.util.Map<Long, FileSummaryResponse> files) {
+	private DmShareResponse toShare(DmMessageRow row, Long me,
+			java.util.Map<Long, FileSummaryResponse> files,
+			java.util.Map<Long, SharedAuthorStory> authorStories) {
 		if ("FEED".equals(row.getShareType())) {
 			boolean available = row.getFeedDeleted() != null
 					&& row.getFeedDeleted() == 0
@@ -427,6 +431,7 @@ public class DmService {
 			Long fileId = available
 					? displayFileId(row.getMediaType(), row.getMediaFileId(), row.getMediaThumbnailFileId())
 					: null;
+			SharedAuthorStory authorStory = sharedAuthorStory(available ? row.getAuthorUserNo() : null, me, authorStories);
 			return DmShareResponse.builder()
 					.type("FEED")
 					.available(available)
@@ -435,6 +440,8 @@ public class DmService {
 					.mediaIndex(available ? row.getMediaIndex() : null)
 					.authorUserNo(available ? row.getAuthorUserNo() : null)
 					.authorNickname(available ? row.getAuthorNickname() : null)
+					.authorHasStory(authorStory.hasStory())
+					.authorHasUnviewed(authorStory.hasUnviewed())
 					.authorProfileFile(available && row.getAuthorProfileFileId() != null
 							? files.get(row.getAuthorProfileFileId())
 							: null)
@@ -449,14 +456,32 @@ public class DmService {
 			Long fileId = available
 					? displayFileId(row.getStoryMediaType(), row.getStoryFileId(), row.getStoryThumbnailFileId())
 					: null;
+			SharedAuthorStory authorStory = sharedAuthorStory(available ? row.getAuthorUserNo() : null, me, authorStories);
 			return DmShareResponse.builder()
 					.type("STORY")
 					.available(available)
 					.storyId(row.getStoryId())
+					.authorUserNo(available ? row.getAuthorUserNo() : null)
+					.authorNickname(available ? row.getAuthorNickname() : null)
+					.authorProfileFile(available && row.getAuthorProfileFileId() != null
+							? files.get(row.getAuthorProfileFileId()) : null)
+					.authorHasStory(authorStory.hasStory())
+					.authorHasUnviewed(authorStory.hasUnviewed())
 					.file(fileId == null ? null : files.get(fileId))
 					.build();
 		}
 		return null;
+	}
+
+	private record SharedAuthorStory(boolean hasStory, boolean hasUnviewed) {}
+
+	private SharedAuthorStory sharedAuthorStory(Long owner, Long viewer,
+			java.util.Map<Long, SharedAuthorStory> cache) {
+		if (owner == null) return new SharedAuthorStory(false, false);
+		return cache.computeIfAbsent(owner, userNo -> {
+			boolean visible = storyService.hasVisibleStory(viewer, userNo);
+			return new SharedAuthorStory(visible, visible && storyService.hasUnviewedStory(userNo, viewer));
+		});
 	}
 
 	private void collectFileIds(DmMessageRow row, Set<Long> fileIds) {
@@ -464,6 +489,7 @@ public class DmService {
 			add(fileIds, row.getAuthorProfileFileId());
 			add(fileIds, displayFileId(row.getMediaType(), row.getMediaFileId(), row.getMediaThumbnailFileId()));
 		} else if ("STORY".equals(row.getShareType())) {
+			add(fileIds, row.getAuthorProfileFileId());
 			add(fileIds, displayFileId(row.getStoryMediaType(), row.getStoryFileId(), row.getStoryThumbnailFileId()));
 		}
 	}

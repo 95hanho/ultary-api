@@ -595,6 +595,21 @@
 		  AND <include refid="notBlocked"><property name="ownerExpr" value="t.receiver_user_no"/><property name="actorExpr" value="r.user_no"/></include>
 	</select>
 
+	<!-- 알림 자체에는 콘텐츠 FK를 저장하지 않아 숨김 후에도 남긴다. 이동 정보는 작업에서 조회한다. -->
+	<sql id="moderationTargetColumns">
+		CASE WHEN n.type='AI_MODERATION' THEN mj.feed_id ELSE n.feed_id END AS feed_id,
+		CASE WHEN n.type='AI_MODERATION' THEN CASE
+			WHEN mj.target_type='COMMENT' THEN mj.target_id
+			WHEN mj.target_type='REPLY' THEN mr.feed_comment_id END ELSE n.feed_comment_id END AS feed_comment_id,
+		CASE WHEN n.type='AI_MODERATION' THEN CASE WHEN mj.target_type='REPLY' THEN mj.target_id END ELSE n.feed_reply_id END AS feed_reply_id
+	</sql>
+	<sql id="moderationTargetJoins">
+		LEFT JOIN ultary_ai_moderation_job mj ON n.type='AI_MODERATION'
+			AND mj.job_id=CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(n.group_key, ':', 2), ':', -1) AS UNSIGNED)
+			AND mj.user_no=n.receiver_user_no
+		LEFT JOIN ultary_feed_reply mr ON mj.target_type='REPLY' AND mr.feed_reply_id=mj.target_id
+	</sql>
+
 	<select id="findByReceiver" resultType="me._hanho.ultary.domain.notification.model.NotificationListRow">
 		SELECT
 			n.notification_id,
@@ -611,9 +626,7 @@
 				ELSE n.has_reply
 			END AS has_reply,
 			n.content,
-			n.feed_id,
-			n.feed_comment_id,
-			n.feed_reply_id,
+			<include refid="moderationTargetColumns"/>,
 			n.story_id,
 			n.neighbor_id,
 			nb.requester_user_no AS neighbor_requester_user_no,
@@ -626,6 +639,7 @@
 		INNER JOIN ultary_user u ON u.user_no = n.actor_user_no AND u.withdrawal_status = 'ACTIVE'
 		LEFT JOIN ultary_neighbor nb ON nb.neighbor_id = n.neighbor_id
 		LEFT JOIN ultary_notification_setting s ON s.user_no = n.receiver_user_no
+		<include refid="moderationTargetJoins"/>
 		WHERE <include refid="visibleNotification"/>
 		ORDER BY n.updated_at DESC, n.notification_id DESC
 		LIMIT #{limit}
@@ -654,9 +668,7 @@
 				ELSE n.has_reply
 			END AS has_reply,
 			n.content,
-			n.feed_id,
-			n.feed_comment_id,
-			n.feed_reply_id,
+			<include refid="moderationTargetColumns"/>,
 			n.story_id,
 			n.neighbor_id,
 			nb.requester_user_no AS neighbor_requester_user_no,
@@ -669,6 +681,7 @@
 		INNER JOIN ultary_user u ON u.user_no = n.actor_user_no AND u.withdrawal_status = 'ACTIVE'
 		LEFT JOIN ultary_neighbor nb ON nb.neighbor_id = n.neighbor_id
 		LEFT JOIN ultary_notification_setting s ON s.user_no = n.receiver_user_no
+		<include refid="moderationTargetJoins"/>
 		WHERE n.notification_id = #{notificationId}
 		  AND <include refid="visibleNotification"/>
 	</select>

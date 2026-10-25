@@ -19,6 +19,8 @@ class AdminAiReviewIntegrationTest {
     @Autowired ModerationTransactions transactions;
     @Autowired AiRequestLogMapper logs;
     @Autowired AdminAiLogService adminLogs;
+    @Autowired org.mybatis.spring.SqlSessionTemplate sqlSession;
+    @Autowired me._hanho.ultary.domain.notification.NotificationMapper notices;
     Long user, admin, feed, comment, reply;
     @BeforeEach void setup() {
         jdbc.update("INSERT INTO ultary_user(nickname) VALUES(?)", "manual_"+UUID.randomUUID().toString().substring(0,8)); user=id();
@@ -71,5 +73,131 @@ class AdminAiReviewIntegrationTest {
         assertThatThrownBy(()->adminLogs.review(log,admin,"DELETED")).isInstanceOf(me._hanho.ultary.common.exception.BusinessException.class);
         assertThat(jdbc.queryForObject("SELECT is_deleted FROM ultary_feed_comment WHERE feed_comment_id=?",Integer.class,comment)).isZero();
     }
+
+    @Test void enqueueRejectsMismatchedFeedOwnerOrSnapshotBeforeCreatingAJob() {
+        jdbc.update("INSERT INTO ultary_feed(user_no,content,visibility) VALUES(?,'other','PUBLIC')",user);
+        Long otherFeed=id();
+        assertThatThrownBy(()->queue.enqueue("COMMENT",comment,otherFeed,user,null,"current",true))
+            .hasMessageContaining("게시글 연결 정보");
+        assertThatThrownBy(()->queue.enqueue("REPLY",reply,otherFeed,user,null,"current",true))
+            .hasMessageContaining("게시글 연결 정보");
+        assertThatThrownBy(()->queue.enqueue("COMMENT",comment,feed,user+1,null,"current",true))
+            .hasMessageContaining("작성자 또는 본문");
+        assertThatThrownBy(()->queue.enqueue("COMMENT",comment,feed,user,null,"different",true))
+            .hasMessageContaining("작성자 또는 본문");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ultary_ai_moderation_job WHERE user_no=?",Integer.class,user)).isZero();
+    }
+
+    @Test void mismatchedRecordedFeedIsExplainedAndAlignedMetadataAllowsReview() {
+        Long log=error("COMMENT",comment);
+        Long job=adminLogs.detail(log).getModerationJobId();
+        jdbc.update("INSERT INTO ultary_feed(user_no,content,visibility,is_deleted) VALUES(?,'old','PUBLIC',1)",user);
+        Long oldFeed=id();
+        jdbc.update("UPDATE ultary_ai_moderation_job SET feed_id=? WHERE job_id=?",oldFeed,job);
+        jdbc.update("UPDATE ultary_ai_request_log SET target_feed_id=? WHERE moderation_job_id=?",oldFeed,job);
+        sqlSession.clearCache();
+        assertThatThrownBy(()->adminLogs.review(log,admin,"DELETED")).hasMessageContaining("게시글 연결 정보");
+        assertThat(jdbc.queryForObject("SELECT is_deleted FROM ultary_feed_comment WHERE feed_comment_id=?",Integer.class,comment)).isZero();
+        jdbc.update("UPDATE ultary_ai_moderation_job SET feed_id=? WHERE job_id=?",feed,job);
+        jdbc.update("UPDATE ultary_ai_request_log SET target_feed_id=? WHERE moderation_job_id=?",feed,job);
+        sqlSession.clearCache();
+        adminLogs.review(log,admin,"DELETED");
+        assertThat(jdbc.queryForObject("SELECT is_deleted FROM ultary_feed_comment WHERE feed_comment_id=?",Integer.class,comment)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT comment_count FROM ultary_feed WHERE feed_id=?",Integer.class,feed)).isZero();
+    }
+
+    @Test void deletedParentsAndDeletedTargetsHaveDistinctErrors() {
+        Long log=error("COMMENT",comment);
+        jdbc.update("UPDATE ultary_feed SET is_deleted=1 WHERE feed_id=?",feed);
+        sqlSession.clearCache();
+        assertThatThrownBy(()->adminLogs.review(log,admin,"DELETED")).hasMessageContaining("부모 게시글");
+        jdbc.update("UPDATE ultary_feed SET is_deleted=0 WHERE feed_id=?",feed);
+        jdbc.update("UPDATE ultary_feed_comment SET is_deleted=1 WHERE feed_comment_id=?",comment);
+        sqlSession.clearCache();
+        assertThatThrownBy(()->adminLogs.review(log,admin,"DELETED")).hasMessageContaining("콘텐츠가 없거나 삭제");
+    }
+
+    @Test void deletedParentCommentPreventsReplyReviewWithASpecificError() {
+        Long log=error("REPLY",reply);
+        jdbc.update("UPDATE ultary_feed_comment SET is_deleted=1 WHERE feed_comment_id=?",comment);
+        sqlSession.clearCache();
+        assertThatThrownBy(()->adminLogs.review(log,admin,"DELETED")).hasMessageContaining("부모 댓글");
+        assertThat(jdbc.queryForObject("SELECT is_deleted FROM ultary_feed_reply WHERE feed_reply_id=?",Integer.class,reply)).isZero();
+    }
+
+    @Test void deletionCanBeReversedToKeptOrPendingForEveryTargetWithoutDoubleCounting() {
+        String[] kinds={"FEED","COMMENT","REPLY"};
+        Long[] targets={feed,comment,reply};
+        String[] tables={"ultary_feed","ultary_feed_comment","ultary_feed_reply"};
+        String[] keys={"feed_id","feed_comment_id","feed_reply_id"};
+        for (int i=0; i<kinds.length; i++) {
+            Long log=error(kinds[i],targets[i]);
+            for (String restoredStatus : new String[]{"KEPT","PENDING"}) {
+                adminLogs.review(log,admin,"DELETED");
+                assertThat(jdbc.queryForObject("SELECT is_deleted FROM " + tables[i] + " WHERE " + keys[i] + "=?",Integer.class,targets[i])).isEqualTo(1);
+                adminLogs.review(log,admin,restoredStatus);
+                adminLogs.review(log,admin,restoredStatus);
+                assertThat(jdbc.queryForObject("SELECT is_deleted FROM " + tables[i] + " WHERE " + keys[i] + "=?",Integer.class,targets[i])).isZero();
+                assertThat(jdbc.queryForObject("SELECT comment_count FROM ultary_feed WHERE feed_id=?",Integer.class,feed)).isEqualTo(1);
+                assertThat(adminLogs.detail(log).getAdminReviewStatus()).isEqualTo(restoredStatus);
+                assertThat(adminLogs.detail(log).getJobStatus()).isEqualTo("SKIPPED");
+            }
+        }
+    }
+
+    @Test void reversingADeletionStillChecksContentVersionAndDeletedParents() {
+        Long log=error("COMMENT",comment);
+        adminLogs.review(log,admin,"DELETED");
+        jdbc.update("UPDATE ultary_ai_moderation_state SET latest_version=latest_version+1 WHERE target_type='COMMENT' AND target_id=?",comment);
+        sqlSession.clearCache();
+        assertThatThrownBy(()->adminLogs.review(log,admin,"KEPT")).hasMessageContaining("검사 이후 콘텐츠");
+        assertThat(jdbc.queryForObject("SELECT is_deleted FROM ultary_feed_comment WHERE feed_comment_id=?",Integer.class,comment)).isEqualTo(1);
+        jdbc.update("UPDATE ultary_ai_moderation_state SET latest_version=latest_version-1 WHERE target_type='COMMENT' AND target_id=?",comment);
+        jdbc.update("UPDATE ultary_feed SET is_deleted=1 WHERE feed_id=?",feed);
+        sqlSession.clearCache();
+        assertThatThrownBy(()->adminLogs.review(log,admin,"PENDING")).hasMessageContaining("부모 게시글");
+        assertThat(adminLogs.detail(log).getAdminReviewStatus()).isEqualTo("DELETED");
+    }
+
+    @Test void anActiveReportDeletionPreventsAccidentalRestoration() {
+        Long log=error("COMMENT",comment);
+        adminLogs.review(log,admin,"DELETED");
+        jdbc.update("INSERT INTO ultary_report(reporter_user_no,target_type,target_comment_id,reason,status) VALUES(?,'COMMENT',?,'ABUSE','DELETED')",user,comment);
+        Long report=id();
+        sqlSession.clearCache();
+        assertThatThrownBy(()->adminLogs.review(log,admin,"KEPT")).hasMessageContaining("신고에서 삭제조치");
+        assertThat(jdbc.queryForObject("SELECT is_deleted FROM ultary_feed_comment WHERE feed_comment_id=?",Integer.class,comment)).isEqualTo(1);
+        jdbc.update("UPDATE ultary_report SET status='REJECTED' WHERE report_id=?",report);
+        sqlSession.clearCache();
+        adminLogs.review(log,admin,"KEPT");
+        assertThat(jdbc.queryForObject("SELECT is_deleted FROM ultary_feed_comment WHERE feed_comment_id=?",Integer.class,comment)).isZero();
+    }
+
+    @Test void everyAdminChangeCreatesAPersistentNoticeWithTheCorrectTargetEvenWhenHidden() {
+        String[] kinds={"FEED","COMMENT","REPLY"};
+        Long[] targets={feed,comment,reply};
+        String[] nouns={"게시글","댓글","답글"};
+        for (int i=0; i<kinds.length; i++) {
+            String noun=nouns[i];
+            Long log=error(kinds[i],targets[i]);
+            Long job=adminLogs.detail(log).getModerationJobId();
+            String group="AI_MODERATION:"+job+":%";
+            adminLogs.review(log,admin,"DELETED");
+            var hiddenNotice=notices.findByReceiver(user,50).stream()
+                    .filter(row->row.getContent().equals("관리자 확인 후 "+noun+"이 숨김 처리되었습니다."))
+                    .findFirst().orElseThrow();
+            assertThat(hiddenNotice.getFeedId()).isEqualTo(feed);
+            assertThat(hiddenNotice.getFeedCommentId()).isEqualTo(i==0 ? null : comment);
+            assertThat(hiddenNotice.getFeedReplyId()).isEqualTo(i==2 ? reply : null);
+            assertThat(notices.findByIdAndReceiver(hiddenNotice.getNotificationId(),user).getFeedId()).isEqualTo(feed);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ultary_notification WHERE receiver_user_no=? AND group_key LIKE ? AND feed_id IS NULL AND feed_comment_id IS NULL AND feed_reply_id IS NULL",Integer.class,user,group)).isEqualTo(1);
+            adminLogs.review(log,admin,"KEPT");
+            adminLogs.review(log,admin,"PENDING");
+            adminLogs.review(log,admin,"PENDING");
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ultary_notification WHERE receiver_user_no=? AND group_key LIKE ?",Integer.class,user,group)).isEqualTo(3);
+            assertThat(notices.findByReceiver(user,50).stream().anyMatch(row->row.getContent().contains(noun+"의 삭제조치가 취소되어 복구"))).isTrue();
+        }
+    }
+
     Long id(){return jdbc.queryForObject("SELECT LAST_INSERT_ID()",Long.class);}
 }

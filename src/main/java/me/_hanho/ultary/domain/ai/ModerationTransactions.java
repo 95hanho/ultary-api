@@ -11,6 +11,8 @@ import me._hanho.ultary.domain.feed.FeedMapper;
 import me._hanho.ultary.domain.feed.FeedService;
 import me._hanho.ultary.domain.notification.NotificationService;
 import me._hanho.ultary.domain.ws.RealtimePush;
+import me._hanho.ultary.common.exception.BusinessException;
+import me._hanho.ultary.common.exception.ErrorCode;
 
 @Slf4j
 @Service
@@ -93,7 +95,7 @@ public class ModerationTransactions {
                 ? noun + " 수정 내용이 부적절한 표현으로 판정되어 이전 내용으로 복구되었습니다."
                 : noun + "에 부적절한 표현이 확인되어 숨김 처리되었습니다.";
         notifications.notifyModeration(job.getUserNo(), job.getJobId(), message);
-        realtime.pushModeration(job, action, message);
+        realtime.pushModeration(job, action);
         log.info("[AI moderation] applied jobId={} target={}:{} version={} action={}",
                 job.getJobId(), job.getTargetType(), job.getTargetId(), job.getContentVersion(), action);
     }
@@ -111,15 +113,36 @@ public class ModerationTransactions {
         var state = mapper.lockState(snapshot.getTargetType(), snapshot.getTargetId());
         var job = mapper.lockJob(jobId);
         if (decision.equals(job.getAdminReviewStatus())) return;
-        if (feed == null || feed.isDeleted() || target == null || target.isDeleted() || state == null
-                || !Objects.equals(target.getUserNo(), job.getUserNo()) || !Objects.equals(target.getFeedId(), job.getFeedId())
+        boolean undoDelete = "DELETED".equals(job.getAdminReviewStatus()) && "HIDDEN".equals(job.getResultAction());
+        if (target == null || (target.isDeleted() && !undoDelete)) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "검사 대상 콘텐츠가 없거나 삭제되었습니다.");
+        }
+        if (!Objects.equals(target.getFeedId(), job.getFeedId())) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "검사 기록과 현재 콘텐츠의 게시글 연결 정보가 일치하지 않습니다. 연결 정보를 확인해 주세요.");
+        }
+        if (feed == null || (feed.isDeleted() && !("FEED".equals(job.getTargetType()) && undoDelete))) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "검사 대상의 부모 게시글이 없거나 삭제되어 처리할 수 없습니다.");
+        }
+        if (state == null || !Objects.equals(target.getUserNo(), job.getUserNo())
                 || !Objects.equals(state.getLatestVersion(), job.getContentVersion()) || !Objects.equals(target.getContent(), job.getContent())) {
-            throw new me._hanho.ultary.common.exception.BusinessException(me._hanho.ultary.common.exception.ErrorCode.INVALID_INPUT,
-                    "이미 수정되거나 삭제된 콘텐츠입니다. 최신 오류 기록을 확인해 주세요.");
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "검사 이후 콘텐츠가 수정되었거나 검사 정보가 일치하지 않습니다. 최신 오류 기록을 확인해 주세요.");
         }
         if ("REPLY".equals(job.getTargetType())) {
             var parent = mapper.lockTarget("COMMENT", target.getParentCommentId());
-            if (parent == null || parent.isDeleted()) throw new me._hanho.ultary.common.exception.BusinessException(me._hanho.ultary.common.exception.ErrorCode.NOT_FOUND);
+            if (parent == null || parent.isDeleted()) throw new BusinessException(ErrorCode.INVALID_INPUT, "답글의 부모 댓글이 없거나 삭제되어 처리할 수 없습니다.");
+        }
+        if (undoDelete && target.isDeleted()) {
+            if (mapper.countOtherDeletedJobs(job.getTargetType(), job.getTargetId(), jobId) > 0
+                    || mapper.countDeletedReports(job.getTargetType(), job.getTargetId()) > 0) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT, "다른 오류 기록이나 신고에서 삭제조치 중인 콘텐츠입니다. 해당 조치를 먼저 변경해 주세요.");
+            }
+            switch (job.getTargetType()) {
+                case "FEED" -> feedService.restoreByAdmin(job.getTargetId());
+                case "COMMENT" -> feedService.restoreCommentByAdmin(job.getTargetId(), job.getFeedId());
+                case "REPLY" -> feedService.restoreReplyByAdmin(job.getTargetId(), job.getFeedId());
+                default -> throw new IllegalStateException("Unknown moderation target");
+            }
+            realtime.pushModeration(job, "RESTORED");
         }
         if ("DELETED".equals(decision)) {
             mapper.hide(job.getTargetType(), job.getTargetId());
@@ -130,11 +153,22 @@ public class ModerationTransactions {
                 default -> throw new IllegalStateException("Unknown moderation target");
             }
             if (!"FEED".equals(job.getTargetType())) notifications.syncFeedThread(job.getFeedId(), false);
-            realtime.pushModeration(job, "HIDDEN", "관리자 확인 후 숨김 처리되었습니다.");
+            realtime.pushModeration(job, "HIDDEN");
         } else if ("KEPT".equals(decision)) {
             state.setApprovedVersion(job.getContentVersion()); state.setApprovedContent(job.getContent()); state.setHasApproved(true);
             mapper.saveState(state);
         }
         mapper.reviewJob(jobId, decision, adminNo);
+        String noun = switch (job.getTargetType()) { case "FEED" -> "게시글"; case "COMMENT" -> "댓글"; default -> "답글"; };
+        String message = switch (decision) {
+            case "DELETED" -> "관리자 확인 후 " + noun + "이 숨김 처리되었습니다.";
+            case "KEPT" -> undoDelete
+                    ? "관리자 확인 후 " + noun + "의 삭제조치가 취소되어 복구되었습니다."
+                    : "관리자 확인 결과 " + noun + "이 유지되었습니다.";
+            default -> undoDelete
+                    ? noun + "의 삭제조치가 취소되어 복구되었으며, 관리자 확인 대기 상태로 변경되었습니다."
+                    : noun + "이 관리자 확인 대기 상태로 변경되었습니다.";
+        };
+        notifications.notifyModerationReview(job.getUserNo(), jobId, message);
     }
 }

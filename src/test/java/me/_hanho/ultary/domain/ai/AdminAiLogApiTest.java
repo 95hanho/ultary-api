@@ -121,10 +121,86 @@ class AdminAiLogApiTest {
         Long job = jdbc.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
         jdbc.update("UPDATE ultary_ai_request_log SET moderation_job_id=?,content_version=1 WHERE ai_request_id IN (?,?)", job, first, second);
         mvc.perform(get(path).header("Authorization", "Bearer " + adminToken).param("moderationJobId", job.toString()))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.data.items.length()").value(2))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.items.length()").value(1))
+                .andExpect(jsonPath("$.data.totalCount").value(1))
+                .andExpect(jsonPath("$.data.items[0].attemptCount").value(2))
                 .andExpect(jsonPath("$.data.items[0].status").value("FAILED"))
                 .andExpect(jsonPath("$.data.items[0].jobStatus").value("REJECTED"))
                 .andExpect(jsonPath("$.data.items[0].jobAttemptCount").value(2))
                 .andExpect(jsonPath("$.data.items[0].resultAction").value("RESTORED"));
+        mvc.perform(get(path + "/" + first).header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.attempts.length()").value(2))
+                .andExpect(jsonPath("$.data.attempts[0].aiRequestId").value(first))
+                .andExpect(jsonPath("$.data.attempts[1].aiRequestId").value(second));
+    }
+
+    @Test void groupedPaginationContactFiltersAndSuccessfulRetryHistory() throws Exception {
+        String email = "ailog-" + UUID.randomUUID().toString().substring(0, 12) + "@example.com";
+        String phone = "019" + String.format("%08d", user % 100000000);
+        jdbc.update("UPDATE ultary_user SET phone=?,email=? WHERE user_no=?", phone, email, user);
+        jdbc.update("INSERT INTO ultary_ai_moderation_job(target_type,target_id,feed_id,user_no,content_version,operation,status,attempt_count) VALUES('COMMENT',120,120,?,1,'UPDATE','APPROVED',3)", user);
+        Long job = jdbc.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+        jdbc.update("UPDATE ultary_ai_request_log SET moderation_job_id=?,content_version=1 WHERE ai_request_id IN (?,?,?)", job, first, second, success);
+        Long standalone = insert("FAILED", "GEMINI_TIMEOUT");
+        String response = mvc.perform(get(path).header("Authorization", "Bearer " + adminToken)
+                .param("phone", phone.substring(0,3) + "-" + phone.substring(3)).param("email", email).param("limit", "1"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalCount").value(2))
+                .andExpect(jsonPath("$.data.items[0].aiRequestId").value(second))
+                .andExpect(jsonPath("$.data.items[0].attemptCount").value(3))
+                .andReturn().getResponse().getContentAsString();
+        long cursor = json.readTree(response).path("data").path("nextCursorAiRequestId").asLong();
+        mvc.perform(get(path).header("Authorization", "Bearer " + adminToken).param("email", email)
+                .param("cursorAiRequestId", String.valueOf(cursor)).param("limit", "1").param("targetType", "COMMENT"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalCount").value(2))
+                .andExpect(jsonPath("$.data.items[0].aiRequestId").value(standalone))
+                .andExpect(jsonPath("$.data.nextCursorAiRequestId").isEmpty());
+        mvc.perform(get(path + "/" + first).header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.userEmail").value(email))
+                .andExpect(jsonPath("$.data.attempts.length()").value(3))
+                .andExpect(jsonPath("$.data.attempts[2].status").value("SUCCESS"));
+        mvc.perform(get(path).header("Authorization", "Bearer " + adminToken).param("email", email).param("targetType", "FEED"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalCount").value(0));
+        mvc.perform(get(path).header("Authorization", "Bearer " + adminToken).param("email", "missing-" + email))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalCount").value(0));
+        jdbc.update("UPDATE ultary_ai_request_log SET feature_type='HASHTAG',target_type=NULL WHERE ai_request_id=?", standalone);
+        sqlSession.clearCache();
+        mvc.perform(get(path).header("Authorization", "Bearer " + adminToken).param("email", email).param("targetType", "HASHTAG"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalCount").value(1))
+                .andExpect(jsonPath("$.data.items[0].aiRequestId").value(standalone));
+    }
+
+    @Test void pendingReviewJobsComeBeforeNewerNonActionableLogsAcrossEveryPage() throws Exception {
+        Long secondJob = null;
+        for (Long request : java.util.List.of(first, second)) {
+            jdbc.update("INSERT INTO ultary_ai_moderation_job(target_type,target_id,feed_id,user_no,content_version,operation,status,attempt_count) VALUES('COMMENT',120,120,?,?,'UPDATE','FAILED',1)", user, request);
+            Long job = jdbc.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+            jdbc.update("UPDATE ultary_ai_request_log SET moderation_job_id=?,content_version=? WHERE ai_request_id=?", job, request, request);
+            if (request.equals(second)) secondJob = job;
+        }
+        Long reviewed = insert("FAILED", "GEMINI_TIMEOUT");
+        jdbc.update("INSERT INTO ultary_ai_moderation_job(target_type,target_id,feed_id,user_no,content_version,operation,status,attempt_count,admin_review_status) VALUES('COMMENT',120,120,?,?,'UPDATE','SKIPPED',1,'KEPT')", user, reviewed);
+        Long reviewedJob = jdbc.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+        jdbc.update("UPDATE ultary_ai_request_log SET moderation_job_id=?,content_version=? WHERE ai_request_id=?", reviewedJob, reviewed, reviewed);
+        Long noTarget = insert("FAILED", "GEMINI_TIMEOUT");
+        sqlSession.clearCache();
+        var ids = new java.util.ArrayList<Long>();
+        String cursor = null;
+        for (int page=0; page<4; page++) {
+            var request = get(path).header("Authorization", "Bearer " + adminToken).param("userNo", user.toString()).param("limit", "1");
+            if (cursor != null) request.param("cursorAiRequestId", cursor);
+            String response = mvc.perform(request).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.totalCount").value(4)).andExpect(jsonPath("$.data.items.length()").value(1))
+                    .andReturn().getResponse().getContentAsString();
+            var data = json.readTree(response).path("data");
+            ids.add(data.path("items").get(0).path("aiRequestId").asLong());
+            cursor = data.path("nextCursorAiRequestId").isNull() ? null : data.path("nextCursorAiRequestId").asText();
+        }
+        assertThat(ids).containsExactly(second, first, noTarget, reviewed);
+        assertThat(cursor).isNull();
+        jdbc.update("UPDATE ultary_ai_moderation_job SET admin_review_status='KEPT' WHERE job_id=?", secondJob);
+        sqlSession.clearCache();
+        mvc.perform(get(path).header("Authorization", "Bearer " + adminToken).param("userNo", user.toString()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.items[0].aiRequestId").value(first))
+                .andExpect(jsonPath("$.data.items[1].aiRequestId").value(noTarget));
     }
 }

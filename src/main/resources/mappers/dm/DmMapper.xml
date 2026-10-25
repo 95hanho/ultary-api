@@ -248,12 +248,12 @@
 		msg.created_at AS createdAt,
 		f.content AS feedContent,
 		f.is_deleted AS feedDeleted,
-		f.user_no AS authorUserNo,
+		COALESCE(f.user_no, s.user_no) AS authorUserNo,
 		au.nickname AS authorNickname,
 		(
 			SELECT rp.profile_file_id
 			FROM ultary_pet rp
-			WHERE rp.user_no = f.user_no
+			WHERE rp.user_no = COALESCE(f.user_no, s.user_no)
 			  AND rp.is_deleted = 0
 			  AND rp.profile_file_id IS NOT NULL
 			ORDER BY rp.priority ASC, rp.pet_id ASC
@@ -272,9 +272,9 @@
 	<sql id="messageFrom">
 		FROM ultary_dm_message msg
 		LEFT JOIN ultary_feed f ON f.feed_id = msg.feed_id
-		LEFT JOIN ultary_user au ON au.user_no = f.user_no
 		LEFT JOIN ultary_feed_media fm ON fm.feed_media_id = msg.feed_media_id
 		LEFT JOIN ultary_story s ON s.story_id = msg.story_id
+		LEFT JOIN ultary_user au ON au.user_no = COALESCE(f.user_no, s.user_no)
 	</sql>
 
 	<select id="findMessages" resultType="me._hanho.ultary.domain.dm.model.DmMessageRow">

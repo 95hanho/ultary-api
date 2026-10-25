@@ -22,6 +22,8 @@ import me._hanho.ultary.security.bff.BffSecurityProperties;
 @Transactional
 class AdminReportPreviewIntegrationTest {
     @Autowired AdminService admin;
+    @Autowired AdminAiLogPreviewService aiPreviews;
+    @Autowired me._hanho.ultary.domain.ai.AiRequestLogMapper aiLogs;
     @Autowired JdbcTemplate jdbc;
     @Autowired MockMvc mvc;
     @Autowired JwtTokenProvider jwt;
@@ -76,6 +78,57 @@ class AdminReportPreviewIntegrationTest {
         assertThatCode(() -> admin.assertReportPreviewFile(report, file)).doesNotThrowAnyException();
         assertThatThrownBy(() -> admin.assertReportPreviewFile(report, Long.MAX_VALUE)).isInstanceOfSatisfying(BusinessException.class,
             error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.FILE_NOT_FOUND));
+    }
+
+    @Test void aiPreviewResolvesEachTargetAndRetainsDeletedContentWithoutCreatingReports() {
+        Long feedLog = aiLog("FEED", feed), commentLog = aiLog("COMMENT", comment), replyLog = aiLog("REPLY", reply);
+        assertThat(aiPreviews.preview(feedLog).feed().getFeedId()).isEqualTo(feed);
+        assertThat(aiPreviews.preview(commentLog).comments().get(0).getFeedCommentId()).isEqualTo(comment);
+        jdbc.update("UPDATE ultary_feed SET is_deleted=1 WHERE feed_id=?", feed);
+        jdbc.update("UPDATE ultary_feed_comment SET is_deleted=1 WHERE feed_comment_id=?", comment);
+        jdbc.update("UPDATE ultary_feed_reply SET is_deleted=1 WHERE feed_reply_id=?", reply);
+        jdbc.update("UPDATE ultary_user SET withdrawal_status='SUSPENDED' WHERE user_no=?", author);
+        var preview = aiPreviews.preview(replyLog);
+        assertThat(preview.feed().getContent()).isEqualTo("private original");
+        assertThat(preview.comments().get(0).getReplies().get(0).getContent()).isEqualTo("reply original");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ultary_report WHERE reporter_user_no=?", Integer.class, reporter)).isZero();
+    }
+
+    @Test void aiPreviewAndItsFilesRequireAnAdminToken() throws Exception {
+        Long log = aiLog("REPLY", reply);
+        String url = "/api/v1/admin/ai/logs/" + log + "/preview";
+        mvc.perform(get(url).secure(true).header("X-BFF-Key", bff.getSharedKey())).andExpect(status().isUnauthorized());
+        mvc.perform(get(url).secure(true).header("X-BFF-Key", bff.getSharedKey()).header("Authorization", "Bearer " + jwt.createUserAccessToken(reporter)))
+            .andExpect(status().isUnauthorized());
+        Long adminNo = jdbc.queryForObject("SELECT MIN(admin_no) FROM ultary_admin WHERE status='ACTIVE'", Long.class);
+        mvc.perform(get(url).secure(true).header("X-BFF-Key", bff.getSharedKey()).header("Authorization", "Bearer " + jwt.createAdminAccessToken(adminNo)))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.feed.feedId").value(feed))
+            .andExpect(jsonPath("$.data.comments[0].replies[0].content").value("reply original"));
+        mvc.perform(get("/api/v1/admin/ai/logs/" + log + "/files/1/content").secure(true).header("X-BFF-Key", bff.getSharedKey()))
+            .andExpect(status().isUnauthorized());
+        assertThat(aiLogs.findForAdmin(log).getStatus()).isEqualTo("FAILED");
+    }
+
+    @Test void aiPreviewCannotExposeUnrelatedFilesOrTargetsAbsentFromTheLog() {
+        Long log = aiLog("FEED", feed);
+        jdbc.update("INSERT INTO ultary_file(store_name,file_path,mime_type,extension,source_type,uploaded_by_user_no) VALUES('ai-preview.jpg','images/ai-preview.jpg','image/jpeg','jpg','OWNED',?)", author);
+        Long file = id();
+        jdbc.update("INSERT INTO ultary_feed_media(feed_id,file_id,media_type,sort_order) VALUES(?,?,'IMAGE',0)", feed, file);
+        assertThatCode(() -> aiPreviews.assertPreviewFile(log, file)).doesNotThrowAnyException();
+        assertThatThrownBy(() -> aiPreviews.assertPreviewFile(log, Long.MAX_VALUE)).isInstanceOfSatisfying(BusinessException.class,
+            error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.FILE_NOT_FOUND));
+        assertThatThrownBy(() -> aiPreviews.preview(Long.MAX_VALUE)).isInstanceOf(BusinessException.class);
+        Long unsaved = aiLog("COMMENT", null), missing = aiLog("REPLY", (long) Integer.MAX_VALUE);
+        assertThatThrownBy(() -> aiPreviews.preview(unsaved)).isInstanceOf(BusinessException.class);
+        assertThatThrownBy(() -> aiPreviews.preview(missing)).isInstanceOf(BusinessException.class);
+    }
+
+    Long aiLog(String type, Long target) {
+        var row = new me._hanho.ultary.domain.ai.model.AiRequestLog();
+        row.setUserNo(author); row.setFeatureType("FEED".equals(type) ? "FEED_CAPTION" : "COMMENT_FILTER");
+        row.setStatus("FAILED"); row.setTargetType(type); row.setTargetId(target); row.setErrorCode("GEMINI_TIMEOUT");
+        aiLogs.insert(row);
+        return row.getAiRequestId();
     }
     Long report(String type) {
         jdbc.update("INSERT INTO ultary_report(reporter_user_no,target_type,target_feed_id,target_comment_id,target_reply_id,reason) VALUES(?,?,?,?,?,'ABUSE')",

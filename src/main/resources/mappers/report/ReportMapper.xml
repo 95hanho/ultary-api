@@ -69,6 +69,7 @@
 
 	<sql id="adminReportFrom">
 		FROM ultary_report r
+		LEFT JOIN ultary_user reporter ON reporter.user_no = r.reporter_user_no
 		LEFT JOIN ultary_user u
 			ON r.target_type = 'USER' AND u.user_no = r.target_user_no
 		LEFT JOIN ultary_feed f
@@ -88,6 +89,7 @@
 	<sql id="adminReportColumns">
 			r.report_id,
 			r.reporter_user_no,
+			reporter.nickname AS reporter_nickname,
 			r.target_type,
 			CASE r.target_type
 				WHEN 'USER' THEN r.target_user_no

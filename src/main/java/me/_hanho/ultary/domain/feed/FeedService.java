@@ -121,6 +121,16 @@ public class FeedService {
 	@Transactional(readOnly = true)
 	public FeedResponse getReportedFeed(Long reportId) {
 		Feed feed = feedMapper.findReportedFeed(reportId);
+		return toAdminPreviewFeed(feed);
+	}
+
+	/** 관리자 AI 로그에 연결된 대상만 조회한다. 일반 회원 API에서는 사용하지 않는다. */
+	@Transactional(readOnly = true)
+	public FeedResponse getAiLogFeed(Long aiRequestId) {
+		return toAdminPreviewFeed(feedMapper.findAiLogFeed(aiRequestId));
+	}
+
+	private FeedResponse toAdminPreviewFeed(Feed feed) {
 		if (feed == null) throw new BusinessException(ErrorCode.FEED_NOT_FOUND);
 		User author = userMapper.findByUserNo(feed.getUserNo());
 		List<FeedMedia> media = feedMapper.findMediaByFeedId(feed.getFeedId());
@@ -138,6 +148,14 @@ public class FeedService {
 	public List<FeedCommentResponse> getReportedComments(Long reportId, Long feedId) {
 		return feedMapper.findReportComments(reportId, feedId).stream().map(comment -> {
 			List<FeedReply> replies = feedMapper.findReportReplies(reportId, comment.getFeedCommentId());
+			return toCommentResponse(comment, true, null, Set.of(), null, replies, Map.of(), Map.of());
+		}).toList();
+	}
+
+	@Transactional(readOnly = true)
+	public List<FeedCommentResponse> getAiLogComments(Long aiRequestId, Long feedId) {
+		return feedMapper.findAiLogComments(aiRequestId, feedId).stream().map(comment -> {
+			List<FeedReply> replies = feedMapper.findAiLogReplies(aiRequestId, comment.getFeedCommentId());
 			return toCommentResponse(comment, true, null, Set.of(), null, replies, Map.of(), Map.of());
 		}).toList();
 	}

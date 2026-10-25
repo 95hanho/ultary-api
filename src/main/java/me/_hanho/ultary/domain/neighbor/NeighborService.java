@@ -159,6 +159,7 @@ public class NeighborService {
 					.profileFile(profileId == null ? null : files.get(profileId))
 					.status(row.getStatus())
 					.listType(row.getListType())
+					.mutual(row.isMutual())
 					.hasStory(hasStory)
 					.hasUnviewed(hasStory && storyService.hasUnviewedStory(row.getUserNo(), me))
 					.petTags(petTags.getOrDefault(row.getUserNo(), List.of()))

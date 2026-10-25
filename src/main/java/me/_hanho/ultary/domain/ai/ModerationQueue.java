@@ -6,6 +6,8 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import me._hanho.ultary.domain.ai.model.*;
+import me._hanho.ultary.common.exception.BusinessException;
+import me._hanho.ultary.common.exception.ErrorCode;
 
 /** Only DB work here: the content write and enqueue always share one transaction. */
 @Service
@@ -35,6 +37,16 @@ public class ModerationQueue {
     }
 
     public void enqueue(String kind, Long id, Long feedId, Long userNo, String previous, String content, boolean created) {
+        ModerationTarget target = lock(kind, id, feedId);
+        if (target == null || target.isDeleted()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "검사 대상이 없거나 삭제되었습니다.");
+        }
+        if (!Objects.equals(target.getFeedId(), feedId)) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "검사 대상의 게시글 연결 정보가 일치하지 않습니다.");
+        }
+        if (!Objects.equals(target.getUserNo(), userNo) || !Objects.equals(target.getContent(), content)) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "검사 대상의 작성자 또는 본문이 일치하지 않습니다.");
+        }
         if (!created && Objects.equals(previous, content)) return;
         mapper.ensureState(kind, id, previous, !created);
         ModerationState state = mapper.lockState(kind, id);
