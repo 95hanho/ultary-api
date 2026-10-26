@@ -10,6 +10,18 @@ version = '0.0.1-SNAPSHOT'
 
 bootWar {
     archiveFileName = 'ROOT.war'
+    // Runtime/local configuration remains available to bootRun and tests only.
+    // Package environment-based production templates instead of workstation secrets.
+    classpath = classpath.filter { it != sourceSets.main.output.resourcesDir }
+    from(sourceSets.main.output.resourcesDir) {
+        into 'WEB-INF/classes'
+        exclude 'application*.yml', 'application*.yaml', 'application.properties', 'config-samples/**'
+    }
+    from('src/main/resources/config-samples') {
+        into 'WEB-INF/classes'
+        include 'application.yml', 'application-prod.yml'
+        filter { line -> line.replace('active: local', 'active: ${SPRING_PROFILES_ACTIVE:prod}') }
+    }
 }
 
 war {

@@ -12,7 +12,7 @@ spring:
     driver-class-name: org.mariadb.jdbc.Driver
 
     # 운영 DB URL
-    url: jdbc:mariadb://localhost:3306/DATABASE
+    url: ${DB_URL}
 
     # DB 계정 (공유 금지 - 복사 후 채움 / 환경변수 권장)
     username: ${DB_USERNAME}
@@ -26,7 +26,7 @@ spring:
   # ==============================
   servlet:
     multipart:
-      location: ${UPLOAD_DIR:/path/to/ultary}
+      location: ${UPLOAD_DIR}
 # BFF_INTERNAL_KEY는 FE .env.production과 동일한 값으로 설정한다.
 # BFF server authentication (private configuration)
 security:
@@ -39,3 +39,8 @@ security:
 server:
   # 임의의 Forwarded 헤더로 request.isSecure()가 바뀌지 않도록 한다.
   forward-headers-strategy: none
+
+# Browser WebSocket Origin must match the final FE domain.
+ultary:
+  ws:
+    allowed-origins: ${WS_ALLOWED_ORIGINS}

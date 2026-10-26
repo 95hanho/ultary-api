@@ -1,6 +1,7 @@
 package me._hanho.ultary.domain.feed;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.Mockito.*;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
@@ -23,8 +24,6 @@ class FeedEditIntegrationTest {
     @Autowired FeedMapper mapper;
     @Autowired JdbcTemplate jdbc;
     @Autowired jakarta.validation.Validator validator;
-    @Autowired me._hanho.ultary.domain.ai.ModerationMapper moderation;
-    @Autowired me._hanho.ultary.domain.ai.ModerationTransactions transactions;
     @Autowired me._hanho.ultary.domain.settings.PrivacyService privacy;
     @Autowired org.mybatis.spring.SqlSessionTemplate sqlSession;
     Long owner, other, feed, file, media, secondMedia, foreignMedia, oldPet, newPet, collaborator;
@@ -95,18 +94,30 @@ class FeedEditIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT use_count FROM ultary_tag WHERE tag_id=?",Integer.class,b)).isZero();
     }
 
-    @Test void rejectedCaptionRestoresItsHashtagLinksAlongWithTheApprovedText() {
+    @Test void rejectedCaptionPreservesItsHashtagLinksUntilSynchronousApproval() {
         Long a=tag(),b=tag();
         String oldText="#"+jdbc.queryForObject("SELECT hashtag FROM ultary_tag WHERE tag_id=?",String.class,a);
         String newText="#"+jdbc.queryForObject("SELECT hashtag FROM ultary_tag WHERE tag_id=?",String.class,b);
         jdbc.update("UPDATE ultary_feed SET content=? WHERE feed_id=?",oldText,feed);
         var initial=new UpdateFeedRequest();initial.setTagIds(List.of(a));feeds.update(principal,feed,initial);
-        var edit=new UpdateFeedRequest();edit.setContent(newText);edit.setTagIds(List.of(b));feeds.update(principal,feed,edit);
-        Long job=jdbc.queryForObject("SELECT job_id FROM ultary_ai_moderation_job WHERE target_type='FEED' AND target_id=?",Long.class,feed);
-        transactions.complete(transactions.claim(job),new me._hanho.ultary.domain.ai.ModerationResult(false,"ABUSE",null,null,false));
+        var ai=mock(me._hanho.ultary.domain.ai.AiService.class);
+        // Keep the test's rollback transaction; only the external AI call is mocked.
+        var inspectedFeeds=new FeedCreationService(ai,feeds);
+        var edit=new UpdateFeedRequest();edit.setContent(newText);edit.setTagIds(List.of(b));
+        doThrow(new BusinessException(ErrorCode.AI_CONTENT_BLOCKED)).when(ai).assertFeedUpdateAllowed(owner,feed,newText);
+        assertThatThrownBy(()->inspectedFeeds.update(principal,feed,edit))
+                .isInstanceOfSatisfying(BusinessException.class,e->assertThat(e.getErrorCode()).isEqualTo(ErrorCode.AI_CONTENT_BLOCKED));
         assertThat(jdbc.queryForObject("SELECT content FROM ultary_feed WHERE feed_id=?",String.class,feed)).isEqualTo(oldText);
         assertThat(mapper.findTagIdsByFeedId(feed)).containsExactly(a);
+        assertThat(jdbc.queryForObject("SELECT use_count FROM ultary_tag WHERE tag_id=?",Integer.class,a)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT use_count FROM ultary_tag WHERE tag_id=?",Integer.class,b)).isZero();
+        doNothing().when(ai).assertFeedUpdateAllowed(owner,feed,newText);
+        inspectedFeeds.update(principal,feed,edit);
+        assertThat(jdbc.queryForObject("SELECT content FROM ultary_feed WHERE feed_id=?",String.class,feed)).isEqualTo(newText);
+        assertThat(mapper.findTagIdsByFeedId(feed)).containsExactly(b);
+        assertThat(jdbc.queryForObject("SELECT use_count FROM ultary_tag WHERE tag_id=?",Integer.class,a)).isZero();
+        assertThat(jdbc.queryForObject("SELECT use_count FROM ultary_tag WHERE tag_id=?",Integer.class,b)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ultary_ai_moderation_job WHERE target_type='FEED' AND target_id=?",Integer.class,feed)).isZero();
     }
 
     @Test void createsWithAccountDefaultOrExplicitPostVisibility() {

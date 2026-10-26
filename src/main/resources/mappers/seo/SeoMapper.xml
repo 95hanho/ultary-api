@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="me._hanho.ultary.domain.seo.SeoMapper">
+ <sql id="publicAccount">
+  u.withdrawal_status='ACTIVE'
+  AND NOT EXISTS (SELECT 1 FROM ultary_user_privacy p WHERE p.user_no=u.user_no AND p.private_account=1)
+ </sql>
+ <select id="profiles" resultType="me._hanho.ultary.domain.seo.SeoEntry">
+  SELECT u.user_no AS id, u.nickname FROM ultary_user u
+  WHERE <include refid="publicAccount"/> AND u.user_no &gt; #{cursorId}
+  ORDER BY u.user_no LIMIT #{limit}
+ </select>
+ <select id="feeds" resultType="me._hanho.ultary.domain.seo.SeoEntry">
+  SELECT f.feed_id AS id FROM ultary_feed f JOIN ultary_user u ON u.user_no=f.user_no
+  WHERE <include refid="publicAccount"/> AND f.is_deleted=0 AND f.visibility='PUBLIC' AND f.feed_id &gt; #{cursorId}
+  ORDER BY f.feed_id LIMIT #{limit}
+ </select>
+</mapper>

@@ -44,3 +44,8 @@ build/libs/ROOT.war
 ```
 
 생성된 ROOT.war 파일을 Cafe24 Tomcat 서버에 배포합니다.
+
+
+### WAR 운영 설정
+
+bootWar는 실제 로컬 application*.yml 대신 환경변수 기반 운영 템플릿을 포함하며 기본 profile은 prod입니다. 서버의 DB_URL·JWT 키·BFF 키·UPLOAD_DIR·WS_ALLOWED_ORIGINS 등은 별도 주입해야 합니다. 로컬 설정을 WAR에 포함한다고 가정하지 마세요. 자세한 필수값과 마지막 검증 결과는 [배포 점검](share/docs/deployment-readiness.md)을 참고하세요.

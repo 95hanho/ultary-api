@@ -49,7 +49,8 @@ class RecentSearchPaginationIntegrationTest {
     }
 
     @Test void totalUsesTheSameFiltersAsTheListAndStaysScopedToTheViewer() {
-        mapper.upsertUser(me, user()); mapper.upsertTag(me, tag(me));
+        Long visibleUser = user(), visibleTag = tag(me);
+        mapper.upsertUser(me, visibleUser); mapper.upsertTag(me, visibleTag);
         Long withdrawn = user(); mapper.upsertUser(me, withdrawn);
         jdbc.update("UPDATE ultary_user SET withdrawal_status='WITHDRAWN' WHERE user_no=?", withdrawn);
         Long blocked = user(), blocker = user(); mapper.upsertUser(me, blocked); mapper.upsertUser(me, blocker);
@@ -60,8 +61,13 @@ class RecentSearchPaginationIntegrationTest {
         jdbc.update("UPDATE ultary_user SET withdrawal_status='SUSPENDED' WHERE user_no=?", suspended);
         mapper.upsertUser(user(), user());
         var page = service.getRecentSearches(principal);
-        assertThat(page.getTotalCount()).isEqualTo(2);
-        assertThat(page.getItems()).hasSize(2);
+        // A user I blocked remains searchable; a user who blocked me is hidden.
+        assertThat(page.getTotalCount()).isEqualTo(3);
+        assertThat(page.getItems()).hasSize(3);
+        assertThat(page.getItems()).filteredOn(item -> "USER".equals(item.getType()))
+            .extracting(SearchHistoryItemResponse::getUserNo).containsExactlyInAnyOrder(visibleUser, blocked);
+        assertThat(page.getItems()).filteredOn(item -> "TAG".equals(item.getType()))
+            .extracting(SearchHistoryItemResponse::getTagId).containsExactly(visibleTag);
         assertThat(page.getNextCursorHistoryId()).isNull();
     }
 
