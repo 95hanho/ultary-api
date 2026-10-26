@@ -32,7 +32,9 @@ spring:
 security:
   bff:
     shared-key: ${BFF_INTERNAL_KEY:}
-    require-https: true
+    # Cafe24 terminates TLS before forwarding HTTP to Tomcat without a protocol header.
+    # FE production requests still require HTTPS; the BFF key remains mandatory here.
+    require-https: false
     # TLS를 종료하는 신뢰 프록시의 실제 peer IP/CIDR. 비우면 전달 헤더를 신뢰하지 않는다.
     trusted-proxies: ${BFF_TRUSTED_PROXIES:}
 
@@ -43,4 +45,4 @@ server:
 # Browser WebSocket Origin must match the final FE domain.
 ultary:
   ws:
-    allowed-origins: ${WS_ALLOWED_ORIGINS}
+    allowed-origins: ${WS_ALLOWED_ORIGINS:https://ultary-web.vercel.app}

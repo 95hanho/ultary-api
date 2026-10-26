@@ -40,10 +40,10 @@ WAR 파일을 생성합니다.
 빌드 결과물은 아래 경로에 생성됩니다.
 
 ```bash
-build/libs/ROOT.war
+build/libs/ultary.war
 ```
 
-생성된 ROOT.war 파일을 Cafe24 Tomcat 서버에 배포합니다.
+생성된 ultary.war 파일을 Cafe24 Tomcat 서버에 배포합니다.
 
 
 ### WAR 운영 설정

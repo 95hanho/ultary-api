@@ -44,7 +44,7 @@ class BffAuthenticationFilterTest {
 		assertThat(reached.get()).isFalse();
 	}
 	@Test void productionRejectsHttpEvenWithCorrectKey() throws Exception {
-		properties.setRequireHttps(true); run(request("/api/v1/health", key));
+		properties.setRequireHttps(true); run(request("/api/v1/health/db", key));
 		assertThat(reached.get()).isFalse(); assertThat(response.getContentAsString()).contains("HTTPS_REQUIRED");
 	}
 	@Test void productionAcceptsRealTls() throws Exception {

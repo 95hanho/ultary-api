@@ -9,7 +9,9 @@ group = 'me._hanho'
 version = '0.0.1-SNAPSHOT'
 
 bootWar {
-    archiveFileName = 'ROOT.war'
+    archiveFileName = 'ultary.war'
+    // WAR copy filters otherwise use the platform charset (e.g. MS949 on Windows).
+    filteringCharset = 'UTF-8'
     // Runtime/local configuration remains available to bootRun and tests only.
     // Package environment-based production templates instead of workstation secrets.
     classpath = classpath.filter { it != sourceSets.main.output.resourcesDir }
@@ -21,6 +23,22 @@ bootWar {
         into 'WEB-INF/classes'
         include 'application.yml', 'application-prod.yml'
         filter { line -> line.replace('active: local', 'active: ${SPRING_PROFILES_ACTIVE:prod}') }
+    }
+    doLast {
+        new java.util.zip.ZipFile(archiveFile.get().asFile).withCloseable { war ->
+            ['application.yml', 'application-prod.yml'].each { name ->
+                def entry = war.getEntry("WEB-INF/classes/${name}")
+                if (entry == null) throw new GradleException("Missing WAR configuration: ${name}")
+                war.getInputStream(entry).withCloseable { input ->
+                    try {
+                        java.nio.charset.StandardCharsets.UTF_8.newDecoder()
+                            .decode(java.nio.ByteBuffer.wrap(input.readAllBytes()))
+                    } catch (java.nio.charset.CharacterCodingException error) {
+                        throw new GradleException("WAR configuration must be UTF-8: ${name}", error)
+                    }
+                }
+            }
+        }
     }
 }
 

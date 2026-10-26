@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Collections;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -18,15 +19,18 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /** BFF 서버 인증은 사용자 JWT 인증과 별개이며 먼저 검사한다. */
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class BffAuthenticationFilter extends OncePerRequestFilter {
 
 	public static final String KEY_HEADER = "X-BFF-Key";
 	private final BffSecurityProperties properties;
 	private final ObjectMapper json;
+	private final AtomicBoolean httpsWarningLogged = new AtomicBoolean();
 
 	@Override
 	protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -38,6 +42,12 @@ public class BffAuthenticationFilter extends OncePerRequestFilter {
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
 			throws ServletException, IOException {
 		if (properties.isRequireHttps() && !secureTransport(request)) {
+			if ("/api/v1/health/db".equals(path(request)) && httpsWarningLogged.compareAndSet(false, true)) {
+				var protocols = Collections.list(request.getHeaders("X-Forwarded-Proto"));
+				log.warn("[BFF] HTTPS_REQUIRED: remoteAddr={}, scheme={}, secure={}, forwardedProtoCount={}, forwardedProtoHttps={}, trustedProxyCount={}",
+						request.getRemoteAddr(), request.getScheme(), request.isSecure(), protocols.size(),
+						protocols.size() == 1 && "https".equalsIgnoreCase(protocols.get(0)), properties.getTrustedProxies().size());
+			}
 			reject(response, "HTTPS_REQUIRED", "HTTPS 통신이 필요합니다.");
 			return;
 		}
