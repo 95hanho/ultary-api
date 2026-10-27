@@ -319,6 +319,10 @@ public interface FeedMapper {
 
 	int insertCommentMention(FeedCommentMention mention);
 
+	int deleteCommentMention(@Param("mentionId") Long mentionId);
+    int saveMentionSnapshot(@Param("kind") String kind, @Param("targetId") Long targetId, @Param("content") String content, @Param("targets") String targets);
+    String findMentionSnapshot(@Param("kind") String kind, @Param("targetId") Long targetId, @Param("content") String content);
+
 	List<FeedCommentMention> findMentionsByCommentId(@Param("commentId") Long commentId);
 
 	List<FeedCommentMention> findMentionsByReplyId(@Param("replyId") Long replyId);

@@ -21,6 +21,7 @@ public class ModerationTransactions {
     private final ModerationMapper mapper;
     private final FeedMapper feedMapper;
     private final FeedService feedService;
+    private final me._hanho.ultary.domain.feed.CommentMentionService commentMentions;
     private final NotificationService notifications;
     private final RealtimePush realtime;
 
@@ -71,8 +72,16 @@ public class ModerationTransactions {
             mapper.restoreContent(job.getTargetType(), job.getTargetId(), state.getApprovedContent());
             if ("FEED".equals(job.getTargetType())) feedService.restoreCaptionTags(job.getTargetId(), state.getApprovedContent());
             action = "RESTORED";
-            if ("COMMENT".equals(job.getTargetType())) notifications.refreshCommentSnippet(job.getTargetId());
-            if ("REPLY".equals(job.getTargetType())) notifications.refreshReplySnippet(job.getTargetId());
+            if ("COMMENT".equals(job.getTargetType())) {
+                commentMentions.restore(job.getUserNo(), job.getTargetId(), null, state.getApprovedContent());
+                notifications.syncCommentMentions(job.getTargetId());
+                notifications.refreshCommentSnippet(job.getTargetId());
+            }
+            if ("REPLY".equals(job.getTargetType())) {
+                commentMentions.restore(job.getUserNo(), null, job.getTargetId(), state.getApprovedContent());
+                notifications.syncReplyMentions(job.getTargetId(), false);
+                notifications.refreshReplySnippet(job.getTargetId());
+            }
         } else {
             mapper.hide(job.getTargetType(), job.getTargetId());
             action = "HIDDEN";

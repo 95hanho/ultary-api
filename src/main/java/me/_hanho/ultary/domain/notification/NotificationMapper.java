@@ -69,6 +69,8 @@ public interface NotificationMapper {
 
 	NotificationDraft findReplySource(@Param("replyId") Long replyId);
 
+	NotificationDraft findParentReplySource(@Param("replyId") Long replyId);
+
 	NotificationDraft findFeedSource(@Param("feedId") Long feedId);
 
 	NotificationDraft findStorySource(@Param("storyId") Long storyId);

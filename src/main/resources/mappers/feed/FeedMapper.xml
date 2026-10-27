@@ -1304,6 +1304,16 @@
 		</foreach>
 	</select>
 
+	<insert id="saveMentionSnapshot">
+      INSERT INTO ultary_comment_mention_snapshot(target_type,target_id,content_hash,targets_json)
+      VALUES(#{kind},#{targetId},SHA2(#{content},256),#{targets})
+      ON DUPLICATE KEY UPDATE targets_json=VALUES(targets_json)
+    </insert>
+    <select id="findMentionSnapshot" resultType="string">
+      SELECT targets_json FROM ultary_comment_mention_snapshot
+      WHERE target_type=#{kind} AND target_id=#{targetId} AND content_hash=SHA2(#{content},256)
+    </select>
+    <delete id="deleteCommentMention">DELETE FROM ultary_feed_comment_mention WHERE feed_comment_mention_id = #{mentionId}</delete>
 	<insert id="insertCommentMention" useGeneratedKeys="true" keyProperty="feedCommentMentionId" keyColumn="feed_comment_mention_id">
 		INSERT INTO ultary_feed_comment_mention (
 			feed_comment_id,

@@ -43,7 +43,7 @@ public interface DmMapper {
 
 	List<ShareTargetRow> findShareCandidates(@Param("userNo") Long userNo,
 			@Param("cutoff") LocalDateTime cutoff, @Param("query") String query,
-			@Param("tagging") boolean tagging);
+			@Param("tagging") boolean tagging, @Param("mentioning") boolean mentioning, @Param("feedId") Long feedId);
 
 	DmRoomRow findRoomRow(@Param("userNo") Long userNo, @Param("dmRoomId") Long dmRoomId);
 

@@ -536,7 +536,11 @@ public class DmService {
 
 	@Transactional(readOnly = true)
 	public DmShareTargetListResponse shareTargets(UserPrincipal principal, Integer limit, String query, String priorityOrder, String mode) {
-		if (!Set.of("SHARE", "DM", "STORY_TAG", "FEED_TAG").contains(mode)) {
+        return shareTargets(principal,limit,query,priorityOrder,mode,null);
+    }
+    @Transactional(readOnly = true)
+    public DmShareTargetListResponse shareTargets(UserPrincipal principal, Integer limit, String query, String priorityOrder, String mode, Long feedId) {
+		if (!Set.of("SHARE", "DM", "STORY_TAG", "FEED_TAG", "COMMENT_MENTION").contains(mode)) {
 			throw new BusinessException(ErrorCode.INVALID_INPUT, "지원하지 않는 목록 모드입니다.");
 		}
 		boolean tagging = "STORY_TAG".equals(mode) || "FEED_TAG".equals(mode);
@@ -545,23 +549,34 @@ public class DmService {
 			case "FEED_TAG" -> "OWN_FEED_TAG,DM,OWN_STORY_TAG";
 			default -> null;
 		};
-		List<String> order = sharePriorityOrder(StringUtils.hasText(priorityOrder) ? priorityOrder : defaultOrder);
+		List<String> baseOrder = sharePriorityOrder(StringUtils.hasText(priorityOrder) ? priorityOrder : defaultOrder);
+        List<String> order = new ArrayList<>();
+        if ("COMMENT_MENTION".equals(mode)) order.add("MENTION");
+        for (String priority : baseOrder) {
+            order.add(tagging && "DM".equals(priority) ? "DM_OR_MENTION" : priority);
+            if (!tagging && !"COMMENT_MENTION".equals(mode) && "DM".equals(priority)) order.add("MENTION");
+        }
 		String term = query == null ? "" : query.trim().replaceFirst("^@+", "").toLowerCase(Locale.ROOT);
+		Long participantFeed = "COMMENT_MENTION".equals(mode) ? feedId : null;
+        if (participantFeed != null) feedService.assertVisible(participantFeed, principal.getUserNo());
 		LocalDateTime cutoff = LocalDateTime.now().minusMonths(1);
-		List<ShareTargetRow> rows = dmMapper.findShareCandidates(principal.getUserNo(), cutoff, term, tagging);
+		List<ShareTargetRow> rows = dmMapper.findShareCandidates(principal.getUserNo(), cutoff, term, tagging, "COMMENT_MENTION".equals(mode), participantFeed);
 		List<RankedTarget> ranked = new ArrayList<>();
 		for (ShareTargetRow row : rows) {
 			if (row.getUserNo() == null) {
 				continue;
 			}
 			RankedTarget target = tagging && row.getUserNo().equals(principal.getUserNo())
-					? new RankedTarget(row, 10, cutoff) : rank(row, cutoff, order);
+					? new RankedTarget(row, 99, cutoff) : rank(row, cutoff, order, "COMMENT_MENTION".equals(mode));
 			if (target != null) {
 				ranked.add(target);
 			}
 		}
 		ranked.sort(Comparator
-				.comparingInt(RankedTarget::group)
+				.comparing((RankedTarget target) -> target.group() == 99)
+                .thenComparing(target -> target.row().getFollowedAt() == null)
+                .thenComparingInt(RankedTarget::group)
+                .thenComparingInt(RankedTarget::mentionOrder)
 				.thenComparing(RankedTarget::activeAt, Comparator.reverseOrder())
 				.thenComparing(target -> target.row().getUserNo(), Comparator.reverseOrder()));
 		int size = Math.min(ranked.size(), resolveLimit(limit));
@@ -615,34 +630,43 @@ public class DmService {
 		return order;
 	}
 
-	private RankedTarget rank(ShareTargetRow row, LocalDateTime cutoff, List<String> order) {
-		for (int i = 0; i < order.size(); i++) {
-			LocalDateTime at = switch (order.get(i)) {
-				case "DM" -> row.getLastMessageAt();
-				case "OWN_STORY_TAG" -> row.getOwnStoryTagAt();
-				case "OWN_FEED_TAG" -> row.getOwnFeedTagAt();
-				default -> null;
-			};
-			if (withinMonth(at, cutoff)) return new RankedTarget(row, i + 1, at);
-		}
-		if (withinMonth(row.getTaggedInStoryAt(), cutoff)) return new RankedTarget(row, 4, row.getTaggedInStoryAt());
-		if (withinMonth(row.getTaggedInFeedAt(), cutoff)) return new RankedTarget(row, 5, row.getTaggedInFeedAt());
-		if (withinMonth(row.getFollowedAt(), cutoff)) {
-			return new RankedTarget(row, 6, row.getFollowedAt());
-		}
-		if (withinMonth(row.getFollowerAt(), cutoff)) {
-			return new RankedTarget(row, 7, row.getFollowerAt());
-		}
-		if (row.getFollowedAt() != null) return new RankedTarget(row, 8, row.getFollowedAt());
-		if (row.getFollowerAt() != null) return new RankedTarget(row, 9, row.getFollowerAt());
-		return null;
-	}
+    private RankedTarget rank(ShareTargetRow row, LocalDateTime cutoff, List<String> order, boolean commentMode) {
+        for (int i=0; i<order.size(); i++) {
+            String priority = order.get(i);
+            if ("MENTION".equals(priority)) {
+                if (withinMonth(row.getOwnMentionAt(), cutoff)) return new RankedTarget(row,i+1,row.getOwnMentionAt(),0);
+                if (withinMonth(row.getIncomingMentionAt(), cutoff)) return new RankedTarget(row,i+1,row.getIncomingMentionAt(),1);
+                continue;
+            }
+            LocalDateTime at = switch(priority) {
+                case "DM" -> row.getLastMessageAt();
+                case "DM_OR_MENTION" -> newest(row.getLastMessageAt(),row.getOwnMentionAt(),row.getIncomingMentionAt());
+                case "OWN_STORY_TAG" -> row.getOwnStoryTagAt();
+                case "OWN_FEED_TAG" -> row.getOwnFeedTagAt();
+                default -> null;
+            };
+            if (withinMonth(at,cutoff)) return new RankedTarget(row,i+1,at);
+        }
+        int next = order.size()+1;
+        if (withinMonth(row.getTaggedInStoryAt(),cutoff)) return new RankedTarget(row,next,row.getTaggedInStoryAt());
+        if (withinMonth(row.getTaggedInFeedAt(),cutoff)) return new RankedTarget(row,next+1,row.getTaggedInFeedAt());
+        if (withinMonth(row.getFollowedAt(),cutoff)) return new RankedTarget(row,next+2,row.getFollowedAt());
+        if (withinMonth(row.getFollowerAt(),cutoff)) return new RankedTarget(row,next+3,row.getFollowerAt());
+        if (row.getFollowedAt()!=null) return new RankedTarget(row,next+4,row.getFollowedAt());
+        if (commentMode && row.getParticipantAt()!=null) return new RankedTarget(row,next+5,row.getParticipantAt());
+        if (row.getFollowerAt()!=null) return new RankedTarget(row,next+(commentMode?6:5),row.getFollowerAt());
+        return null;
+    }
+    private static LocalDateTime newest(LocalDateTime... values) {
+        return Arrays.stream(values).filter(java.util.Objects::nonNull).max(Comparator.naturalOrder()).orElse(null);
+    }
 
 	private static boolean withinMonth(LocalDateTime at, LocalDateTime cutoff) {
 		return at != null && !at.isBefore(cutoff);
 	}
 
-	private record RankedTarget(ShareTargetRow row, int group, LocalDateTime activeAt) {
+	private record RankedTarget(ShareTargetRow row, int group, LocalDateTime activeAt, int mentionOrder) {
+        RankedTarget(ShareTargetRow row, int group, LocalDateTime activeAt) { this(row,group,activeAt,0); }
 	}
 
 	private int resolveLimit(Integer limit) {

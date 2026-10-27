@@ -167,6 +167,9 @@
 			 ORDER BY p.priority, p.pet_id LIMIT 1) AS profileFileId,
 			r.dm_room_id AS dmRoomId,
 			MAX(CASE WHEN e.kind = 'DM' THEN e.at END) AS lastMessageAt,
+            MAX(CASE WHEN e.kind = 'OWN_MENTION' THEN e.at END) AS ownMentionAt,
+            MAX(CASE WHEN e.kind = 'IN_MENTION' THEN e.at END) AS incomingMentionAt,
+            MAX(CASE WHEN e.kind = 'FEED_PARTICIPANT' THEN e.at END) AS participantAt,
 			MAX(CASE WHEN e.kind = 'OWN_STORY' THEN e.at END) AS ownStoryTagAt,
 			MAX(CASE WHEN e.kind = 'OWN_FEED' THEN e.at END) AS ownFeedTagAt,
 			MAX(CASE WHEN e.kind = 'IN_STORY' THEN e.at END) AS taggedInStoryAt,
@@ -195,6 +198,28 @@
 				IF(t.author = #{userNo}, 'OWN_FEED', 'IN_FEED'), t.tagged_at
 			FROM (<include refid="shareFeedTags"/>) t
 			UNION ALL
+            <if test="feedId != null">
+              SELECT c.user_no, 'FEED_PARTICIPANT', c.created_at
+              FROM ultary_feed_comment c WHERE c.feed_id=#{feedId} AND c.is_deleted=0
+              UNION ALL
+              SELECT r.user_no, 'FEED_PARTICIPANT', r.created_at
+              FROM ultary_feed_reply r JOIN ultary_feed_comment pc ON pc.feed_comment_id=r.feed_comment_id
+              WHERE pc.feed_id=#{feedId} AND pc.is_deleted=0 AND r.is_deleted=0
+              UNION ALL
+            </if>
+            SELECT IF(COALESCE(c.user_no,r.user_no)=#{userNo}, cm.mentioned_user_no, COALESCE(c.user_no,r.user_no)),
+                   IF(COALESCE(c.user_no,r.user_no)=#{userNo}, 'OWN_MENTION','IN_MENTION'), cm.created_at
+            FROM ultary_feed_comment_mention cm
+            LEFT JOIN ultary_feed_comment c ON c.feed_comment_id=cm.feed_comment_id
+            LEFT JOIN ultary_feed_reply r ON r.feed_reply_id=cm.feed_reply_id
+            LEFT JOIN ultary_feed_comment pc ON pc.feed_comment_id=r.feed_comment_id
+            JOIN ultary_feed mf ON mf.feed_id=COALESCE(c.feed_id,pc.feed_id) AND mf.is_deleted=0
+            WHERE cm.mentioned_user_no IS NOT NULL AND cm.created_at &gt;= #{cutoff}
+              AND ((cm.feed_comment_id IS NOT NULL AND c.is_deleted=0)
+                   OR (cm.feed_reply_id IS NOT NULL AND r.is_deleted=0 AND pc.is_deleted=0))
+              AND (COALESCE(c.user_no,r.user_no)=#{userNo} OR cm.mentioned_user_no=#{userNo})
+              AND COALESCE(c.user_no,r.user_no) &lt;&gt; cm.mentioned_user_no
+            UNION ALL
 			SELECT receiver_user_no, 'FOLLOW', COALESCE(accepted_at, requested_at)
 			FROM ultary_neighbor WHERE requester_user_no = #{userNo} AND status = 'ACCEPTED'
 			UNION ALL
@@ -219,6 +244,9 @@
 			</when>
 			<otherwise>AND u.user_no != #{userNo}</otherwise>
 		</choose>
+        <if test="mentioning">
+          AND NOT EXISTS (SELECT 1 FROM ultary_user_privacy mp WHERE mp.user_no=u.user_no AND mp.allow_mention=0)
+        </if>
 		AND NOT EXISTS (SELECT 1 FROM ultary_user_block b WHERE b.is_deleted = 0 AND
 			((b.blocker_user_no = #{userNo} AND b.blocked_user_no = u.user_no)
 			OR (b.blocked_user_no = #{userNo} AND b.blocker_user_no = u.user_no)))

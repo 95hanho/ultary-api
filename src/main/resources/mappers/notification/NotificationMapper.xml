@@ -575,6 +575,19 @@
 		  AND <include refid="notBlocked"><property name="ownerExpr" value="t.receiver_user_no"/><property name="actorExpr" value="c.user_no"/></include>
 	</select>
 
+
+	<select id="findParentReplySource" resultType="me._hanho.ultary.domain.notification.model.NotificationDraft">
+        SELECT c.user_no AS receiver_user_no, r.user_no AS actor_user_no, r.content,
+               c.feed_id, c.feed_comment_id, r.feed_reply_id, 1 AS actor_count, 0 AS has_comment, 1 AS has_reply
+        FROM ultary_feed_reply r
+        JOIN ultary_feed_comment c ON c.feed_comment_id=r.feed_comment_id AND c.is_deleted=0
+        JOIN ultary_feed f ON f.feed_id=c.feed_id AND f.is_deleted=0
+        JOIN ultary_user u ON u.user_no=c.user_no AND u.withdrawal_status='ACTIVE'
+        WHERE r.feed_reply_id=#{replyId} AND r.is_deleted=0
+          AND c.user_no &lt;&gt; r.user_no AND c.user_no &lt;&gt; f.user_no
+          AND <include refid="notBlocked"><property name="ownerExpr" value="c.user_no"/><property name="actorExpr" value="r.user_no"/></include>
+    </select>
+
 	<select id="findReplyMentionReceivers" resultType="long">
 		SELECT DISTINCT t.receiver_user_no
 		FROM (
@@ -591,7 +604,9 @@
 		) t
 		INNER JOIN ultary_user u ON u.user_no = t.receiver_user_no AND u.withdrawal_status = 'ACTIVE'
 		INNER JOIN ultary_feed_reply r ON r.feed_reply_id = #{replyId} AND r.is_deleted = 0
+		JOIN ultary_feed_comment parent_comment ON parent_comment.feed_comment_id=r.feed_comment_id AND parent_comment.is_deleted=0
 		WHERE t.receiver_user_no &lt;&gt; r.user_no
+          AND t.receiver_user_no &lt;&gt; parent_comment.user_no
 		  AND <include refid="notBlocked"><property name="ownerExpr" value="t.receiver_user_no"/><property name="actorExpr" value="r.user_no"/></include>
 	</select>
 

@@ -15,6 +15,9 @@ public class ShareTargetRow {
 	private Long profileFileId;
 	private Long dmRoomId;
 	private LocalDateTime lastMessageAt;
+	private LocalDateTime ownMentionAt;
+	private LocalDateTime incomingMentionAt;
+	private LocalDateTime participantAt;
 	private LocalDateTime ownStoryTagAt;
 	private LocalDateTime ownFeedTagAt;
 	private LocalDateTime taggedInStoryAt;

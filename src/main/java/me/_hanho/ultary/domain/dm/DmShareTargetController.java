@@ -27,8 +27,9 @@ public class DmShareTargetController {
 			@RequestParam(required = false) Integer limit,
 			@RequestParam(required = false) String q,
 			@RequestParam(required = false) String priorityOrder,
-			@RequestParam(defaultValue = "SHARE") String mode) {
+			@RequestParam(defaultValue = "SHARE") String mode,
+            @RequestParam(required = false) Long feedId) {
 		log.info("[shareTargets] userNo={} limit={}", principal.getUserNo(), limit);
-		return ApiResponse.ok(dmService.shareTargets(principal, limit, q, priorityOrder, mode), "공유 대상 조회 성공");
+		return ApiResponse.ok(dmService.shareTargets(principal, limit, q, priorityOrder, mode, feedId), "공유 대상 조회 성공");
 	}
 }

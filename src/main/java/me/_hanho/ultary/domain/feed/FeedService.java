@@ -85,6 +85,7 @@ public class FeedService {
 	private final PrivacyService privacyService;
 	private final ModerationQueue moderationQueue;
 	private final ReportService reportService;
+	private final CommentMentionService commentMentions;
 
 	/** Persist the feed and its durable inspection job together. */
 	@Transactional
@@ -408,7 +409,7 @@ public class FeedService {
 		comment.setUserNo(principal.getUserNo());
 		comment.setContent(content);
 		feedMapper.insertComment(comment);
-		insertCommentMentions(principal.getUserNo(), comment.getFeedCommentId(), null, request.getMentions());
+		commentMentions.replace(principal.getUserNo(), comment.getFeedCommentId(), null, content, request.getMentions());
 		feedMapper.adjustCommentCount(feedId, 1);
 		notificationService.syncFeedThread(feedId, true);
 		notificationService.syncCommentMentions(comment.getFeedCommentId());
@@ -424,10 +425,13 @@ public class FeedService {
 		requireVisible(feedId, principal.getUserNo());
 		requireComment(feedId, commentId);
 		String content = request.getContent().trim();
+		commentMentions.capture(commentId, null, previous.getContent());
 		int updated = feedMapper.updateCommentContent(commentId, principal.getUserNo(), content);
 		if (updated == 0) {
 			throw new BusinessException(ErrorCode.FORBIDDEN);
 		}
+		commentMentions.replace(principal.getUserNo(), commentId, null, content, request.getMentions());
+		notificationService.syncCommentMentions(commentId);
 		notificationService.refreshCommentSnippet(commentId);
 		notificationService.syncFeedThread(feedId, false);
 		moderationQueue.enqueue("COMMENT", commentId, feedId, principal.getUserNo(), previous.getContent(), content, false);
@@ -529,7 +533,7 @@ public class FeedService {
 		reply.setUserNo(principal.getUserNo());
 		reply.setContent(content);
 		feedMapper.insertReply(reply);
-		insertCommentMentions(principal.getUserNo(), null, reply.getFeedReplyId(), request.getMentions());
+		commentMentions.replace(principal.getUserNo(), null, reply.getFeedReplyId(), content, request.getMentions());
 		notificationService.syncFeedThread(feedId, true);
 		notificationService.syncReplyMentions(reply.getFeedReplyId());
 		moderationQueue.enqueue("REPLY", reply.getFeedReplyId(), feedId, principal.getUserNo(), null, content, true);
@@ -549,10 +553,13 @@ public class FeedService {
 		requireComment(feedId, commentId);
 		requireReply(commentId, replyId);
 		String content = request.getContent().trim();
+		commentMentions.capture(null, replyId, previous.getContent());
 		int updated = feedMapper.updateReplyContent(replyId, principal.getUserNo(), content);
 		if (updated == 0) {
 			throw new BusinessException(ErrorCode.FORBIDDEN);
 		}
+		commentMentions.replace(principal.getUserNo(), null, replyId, content, request.getMentions());
+		notificationService.syncReplyMentions(replyId, false);
 		notificationService.refreshReplySnippet(replyId);
 		notificationService.syncFeedThread(feedId, false);
 		moderationQueue.enqueue("REPLY", replyId, feedId, principal.getUserNo(), previous.getContent(), content, false);
@@ -1096,48 +1103,6 @@ public class FeedService {
 				.createdAt(feed.getCreatedAt())
 				.updatedAt(feed.getUpdatedAt())
 				.build();
-	}
-
-	private void insertCommentMentions(
-			Long actorUserNo,
-			Long commentId,
-			Long replyId,
-			List<CommentMentionRequest> mentions) {
-		if (mentions == null || mentions.isEmpty()) {
-			return;
-		}
-		Set<String> seen = new HashSet<>();
-		for (CommentMentionRequest item : mentions) {
-			if (item == null) {
-				continue;
-			}
-			FeedCommentMention mention = new FeedCommentMention();
-			mention.setFeedCommentId(commentId);
-			mention.setFeedReplyId(replyId);
-			if (item.getUserNo() != null) {
-				String key = "U:" + item.getUserNo();
-				if (!seen.add(key)) {
-					continue;
-				}
-				User user = userMapper.findActiveByUserNo(item.getUserNo());
-				if (user == null) {
-					throw new BusinessException(ErrorCode.USER_NOT_FOUND);
-				}
-				privacyService.assertMentionAllowed(actorUserNo, item.getUserNo());
-				mention.setMentionedUserNo(item.getUserNo());
-			} else if (item.getPetId() != null) {
-				String key = "P:" + item.getPetId();
-				if (!seen.add(key)) {
-					continue;
-				}
-				Pet mentioned = requirePet(item.getPetId());
-				privacyService.assertMentionAllowed(actorUserNo, mentioned.getUserNo());
-				mention.setMentionedPetId(item.getPetId());
-			} else {
-				throw new BusinessException(ErrorCode.INVALID_INPUT, "멘션은 userNo 또는 petId가 필요합니다.");
-			}
-			feedMapper.insertCommentMention(mention);
-		}
 	}
 
 	private List<CommentMentionResponse> toMentionResponses(List<FeedCommentMention> mentions) {

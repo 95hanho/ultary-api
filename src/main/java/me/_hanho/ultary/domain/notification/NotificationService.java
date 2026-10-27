@@ -45,9 +45,9 @@ public class NotificationService {
 	private static final int SNIPPET_LENGTH = 40;
 
 	private static final List<String> COMMENT_DIRECT_TYPES = List.of(COMMENT_LIKE, COMMENT_MENTION);
-	private static final List<String> REPLY_DIRECT_TYPES = List.of(REPLY_LIKE, REPLY_MENTION);
+	private static final List<String> REPLY_DIRECT_TYPES = List.of(REPLY_LIKE, REPLY_MENTION, FEED_COMMENT);
 	private static final List<String> COMMENT_TREE_TYPES = List.of(
-			COMMENT_LIKE, COMMENT_MENTION, REPLY_LIKE, REPLY_MENTION);
+			COMMENT_LIKE, COMMENT_MENTION, REPLY_LIKE, REPLY_MENTION, FEED_COMMENT);
 
 	private final NotificationMapper notificationMapper;
 	private final NotificationSettingService notificationSettingService;
@@ -195,7 +195,10 @@ public class NotificationService {
 				null);
 	}
 
-	public void syncReplyMentions(Long replyId) {
+	public void syncReplyMentions(Long replyId) { syncReplyMentions(replyId, true); }
+
+	public void syncReplyMentions(Long replyId, boolean markUnread) {
+        applySingle(FEED_COMMENT, "COMMENT_REPLY:" + replyId, notificationMapper.findParentReplySource(replyId), markUnread);
 		replaceMentions(
 				REPLY_MENTION,
 				"REPLY_MENTION:" + replyId,
@@ -279,24 +282,15 @@ public class NotificationService {
 			List<Long> receivers,
 			Long commentId,
 			Long replyId) {
-		if (commentId != null) {
-			List<String> types = List.of(type);
-			deleteThenPush(
-					notificationMapper.findReceivers(null, null, null, null, commentId, null, types),
-					() -> notificationMapper.deleteByCommentTypes(commentId, types));
-		}
-		if (replyId != null) {
-			List<String> types = List.of(type);
-			deleteThenPush(
-					notificationMapper.findReceivers(null, null, null, null, null, replyId, types),
-					() -> notificationMapper.deleteByReplyTypes(replyId, types));
-		}
-		if (source == null || source.getActorUserNo() == null || receivers == null) {
-			return;
-		}
-		for (Long receiverUserNo : receivers) {
-			save(receiverUserNo, source, type, groupKey, true);
-		}
+        Set<Long> existing = new HashSet<>(notificationMapper.findReceivers(groupKey, null, null, null, null, null, null));
+        Set<Long> desired = source == null || source.getActorUserNo() == null || receivers == null ? Set.of() : new HashSet<>(receivers);
+        for (Long receiver : existing) {
+            if (!desired.contains(receiver)) {
+                notificationMapper.deleteByReceiverGroup(receiver, groupKey);
+                pushUnread(receiver);
+            }
+        }
+        for (Long receiver : desired) save(receiver, source, type, groupKey, !existing.contains(receiver));
 	}
 
 	private void applySingle(String type, String groupKey, NotificationDraft draft, boolean markUnread) {
@@ -428,6 +422,9 @@ public class NotificationService {
 			boolean hasReply,
 			boolean actorFollows) {
 		String name = nickname == null ? "회원" : nickname;
+        if (COMMENT_MENTION.equals(type) || REPLY_MENTION.equals(type)) {
+            return name + "가 " + (COMMENT_MENTION.equals(type) ? "댓글" : "답글") + "에서 나를 언급하였습니다.";
+        }
 		if (NEIGHBOR_REQUEST.equals(type)) {
 			if (actorFollows) {
 				return name + "님이 팔로우했습니다.";

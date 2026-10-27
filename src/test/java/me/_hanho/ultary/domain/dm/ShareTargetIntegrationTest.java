@@ -49,10 +49,10 @@ class ShareTargetIntegrationTest {
         follow(me, peers.get(7), now.minusMonths(2));
         follow(peers.get(8), me, now.minusMonths(2));
         var result = list(null, null, 50);
-        assertThat(result).extracting(DmShareTargetItemResponse::getUserNo).containsExactlyElementsOf(peers);
-        assertThat(result).extracting(DmShareTargetItemResponse::getGroup).containsExactly(1,2,3,4,5,6,7,8,9);
-        assertThat(result.get(1).getPetTags()).hasSize(2);
-        assertThat(result.get(2).getActiveAt()).isEqualTo(now.minusDays(14));
+        assertThat(result).extracting(DmShareTargetItemResponse::getUserNo).containsExactly(peers.get(5),peers.get(7),peers.get(0),peers.get(1),peers.get(2),peers.get(3),peers.get(4),peers.get(6),peers.get(8));
+        assertThat(result).extracting(DmShareTargetItemResponse::getGroup).containsExactly(7,9,1,3,4,5,6,8,10);
+        assertThat(result.get(3).getPetTags()).hasSize(2);
+        assertThat(result.get(4).getActiveAt()).isEqualTo(now.minusDays(14));
     }
 
     @Test void swapsOnlyFirstThreeGroupsAndUsesNewestTimeWithinGroup() {
@@ -99,9 +99,9 @@ class ShareTargetIntegrationTest {
         Long mutual = user(); follow(me, mutual, now.minusMonths(3));
         jdbc.update("UPDATE ultary_neighbor SET followed_back=1,followed_back_at=? WHERE requester_user_no=? AND receiver_user_no=?", now.minusMonths(2), me, mutual);
         var result = list(null, null, 50);
-        assertThat(result).extracting(DmShareTargetItemResponse::getGroup).containsExactly(2,8);
-        assertThat(result.get(1).isFollowing()).isTrue();
-        assertThat(result.get(1).isFollowedBy()).isTrue();
+        assertThat(result).extracting(DmShareTargetItemResponse::getGroup).containsExactly(9,3);
+        assertThat(result.get(0).isFollowing()).isTrue();
+        assertThat(result.get(0).isFollowedBy()).isTrue();
     }
 
     List<DmShareTargetItemResponse> list(String query, String order, int limit) {
@@ -137,6 +137,50 @@ class ShareTargetIntegrationTest {
         assertThat(service.shareTargets(principal, 1, "@" + ownTag.toUpperCase(), null, "STORY_TAG").getItems())
             .extracting(DmShareTargetItemResponse::getUserNo).containsExactly(me);
     }
+
+    @Test void mentionPriorityDiffersByModeAndFollowingAlwaysWins() {
+        Long outgoing=user(), incoming=user(), dmOnly=user(), following=user();
+        mention(me,outgoing,now.minusDays(8)); mention(incoming,me,now.minusDays(1)); dm(dmOnly,now);
+        follow(me,following,now.minusMonths(3));
+        assertThat(service.shareTargets(principal,50,null,null,"COMMENT_MENTION").getItems())
+            .extracting(DmShareTargetItemResponse::getUserNo).containsExactly(following,outgoing,incoming,dmOnly);
+        assertThat(service.shareTargets(principal,50,null,null,"DM").getItems())
+            .extracting(DmShareTargetItemResponse::getUserNo).containsExactly(following,dmOnly,outgoing,incoming);
+    }
+    @Test void tagPickersMergeDmAndMentionByLatestTimeAndIgnoreDeletedOrOldMentions() {
+        Long mentioned=user(), dmOnly=user(), old=user(), deleted=user();
+        pet(mentioned);pet(dmOnly);pet(old);pet(deleted);
+        mention(me,mentioned,now); dm(dmOnly,now.minusDays(1)); mention(me,old,now.minusMonths(2));
+        Long comment=mention(me,deleted,now);jdbc.update("UPDATE ultary_feed_comment SET is_deleted=1 WHERE feed_comment_id=?",comment);
+        assertThat(service.shareTargets(principal,50,null,null,"STORY_TAG").getItems())
+            .extracting(DmShareTargetItemResponse::getUserNo).containsExactly(mentioned,dmOnly);
+        assertThat(service.shareTargets(principal,50,null,null,"FEED_TAG").getItems())
+            .extracting(DmShareTargetItemResponse::getUserNo).containsExactly(mentioned,dmOnly);
+    }
+    Long mention(Long author,Long target,LocalDateTime at) {
+        jdbc.update("INSERT INTO ultary_feed(user_no,content) VALUES(?,'mention fixture')",author);Long feed=id();
+        jdbc.update("INSERT INTO ultary_feed_comment(feed_id,user_no,content) VALUES(?,?,'mention fixture')",feed,author);Long comment=id();
+        jdbc.update("INSERT INTO ultary_feed_comment_mention(feed_comment_id,mentioned_user_no,created_at) VALUES(?,?,?)",comment,target,at);return comment;
+    }
+
+
+    @Test void commentParticipantsComeAfterActivityAndBeforeRemainingFollowers() {
+        Long active=user(),older=user(),newer=user(),follower=user();dm(active,now);
+        follow(follower,me,now.minusMonths(3));
+        jdbc.update("INSERT INTO ultary_feed(user_no,content) VALUES(?,'participants')",me);Long feed=id();
+        jdbc.update("INSERT INTO ultary_feed_comment(feed_id,user_no,content,created_at) VALUES(?,?,'old participant',?)",feed,older,now.minusMonths(3));Long parent=id();
+        jdbc.update("INSERT INTO ultary_feed_reply(feed_comment_id,user_no,content,created_at) VALUES(?,?,'reply participant',?)",parent,newer,now);
+        assertThat(service.shareTargets(principal,50,null,null,"COMMENT_MENTION",feed).getItems())
+            .extracting(DmShareTargetItemResponse::getUserNo).containsExactly(active,newer,older,follower);
+        jdbc.update("UPDATE ultary_feed_comment SET is_deleted=1 WHERE feed_comment_id=?",parent);
+        assertThat(service.shareTargets(principal,50,null,null,"COMMENT_MENTION",feed).getItems())
+            .extracting(DmShareTargetItemResponse::getUserNo).containsExactly(active,follower);
+    }
+    @Test void commentParticipantLookupRequiresFeedAccess() {
+        Long owner=user();jdbc.update("INSERT INTO ultary_feed(user_no,content,visibility) VALUES(?,'private','PRIVATE')",owner);Long feed=id();
+        assertThatThrownBy(()->service.shareTargets(principal,50,null,null,"COMMENT_MENTION",feed)).isInstanceOf(BusinessException.class);
+    }
+
     Long id() { return jdbc.queryForObject("SELECT LAST_INSERT_ID()", Long.class); }
     Long user() { jdbc.update("INSERT INTO ultary_user(nickname) VALUES(?)", "share" + UUID.randomUUID().toString().substring(0,12)); return id(); }
     Long pet(Long owner) { jdbc.update("INSERT INTO ultary_pet(user_no,mention_id,name,priority) VALUES(?,?,?,1)", owner,"share"+UUID.randomUUID().toString().replace("-", "").substring(0,12),"share pet"); return id(); }
