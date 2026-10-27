@@ -277,6 +277,14 @@
 		LEFT JOIN ultary_user au ON au.user_no = COALESCE(f.user_no, s.user_no)
 	</sql>
 
+	<select id="findFirstUnreadMessageId" resultType="long">
+		SELECT MIN(dm_message_id)
+		FROM ultary_dm_message
+		WHERE dm_room_id = #{dmRoomId}
+		  AND sender_user_no &lt;&gt; #{userNo}
+		  AND dm_message_id &gt; COALESCE(#{lastReadMessageId}, 0)
+	</select>
+
 	<select id="findMessages" resultType="me._hanho.ultary.domain.dm.model.DmMessageRow">
 		SELECT
 		<include refid="messageColumns"/>

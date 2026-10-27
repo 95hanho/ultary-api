@@ -15,6 +15,8 @@ public class DmMessageListResponse {
 	private Long nextCursorMessageId;
 	/** 상대가 읽은 마지막 메시지. 아직 없으면 null */
 	private Long peerLastReadMessageId;
+	/** 최초 조회의 읽음 처리 전 첫 안읽은 상대 메시지. 이전 페이지/안읽음 없음이면 null. */
+	private Long firstUnreadMessageId;
 	/** 내가 그 방 상대를 팔로우 중. ACCEPTED만 */
 	private boolean following;
 	/** 그 방 상대가 나를 팔로우 중. ACCEPTED만 */

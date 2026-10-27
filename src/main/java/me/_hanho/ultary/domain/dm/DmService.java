@@ -179,6 +179,8 @@ public class DmService {
 		Long me = principal.getUserNo();
 		DmRoom room = requireOpenRoom(me, roomId);
 		int resolved = resolveLimit(limit);
+		Long firstUnread = beforeMessageId == null
+				? dmMapper.findFirstUnreadMessageId(roomId, me, readCursor(room, me)) : null;
 		List<DmMessageRow> rows = dmMapper.findMessages(roomId, beforeMessageId, resolved + 1);
 		boolean hasMore = rows.size() > resolved;
 		if (hasMore) {
@@ -193,6 +195,7 @@ public class DmService {
 				.items(toMessages(rows, me))
 				.nextCursorMessageId(nextCursor)
 				.peerLastReadMessageId(peerLastRead)
+				.firstUnreadMessageId(firstUnread)
 				.following(neighborService.viewerFollows(me, peer))
 				.followedBy(neighborService.viewerFollows(peer, me))
 				.build();

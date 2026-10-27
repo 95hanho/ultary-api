@@ -52,3 +52,6 @@ spy.log
 ### Python ###
 __pycache__/
 *.pyc
+
+# Private DB cleanup backups and one-off maintenance scripts
+/.local-backups/

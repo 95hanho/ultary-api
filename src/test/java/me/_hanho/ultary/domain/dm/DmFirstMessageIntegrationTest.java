@@ -23,6 +23,7 @@ class DmFirstMessageIntegrationTest {
     @Autowired me._hanho.ultary.domain.story.StoryMapper stories;
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transactions;
+    @Autowired org.mybatis.spring.SqlSessionTemplate sqlSession;
     Long me, peer;
     UserPrincipal principal;
 
@@ -46,6 +47,39 @@ class DmFirstMessageIntegrationTest {
 
     @Test void emptyMessageRollsBackRoomCreation() {
         assertFailedWithoutRoom(request("   "));
+    }
+
+    @Test void firstUnreadAnchorPrecedesTheLatestPageAndSurvivesMarkingTheRoomRead() {
+        var first=service.start(principal,request("already read"));
+        Long room=first.room().getDmRoomId();
+        Long unread=null;
+        for(int i=0;i<40;i++){
+            jdbc.update("INSERT INTO ultary_dm_message(dm_room_id,sender_user_no,body) VALUES(?,?,?)",room,peer,"unread "+i);
+            if(unread==null)unread=jdbc.queryForObject("SELECT LAST_INSERT_ID()",Long.class);
+        }
+        sqlSession.clearCache();
+        var page=service.messages(principal,room,null,30);
+        assertThat(page.getFirstUnreadMessageId()).isEqualTo(unread);
+        assertThat(page.getItems()).hasSize(30).noneMatch(m->m.getDmMessageId().equals(page.getFirstUnreadMessageId()));
+        var older=service.messages(principal,room,page.getNextCursorMessageId(),30);
+        assertThat(older.getItems()).extracting(m->m.getDmMessageId()).contains(unread);
+        assertThat(older.getFirstUnreadMessageId()).isNull();
+        assertThat(service.messages(principal,room,null,30).getFirstUnreadMessageId()).isNull();
+    }
+
+    @Test void unreadAnchorIgnoresMyOwnNewerMessages() {
+        Long room=service.start(principal,request("read baseline")).room().getDmRoomId();
+        jdbc.update("INSERT INTO ultary_dm_message(dm_room_id,sender_user_no,body) VALUES(?,?,'own message')",room,me);
+        sqlSession.clearCache();
+        assertThat(service.messages(principal,room,null,30).getFirstUnreadMessageId()).isNull();
+    }
+
+    @Test void viewerWithoutReadCursorStartsAtTheFirstIncomingMessage() {
+        var first=service.start(principal,request("first incoming message"));
+        var peerPrincipal=new UserPrincipal(peer,"unread-peer-test");
+        sqlSession.clearCache();
+        assertThat(service.messages(peerPrincipal,first.room().getDmRoomId(),null,30).getFirstUnreadMessageId())
+            .isEqualTo(first.message().getDmMessageId());
     }
 
     @Test void leavingHidesOnlyMyRoomAndReopeningPreservesHistory() {

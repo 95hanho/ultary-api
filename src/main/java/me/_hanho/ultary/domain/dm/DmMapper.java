@@ -36,6 +36,9 @@ public interface DmMapper {
 
 	Long findLatestMessageId(@Param("dmRoomId") Long dmRoomId);
 
+	Long findFirstUnreadMessageId(@Param("dmRoomId") Long dmRoomId,
+			@Param("userNo") Long userNo, @Param("lastReadMessageId") Long lastReadMessageId);
+
 	List<DmRoomRow> findRooms(@Param("userNo") Long userNo, @Param("limit") int limit);
 
 	List<ShareTargetRow> findShareCandidates(@Param("userNo") Long userNo,
