@@ -13,6 +13,6 @@ public class SocialLoginResponse {
 	private long expiresIn;
 	/** 이번 요청으로 신규 가입된 경우 true */
 	private boolean newUser;
-	/** 자동 생성 닉네임이면 true → FE에서 변경 유도 */
+	/** 자동 생성 닉네임태그이면 true → FE에서 변경 유도 */
 	private boolean defaultNickname;
 }

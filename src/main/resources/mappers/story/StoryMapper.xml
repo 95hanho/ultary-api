@@ -188,7 +188,6 @@
 				FROM ultary_pet rp
 				WHERE rp.user_no = u.user_no
 				  AND rp.is_deleted = 0
-				  AND rp.profile_file_id IS NOT NULL
 				ORDER BY rp.priority ASC, rp.pet_id ASC
 				LIMIT 1
 			) AS profileFileId,
@@ -224,7 +223,6 @@
 				FROM ultary_pet rp
 				WHERE rp.user_no = u.user_no
 				  AND rp.is_deleted = 0
-				  AND rp.profile_file_id IS NOT NULL
 				ORDER BY rp.priority ASC, rp.pet_id ASC
 				LIMIT 1
 			) AS profileFileId,

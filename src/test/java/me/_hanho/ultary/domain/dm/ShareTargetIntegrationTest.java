@@ -65,12 +65,12 @@ class ShareTargetIntegrationTest {
         assertThatThrownBy(() -> list(null, "DM,OWN_STORY_TAG", 50)).isInstanceOf(BusinessException.class);
     }
 
-    @Test void searchesBeforeLimitByNicknameAndPetTagCaseInsensitively() {
+    @Test void searchesBeforeLimitByNicknameAndPetNameCaseInsensitively() {
         for (int i = 0; i < 3; i++) follow(me, user(), now);
         Long peer = user(); follow(me, peer, now.minusMonths(2));
         jdbc.update("UPDATE ultary_user SET nickname='검색대상' WHERE user_no=?", peer);
         Long pet = pet(peer);
-        jdbc.update("UPDATE ultary_pet SET mention_id='Share_Search_Pet' WHERE pet_id=?", pet);
+        jdbc.update("UPDATE ultary_pet SET name='Share_Search_Pet' WHERE pet_id=?", pet);
         assertThat(list("  @share_SEARCH  ", null, 1)).extracting(DmShareTargetItemResponse::getUserNo).containsExactly(peer);
         assertThat(list("검색대상", null, 1)).hasSize(1);
         assertThat(list("%not-a-wildcard", null, 50)).isEmpty();
@@ -127,13 +127,14 @@ class ShareTargetIntegrationTest {
     @Test void tagPickersExcludeAccountsWithoutPetsAndDisallowedTagsButAllowOwnTags() {
         Long noPets = user(), closed = user(), active = user();
         follow(me, noPets, now); follow(me, closed, now); follow(me, active, now);
-        pet(closed); pet(active); pet(me);
+        pet(closed); pet(active); Long ownPet=pet(me);
+        jdbc.update("UPDATE ultary_pet SET name=? WHERE pet_id=?", "OwnPet"+me, ownPet);
         jdbc.update("INSERT INTO ultary_user_privacy(user_no,allow_tag) VALUES(?,0),(?,0)", closed, me);
         var result = service.shareTargets(principal, 50, null, null, "FEED_TAG").getItems();
         assertThat(result).extracting(DmShareTargetItemResponse::getUserNo).containsExactly(active, me);
         assertThat(service.shareTargets(principal, 50, null, null, "DM").getItems())
             .extracting(DmShareTargetItemResponse::getUserNo).contains(noPets, closed, active).doesNotContain(me);
-        String ownTag = result.get(1).getPets().get(0).mentionId();
+        String ownTag = result.get(1).getPets().get(0).name();
         assertThat(service.shareTargets(principal, 1, "@" + ownTag.toUpperCase(), null, "STORY_TAG").getItems())
             .extracting(DmShareTargetItemResponse::getUserNo).containsExactly(me);
     }

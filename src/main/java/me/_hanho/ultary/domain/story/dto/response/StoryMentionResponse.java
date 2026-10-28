@@ -11,6 +11,7 @@ public class StoryMentionResponse {
 
 	private Long storyMentionId;
 	private Long petId;
+	@com.fasterxml.jackson.annotation.JsonIgnore
 	private String mentionId;
 	private String petName;
 	private BigDecimal posX;

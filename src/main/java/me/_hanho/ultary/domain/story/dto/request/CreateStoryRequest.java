@@ -18,6 +18,8 @@ import lombok.Setter;
 @Getter
 @Setter
 public class CreateStoryRequest {
+    @Size(max = 20)
+    private List<@NotNull @jakarta.validation.constraints.Positive Long> subjectPetIds;
 
 	@NotNull(message = "fileId는 필수입니다.")
 	private Long fileId;

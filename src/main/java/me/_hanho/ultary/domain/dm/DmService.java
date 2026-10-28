@@ -589,13 +589,15 @@ public class DmService {
 		}
 		var files = fileService.findSummaries(fileIds);
 		Map<Long, List<String>> petTags = new HashMap<>();
+        Map<Long, List<String>> petNames = new HashMap<>();
 		Map<Long, List<DmShareTargetItemResponse.PetChoice>> petChoices = new HashMap<>();
 		List<Long> userNos = ranked.subList(0, size).stream().map(t -> t.row().getUserNo()).toList();
 		if (!userNos.isEmpty()) {
 			for (var pet : petMapper.findActiveMentions(userNos)) {
 				petTags.computeIfAbsent(pet.getUserNo(), key -> new ArrayList<>()).add(pet.getMentionId());
+                petNames.computeIfAbsent(pet.getUserNo(), key -> new ArrayList<>()).add(pet.getName());
 				petChoices.computeIfAbsent(pet.getUserNo(), key -> new ArrayList<>())
-						.add(new DmShareTargetItemResponse.PetChoice(pet.getPetId(), pet.getMentionId()));
+						.add(new DmShareTargetItemResponse.PetChoice(pet.getPetId(), pet.getMentionId(), pet.getName()));
 			}
 		}
 		List<DmShareTargetItemResponse> items = new ArrayList<>();
@@ -606,6 +608,7 @@ public class DmService {
 					.userNo(row.getUserNo())
 					.nickname(row.getNickname())
 					.petTags(petTags.getOrDefault(row.getUserNo(), List.of()))
+                    .petNames(petNames.getOrDefault(row.getUserNo(), List.of()))
 					.pets(petChoices.getOrDefault(row.getUserNo(), List.of()))
 					.profileFile(row.getProfileFileId() == null ? null : files.get(row.getProfileFileId()))
 					.dmRoomId(row.getDmRoomId())

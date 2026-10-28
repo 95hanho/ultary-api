@@ -10,6 +10,7 @@ import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
 @Getter
 @Builder
 public class StoryResponse {
+    private List<me._hanho.ultary.domain.pet.ContentPetService.SubjectPet> subjectPets;
 
 	private Long storyId;
 	private Long userNo;

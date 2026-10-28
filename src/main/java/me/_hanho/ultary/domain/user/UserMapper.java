@@ -11,6 +11,11 @@ import me._hanho.ultary.domain.user.model.User;
 
 @Mapper
 public interface UserMapper {
+    @org.apache.ibatis.annotations.Select("SELECT user_no FROM ultary_user WHERE user_no=#{userNo} AND withdrawal_status='ACTIVE' FOR UPDATE")
+    Long lockActiveUser(@Param("userNo") Long userNo);
+    List<User> findAllByPhoneForLogin(@Param("phone") String phone);
+    List<User> findAllByEmailForLogin(@Param("email") String email);
+
 
 	User findActiveByUserNo(@Param("userNo") Long userNo);
 
@@ -43,7 +48,7 @@ public interface UserMapper {
 			@Param("q") String q,
 			@Param("limit") int limit);
 
-	/** 펫 mention_id가 맞는 보호자. 유저당 한 줄 */
+	/** 닉네임태그 또는 펫 이름이 맞는 보호자. 유저당 한 줄 */
 	List<User> searchActiveByPetMention(
 			@Param("viewerUserNo") Long viewerUserNo,
 			@Param("q") String q,
@@ -57,7 +62,7 @@ public interface UserMapper {
 			@Param("userNo") Long userNo,
 			@Param("nickname") String nickname);
 
-	/** local 테스트: 닉네임 쿨다운 기준 시각만 바꾼다 */
+	/** local 테스트: 닉네임태그 쿨다운 기준 시각만 바꾼다 */
 	int updateNicknameChangedAt(
 			@Param("userNo") Long userNo,
 			@Param("nicknameChangedAt") LocalDateTime nicknameChangedAt);

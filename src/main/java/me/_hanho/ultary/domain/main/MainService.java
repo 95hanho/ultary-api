@@ -194,7 +194,8 @@ public class MainService {
 		return toHistoryItem(
 				principal.getUserNo(), row,
 				fileService.findSummary(row.getProfileFileId()),
-				petTagsByUser(List.of(row.getTargetUserNo())).getOrDefault(row.getTargetUserNo(), List.of()));
+				petTagsByUser(List.of(row.getTargetUserNo())).getOrDefault(row.getTargetUserNo(), List.of()),
+                petService.petNamesByUser(List.of(row.getTargetUserNo())).getOrDefault(row.getTargetUserNo(), List.of()));
 	}
 
 	private SearchHistoryItemResponse saveRecentTag(UserPrincipal principal, Long tagId) {
@@ -206,7 +207,7 @@ public class MainService {
 		SearchHistoryRow row = userSearchHistoryMapper.findByTagPair(principal.getUserNo(), tagId);
 		log.info("[saveRecentSearch] userNo={} tagId={} hashtag={}",
 				principal.getUserNo(), tagId, tag.getHashtag());
-		return toHistoryItem(principal.getUserNo(), row, null, List.of());
+		return toHistoryItem(principal.getUserNo(), row, null, List.of(), List.of());
 	}
 
 	/** 스토리 @·사진 태그 모달의 최근 펫. 검색 최근 울타리와 별도 */
@@ -300,6 +301,7 @@ public class MainService {
 		}
 		Map<Long, FileSummaryResponse> files = fileService.findSummaries(profileIds);
 		Map<Long, List<String>> petTags = petTagsByUser(userNos);
+        Map<Long, List<String>> petNames = petService.petNamesByUser(userNos);
 		List<SearchHistoryItemResponse> items = rows.stream()
 				.map(row -> toHistoryItem(
 						principal.getUserNo(), row,
@@ -308,7 +310,8 @@ public class MainService {
 								: files.get(row.getProfileFileId().longValue()),
 						row.getTargetUserNo() == null
 								? List.of()
-								: petTags.getOrDefault(row.getTargetUserNo(), List.of())))
+								: petTags.getOrDefault(row.getTargetUserNo(), List.of()),
+                        row.getTargetUserNo() == null ? List.of() : petNames.getOrDefault(row.getTargetUserNo(), List.of())))
 				.toList();
 		return SearchHistoryPageResponse.builder()
 				.items(items)
@@ -372,7 +375,7 @@ public class MainService {
 	}
 
 	private SearchHistoryItemResponse toHistoryItem(
-			Long viewerUserNo, SearchHistoryRow row, FileSummaryResponse profileFile, List<String> petTags) {
+			Long viewerUserNo, SearchHistoryRow row, FileSummaryResponse profileFile, List<String> petTags, List<String> petNames) {
 		boolean tag = "TAG".equals(row.getHistoryType()) || row.getTargetTagId() != null;
 		boolean hasStory = !tag && storyService.hasVisibleStory(viewerUserNo, row.getTargetUserNo());
 		return SearchHistoryItemResponse.builder()
@@ -385,6 +388,7 @@ public class MainService {
 				.hasStory(hasStory)
 				.hasUnviewed(hasStory && storyService.hasUnviewedStory(row.getTargetUserNo(), viewerUserNo))
 				.petTags(tag ? List.of() : (petTags == null ? List.of() : petTags))
+                .petNames(tag ? List.of() : petNames)
 				.tagId(tag ? row.getTargetTagId() : null)
 				.hashtag(tag ? row.getHashtag() : null)
 				.feedCount(tag ? (row.getFeedCount() == null ? 0L : row.getFeedCount()) : null)
@@ -484,6 +488,7 @@ public class MainService {
 		Map<Long, FileSummaryResponse> files = fileService.findSummaries(profileIds);
 		Map<Long, List<String>> petTags = petTagsByUser(
 				userRows.stream().map(User::getUserNo).toList());
+        Map<Long, List<String>> petNames = petService.petNamesByUser(userRows.stream().map(User::getUserNo).toList());
 		return userRows.stream()
 				.map(u -> {
 					Integer profileFileId = profileByUser.get(u.getUserNo());
@@ -495,6 +500,7 @@ public class MainService {
 							.profileFileId(profileFileId)
 							.profileFile(profileId == null ? null : files.get(profileId))
 							.petTags(petTags.getOrDefault(u.getUserNo(), List.of()))
+                            .petNames(petNames.getOrDefault(u.getUserNo(), List.of()))
 							.hasStory(hasStory)
 							.hasUnviewed(hasStory && storyService.hasUnviewedStory(u.getUserNo(), viewerUserNo))
 							.bio(u.getBio())

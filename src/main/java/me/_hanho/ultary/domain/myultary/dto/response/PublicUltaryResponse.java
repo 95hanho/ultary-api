@@ -9,6 +9,6 @@ public record PublicUltaryResponse(Long userNo, String nickname, String bio,
         int followCount, int followerCount, int feedCount, List<PublicPet> pets,
         List<FeedGridItemResponse> feeds, List<FeedGridItemResponse> pinnedFeeds,
         List<FeedGridItemResponse> taggedFeeds) {
-    public record PublicPet(Long petId, String name, String mentionId, String gender,
+    public record PublicPet(Long petId, String name, @com.fasterxml.jackson.annotation.JsonIgnore String mentionId, String gender,
             String bio, LocalDateTime birthday, FileSummaryResponse profileFile) {}
 }

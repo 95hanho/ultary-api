@@ -11,4 +11,5 @@ public class PetMention {
 	private Long userNo;
 	private Long petId;
 	private String mentionId;
+    private String name;
 }

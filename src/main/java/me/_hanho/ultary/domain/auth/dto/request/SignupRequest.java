@@ -20,7 +20,7 @@ public class SignupRequest {
 	@Pattern(regexp = PasswordRules.REGEX, message = PasswordRules.MESSAGE)
 	private String password;
 
-	@NotBlank(message = "닉네임은 필수입니다.")
+	@NotBlank(message = "닉네임태그는 필수입니다.")
 	@ValidNickname
 	private String nickname;
 

@@ -5,7 +5,13 @@
 
 <mapper namespace="me._hanho.ultary.domain.user.UserMapper">
 
-	<sql id="userColumns">
+	<select id="findAllByPhoneForLogin" resultType="me._hanho.ultary.domain.user.model.User">
+        SELECT <include refid="userColumns"/> FROM ultary_user WHERE phone=#{phone} ORDER BY user_no
+    </select>
+    <select id="findAllByEmailForLogin" resultType="me._hanho.ultary.domain.user.model.User">
+        SELECT <include refid="userColumns"/> FROM ultary_user WHERE email=#{email} ORDER BY user_no
+    </select>
+    <sql id="userColumns">
 		user_no,
 		password,
 		name,
@@ -101,7 +107,10 @@
 		FROM ultary_user u
 		WHERE u.withdrawal_status = 'ACTIVE'
 		  AND u.user_no != #{viewerUserNo}
-		  AND u.nickname LIKE CONCAT('%', #{q}, '%')
+		  AND (LOCATE(LOWER(#{q}), LOWER(u.nickname)) &gt; 0 OR EXISTS (
+            SELECT 1 FROM ultary_pet sp WHERE sp.user_no=u.user_no AND sp.is_deleted=0
+            AND LOCATE(LOWER(#{q}), LOWER(sp.name)) &gt; 0
+          ))
 		  AND NOT EXISTS (
 			SELECT 1
 			FROM ultary_user_block b
@@ -119,13 +128,10 @@
 		FROM ultary_user u
 		WHERE u.withdrawal_status = 'ACTIVE'
 		  AND u.user_no != #{viewerUserNo}
-		  AND EXISTS (
-			SELECT 1
-			FROM ultary_pet p
-			WHERE p.user_no = u.user_no
-			  AND p.is_deleted = 0
-			  AND p.mention_id LIKE CONCAT('%', #{q}, '%')
-		  )
+		  AND (LOCATE(LOWER(#{q}), LOWER(u.nickname)) &gt; 0 OR EXISTS (
+            SELECT 1 FROM ultary_pet sp WHERE sp.user_no=u.user_no AND sp.is_deleted=0
+            AND LOCATE(LOWER(#{q}), LOWER(sp.name)) &gt; 0
+          ))
 		  AND NOT EXISTS (
 			SELECT 1
 			FROM ultary_user_block b

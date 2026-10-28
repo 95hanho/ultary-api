@@ -11,7 +11,7 @@ public class ReportResponse {
 
 	private Long reportId;
 	private Long reporterUserNo;
-	/** 관리자 목록·상세에서 표시하는 신고자 닉네임 */
+	/** 관리자 목록·상세에서 표시하는 신고자 닉네임태그 */
 	private String reporterNickname;
 	private String targetType;
 	private Long targetUserNo;
@@ -19,7 +19,7 @@ public class ReportResponse {
 	private Long targetCommentId;
 	private Long targetReplyId;
 	private String reason;
-	/** 대상 회원 닉네임. 회원 신고는 그 회원, 글·댓글·답글은 작성자. 관리자 목록·상세에서 채운다 */
+	/** 대상 회원 닉네임태그. 회원 신고는 그 회원, 글·댓글·답글은 작성자. 관리자 목록·상세에서 채운다 */
 	private String targetNickname;
 	/** 게시글·댓글·답글 본문. 30자, 넘으면 뒤에 ... 목록에서만 채운다 */
 	private String targetContent;

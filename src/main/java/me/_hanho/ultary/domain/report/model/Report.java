@@ -20,7 +20,7 @@ public class Report {
 	private Long targetCommentId;
 	private Long targetReplyId;
 	private String reason;
-	/** 관리자 목록·상세. 회원 신고는 그 회원, 글·댓글·답글은 작성자 닉네임 */
+	/** 관리자 목록·상세. 회원 신고는 그 회원, 글·댓글·답글은 작성자 닉네임태그 */
 	private String targetNickname;
 	/** 목록 조회용. FEED·COMMENT·REPLY 본문 */
 	private String targetContent;

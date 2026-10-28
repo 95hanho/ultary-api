@@ -11,6 +11,7 @@ import lombok.Setter;
 @Getter
 @Setter
 public class LoginRequest {
+    private Long userNo;
 
 	private String email;
 

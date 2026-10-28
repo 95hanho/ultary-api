@@ -22,6 +22,12 @@ import me._hanho.ultary.domain.feed.model.FeedSave;
 
 @Mapper
 public interface FeedMapper {
+    List<Feed> findPetFeeds(
+            @Param("ownerUserNo") Long ownerUserNo,
+            @Param("viewerUserNo") Long viewerUserNo,
+            @Param("petId") Long petId,
+            @Param("tagged") boolean tagged,
+            @Param("limit") int limit);
     Feed findAiLogFeed(@Param("aiRequestId") Long aiRequestId);
     List<FeedComment> findAiLogComments(@Param("aiRequestId") Long aiRequestId, @Param("feedId") Long feedId);
     List<FeedReply> findAiLogReplies(@Param("aiRequestId") Long aiRequestId, @Param("commentId") Long commentId);

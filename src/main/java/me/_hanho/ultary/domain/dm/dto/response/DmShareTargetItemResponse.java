@@ -14,10 +14,12 @@ public class DmShareTargetItemResponse {
 	private Long userNo;
 	private String nickname;
 	/** 활성 펫의 mentionId. @ 없음. 펫 priority 순 */
+	@com.fasterxml.jackson.annotation.JsonIgnore
 	private List<String> petTags;
+    private List<String> petNames;
 	/** 개별 펫 선택용. priority 순 */
 	private List<PetChoice> pets;
-	public record PetChoice(Long petId, String mentionId) {}
+	public record PetChoice(Long petId, @com.fasterxml.jackson.annotation.JsonIgnore String mentionId, String name) {}
 	private FileSummaryResponse profileFile;
 	/** 이미 대화방이 있으면 그 번호. 없으면 null */
 	private Long dmRoomId;

@@ -12,7 +12,9 @@ public class PetResponse {
 
 	private Long petId;
 	private Long userNo;
+	@com.fasterxml.jackson.annotation.JsonIgnore
 	private String mentionId;
+	@com.fasterxml.jackson.annotation.JsonIgnore
 	private LocalDateTime mentionIdChangedAt;
 	private String name;
 	private String species;

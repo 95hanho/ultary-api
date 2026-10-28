@@ -6,6 +6,8 @@ import lombok.Getter;
 @Getter
 @Builder
 public class PasswordTokenResponse {
+    private boolean selectionRequired;
+    private java.util.List<TokenResponse.AccountChoice> accounts;
 
 	private String passwordChangeToken;
 }

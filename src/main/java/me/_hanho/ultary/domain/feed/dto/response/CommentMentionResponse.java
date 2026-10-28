@@ -12,6 +12,7 @@ public class CommentMentionResponse {
 	private Long userNo;
 	private String nickname;
 	private Long petId;
+	@com.fasterxml.jackson.annotation.JsonIgnore
 	private String mentionId;
 	private String petName;
 }

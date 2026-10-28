@@ -73,6 +73,7 @@ public class FeedService {
 	private static final Set<String> VIDEO_EXTENSIONS = Set.of("mp4", "webm", "mov");
 
 	private final FeedMapper feedMapper;
+    private final me._hanho.ultary.domain.pet.ContentPetService contentPetService;
 	private final StoryService storyService;
 	private final FileService fileService;
 	private final PetMapper petMapper;
@@ -100,6 +101,7 @@ public class FeedService {
 		feed.setContent(blankToNull(request.getContent()));
 		feed.setVisibility(visibility);
 		feedMapper.insertFeed(feed);
+        contentPetService.replace("FEED", feed.getFeedId(), principal.getUserNo(), request.getSubjectPetIds());
 
 		insertMedia(feed.getFeedId(), principal.getUserNo(), request.getMedia());
 		insertPets(feed.getFeedId(), principal.getUserNo(), request.getPets());
@@ -208,6 +210,8 @@ public class FeedService {
 	public FeedResponse update(UserPrincipal principal, Long feedId, UpdateFeedRequest request) {
 		moderationQueue.lock("FEED", feedId, feedId);
 		requireAuthor(feedId, principal.getUserNo());
+
+        contentPetService.replace("FEED", feedId, principal.getUserNo(), request.getSubjectPetIds());
 
 		Feed patch = new Feed();
 		patch.setFeedId(feedId);
@@ -1080,6 +1084,7 @@ public class FeedService {
 				? null
 				: authorProfiles.get(author.getUserNo());
 		return FeedResponse.builder()
+                .subjectPets(contentPetService.list("FEED", feed.getFeedId()))
 				.feedId(feed.getFeedId())
 				.userNo(feed.getUserNo())
 				.authorNickname(author != null ? author.getNickname() : null)

@@ -53,6 +53,25 @@ public class MyUltaryService {
 	private final FeedService feedService;
 	private final FileService fileService;
 	private final StoryService storyService;
+    private final me._hanho.ultary.domain.user.UserBlockMapper userBlockMapper;
+
+    /** 펫 선택은 일반/언급 그리드에만 적용하며, 공개 범위를 통과한 글을 LIMIT 전에 고른다. */
+    @Transactional(readOnly = true)
+    public List<FeedGridItemResponse> getPetFeeds(UserPrincipal principal, Long owner, Long petId, String tab, Integer limit) {
+        requireUser(owner);
+        Long viewer = principal == null ? null : principal.getUserNo();
+        if (viewer == null && privacyService.isPrivateAccount(owner))
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+        if (viewer != null && userBlockMapper.findActiveByPair(owner, viewer) != null)
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+        if (!"feed".equals(tab) && !"tagged".equals(tab))
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "일반 피드 또는 언급 피드만 조회할 수 있습니다.");
+        if (petMapper.findActiveByPetIdAndUserNo(petId, owner) == null)
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "해당 울타리의 반려동물을 선택해 주세요.");
+        if (viewer != null && !viewer.equals(owner)
+                && (hidePrivateGrids(viewer, owner) || userBlockMapper.findActiveByPair(viewer, owner) != null)) return List.of();
+        return toGridItems(feedMapper.findPetFeeds(owner, viewer, petId, "tagged".equals(tab), resolveLimit(limit)));
+    }
 
 	@Transactional(readOnly = true)
 	public MyUltaryProfileResponse getProfile(UserPrincipal principal) {
@@ -105,7 +124,8 @@ public class MyUltaryService {
 
 	@Transactional(readOnly = true)
 	public List<FeedGridItemResponse> getPinnedFeeds(UserPrincipal principal, Integer limit) {
-		return toGridItems(feedMapper.findPinnedByUserNo(principal.getUserNo(), resolveLimit(limit)));
+		return toGridItems(feedMapper.findPinnedVisibleByOwner(
+                principal.getUserNo(), principal.getUserNo(), resolveLimit(limit)));
 	}
 
 	/** 나만 보는 저장. 다른 사람 울타리에는 없다 */
@@ -117,7 +137,8 @@ public class MyUltaryService {
 
 	@Transactional(readOnly = true)
 	public List<FeedGridItemResponse> getTaggedFeeds(UserPrincipal principal, Integer limit) {
-		return toGridItems(feedMapper.findTaggedByUserNo(principal.getUserNo(), resolveLimit(limit)));
+		return toGridItems(feedMapper.findTaggedVisibleByOwner(
+                principal.getUserNo(), principal.getUserNo(), resolveLimit(limit)));
 	}
 
 	/** 그 유저가 울타리에 고정한 글. 본인이면 내 고정 목록과 같고, 아니면 조회자가 볼 수 있는 글만 */

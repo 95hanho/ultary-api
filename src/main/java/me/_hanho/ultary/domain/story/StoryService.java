@@ -52,6 +52,7 @@ public class StoryService {
 	private final PrivacyService privacyService;
 	private final NeighborMapper neighborMapper;
 	private final StoryMapper storyMapper;
+    private final me._hanho.ultary.domain.pet.ContentPetService contentPetService;
 	private final FileService fileService;
 	private final UserMapper userMapper;
 	private final UserBlockMapper userBlockMapper;
@@ -85,6 +86,7 @@ public class StoryService {
 		story.setDurationSec(durationSec);
 		story.setCaption(blankToNull(request.getCaption()));
 		storyMapper.insert(story);
+        contentPetService.replace("STORY", story.getStoryId(), principal.getUserNo(), request.getSubjectPetIds());
 		insertOverlays(story.getStoryId(), principal.getUserNo(), request);
 		notificationService.syncStoryTags(story.getStoryId());
 		log.info("[create] storyId={} userNo={} mediaType={}",
@@ -175,6 +177,7 @@ public class StoryService {
 		int unviewed = storyMapper.countUnviewedActiveByOwner(row.getUserNo(), viewerUserNo);
 		Long profileId = row.getProfileFileId() == null ? null : row.getProfileFileId().longValue();
 		return StoryOwnerResponse.builder()
+                .subjectPets(contentPetService.storyOwnerPets(row.getUserNo()))
 				.userNo(row.getUserNo())
 				.nickname(row.getNickname())
 				.profileFileId(row.getProfileFileId())
@@ -301,6 +304,7 @@ public class StoryService {
 		}
 		Map<Long, FileSummaryResponse> files = fileService.findSummaries(fileIds);
 		return StoryResponse.builder()
+                .subjectPets(contentPetService.list("STORY", story.getStoryId()))
 				.storyId(story.getStoryId())
 				.userNo(story.getUserNo())
 				.authorNickname(author != null ? author.getNickname() : null)

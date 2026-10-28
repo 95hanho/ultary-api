@@ -18,6 +18,8 @@ public class MainSearchUserItem {
 	private boolean hasStory;
 	private boolean hasUnviewed;
 	/** 그 유저 펫의 mentionId. @ 없음. priority 순. 없으면 빈 배열 */
+	@com.fasterxml.jackson.annotation.JsonIgnore
 	private List<String> petTags;
+    private List<String> petNames;
 	private String bio;
 }

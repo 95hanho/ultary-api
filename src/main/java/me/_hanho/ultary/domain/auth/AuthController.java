@@ -120,7 +120,7 @@ public class AuthController {
 	public ApiResponse<ChangeAvailabilityResponse> nicknameChangeAvailability(
 			@AuthenticationPrincipal UserPrincipal principal) {
 		log.info("[nicknameChangeAvailability]");
-		return ApiResponse.ok(authService.nicknameChangeAvailability(principal), "닉네임 변경 가능 여부 조회 성공");
+		return ApiResponse.ok(authService.nicknameChangeAvailability(principal), "닉네임태그 변경 가능 여부 조회 성공");
 	}
 
 	@PatchMapping("/me/nickname")
@@ -128,7 +128,7 @@ public class AuthController {
 			@AuthenticationPrincipal UserPrincipal principal,
 			@Valid @RequestBody ChangeNicknameRequest request) {
 		log.info("[changeNickname] nickname={}", request.getNickname());
-		return ApiResponse.ok(authService.changeNickname(principal, request), "닉네임 변경 성공");
+		return ApiResponse.ok(authService.changeNickname(principal, request), "닉네임태그 변경 성공");
 	}
 
 	@DeleteMapping("/me")
@@ -148,11 +148,11 @@ public class AuthController {
 	@GetMapping("/nickname/check")
 	public ApiResponse<AvailabilityCheckResponse> checkNickname(
 			@RequestParam
-			@NotBlank(message = "닉네임은 필수입니다.")
+			@NotBlank(message = "닉네임태그는 필수입니다.")
 			@ValidNickname
 			String nickname) {
 		log.info("[checkNickname] nickname={}", nickname);
-		return ApiResponse.ok(authService.checkNickname(nickname), "닉네임 중복확인 성공");
+		return ApiResponse.ok(authService.checkNickname(nickname), "닉네임태그 중복확인 성공");
 	}
 
 	@PostMapping("/phone")

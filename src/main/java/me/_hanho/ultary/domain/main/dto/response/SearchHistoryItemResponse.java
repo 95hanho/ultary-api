@@ -25,7 +25,9 @@ public class SearchHistoryItemResponse {
 	private boolean hasStory;
 	private boolean hasUnviewed;
 	/** type=USER: 펫 멘션(@ 없음). type=TAG면 [] */
+	@com.fasterxml.jackson.annotation.JsonIgnore
 	private List<String> petTags;
+    private List<String> petNames;
 
 	/** type=TAG: 태그. type=USER면 null */
 	private Long tagId;

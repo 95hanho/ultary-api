@@ -13,7 +13,7 @@ public class MeResponse {
 	private Long userNo;
 	private String name;
 	private String nickname;
-	/** true면 FE에서 닉네임 변경 유도 */
+	/** true면 FE에서 닉네임태그 변경 유도 */
 	private boolean defaultNickname;
 	/** 비밀번호가 설정된 계정인지 */
 	private boolean hasPassword;

@@ -12,6 +12,7 @@ import me._hanho.ultary.domain.report.dto.response.MyReportResponse;
 @Getter
 @Builder
 public class FeedResponse {
+    private List<me._hanho.ultary.domain.pet.ContentPetService.SubjectPet> subjectPets;
 
 	private Long feedId;
 	private Long userNo;
@@ -55,6 +56,7 @@ public class FeedResponse {
 	@Builder
 	public static class MentionItem {
 		private Long petId;
+		@com.fasterxml.jackson.annotation.JsonIgnore
 		private String mentionId;
 		private String petName;
 		private Long userNo;

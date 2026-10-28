@@ -11,6 +11,7 @@ import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
 @Getter
 @Builder
 public class StoryOwnerResponse {
+    private java.util.List<me._hanho.ultary.domain.pet.ContentPetService.SubjectPet> subjectPets;
 
 	private Long userNo;
 	private String nickname;

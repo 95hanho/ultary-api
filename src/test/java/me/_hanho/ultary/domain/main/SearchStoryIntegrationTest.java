@@ -33,7 +33,7 @@ class SearchStoryIntegrationTest {
         viewer = user(); author = user(); principal = new UserPrincipal(viewer, "search-story");
         nickname = jdbc.queryForObject("SELECT nickname FROM ultary_user WHERE user_no=?", String.class, author);
         mention = "storypet" + author;
-        jdbc.update("INSERT INTO ultary_pet(user_no,mention_id,name,priority) VALUES(?,?,?,1)", author, mention, "search pet");
+        jdbc.update("INSERT INTO ultary_pet(user_no,mention_id,name,priority) VALUES(?,?,?,1)", author, "legacy"+author, mention);
         jdbc.update("INSERT INTO ultary_file(store_name,file_path,mime_type,extension,source_type,uploaded_by_user_no) VALUES('search-story.jpg','images/search-story.jpg','image/jpeg','jpg','OWNED',?)", author);
         Long file = id();
         jdbc.update("INSERT INTO ultary_story(user_no,file_id,media_type,expires_at) VALUES(?,?,'IMAGE',DATE_ADD(NOW(),INTERVAL 1 DAY))", author, file);

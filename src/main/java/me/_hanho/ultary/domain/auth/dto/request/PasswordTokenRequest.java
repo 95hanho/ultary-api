@@ -8,6 +8,7 @@ import me._hanho.ultary.common.validation.PhoneRules;
 
 @Getter
 public class PasswordTokenRequest {
+    @Setter private Long userNo;
 
 	@NotBlank(message = "휴대폰 번호는 필수입니다.")
 	@Pattern(regexp = PhoneRules.REGEX, message = PhoneRules.MESSAGE)

@@ -95,7 +95,6 @@
 			FROM ultary_pet rp
 			WHERE rp.user_no = u.user_no
 			  AND rp.is_deleted = 0
-			  AND rp.profile_file_id IS NOT NULL
 			ORDER BY rp.priority ASC, rp.pet_id ASC
 			LIMIT 1
 		) AS profileFileId,
@@ -163,7 +162,7 @@
 	<select id="findShareCandidates" resultType="me._hanho.ultary.domain.dm.model.ShareTargetRow">
 		SELECT u.user_no AS userNo, u.nickname,
 			(SELECT p.profile_file_id FROM ultary_pet p
-			 WHERE p.user_no = u.user_no AND p.is_deleted = 0 AND p.profile_file_id IS NOT NULL
+			 WHERE p.user_no = u.user_no AND p.is_deleted = 0
 			 ORDER BY p.priority, p.pet_id LIMIT 1) AS profileFileId,
 			r.dm_room_id AS dmRoomId,
 			MAX(CASE WHEN e.kind = 'DM' THEN e.at END) AS lastMessageAt,
@@ -253,7 +252,7 @@
 		<if test="query != null and query != ''">
 			AND (LOCATE(LOWER(#{query}), LOWER(u.nickname)) &gt; 0 OR EXISTS (
 				SELECT 1 FROM ultary_pet sp WHERE sp.user_no = u.user_no AND sp.is_deleted = 0
-				AND LOCATE(LOWER(#{query}), LOWER(sp.mention_id)) &gt; 0))
+				AND (LOCATE(LOWER(#{query}), LOWER(sp.name)) &gt; 0)))
 		</if>
 		GROUP BY u.user_no, u.nickname, r.dm_room_id
 	</select>
@@ -283,7 +282,6 @@
 			FROM ultary_pet rp
 			WHERE rp.user_no = COALESCE(f.user_no, s.user_no)
 			  AND rp.is_deleted = 0
-			  AND rp.profile_file_id IS NOT NULL
 			ORDER BY rp.priority ASC, rp.pet_id ASC
 			LIMIT 1
 		) AS authorProfileFileId,

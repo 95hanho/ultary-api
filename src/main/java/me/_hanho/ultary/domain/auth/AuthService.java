@@ -57,8 +57,8 @@ import me._hanho.ultary.security.principal.UserPrincipal;
 @RequiredArgsConstructor
 public class AuthService {
 
-	private static final String NICKNAME_RANDOM_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-	/** 영문 닉네임 최대 10자. google(6)+4, kakao(5)+5 */
+	private static final String NICKNAME_RANDOM_CHARS = "abcdefghijklmnopqrstuvwxyz";
+	/** 영문 닉네임태그 최대 10자. google(6)+4, kakao(5)+5 */
 	private static final int NICKNAME_ENGLISH_MAX = 10;
 	private static final int NICKNAME_MAX_RETRY = 10;
 	/** ultary_user.name VARCHAR(20) */
@@ -179,18 +179,22 @@ public class AuthService {
 
 	@Transactional
 	public TokenResponse login(LoginRequest request, HttpServletRequest httpRequest) {
-		User user = resolveLoginUser(request);
-
-		rejectClosedAccount(user);
-		if (user == null
-				|| !StringUtils.hasText(user.getPassword())
-				|| !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-
-			throw new BusinessException(ErrorCode.LOGIN_FAILED);
-		}
-		if (!"ACTIVE".equals(user.getWithdrawalStatus())) {
-			throw new BusinessException(ErrorCode.USER_INACTIVE);
-		}
+        var candidates = resolveLoginUsers(request);
+        if (candidates.size() == 1) rejectClosedAccount(candidates.get(0));
+        var matching = candidates.stream()
+            .filter(user -> StringUtils.hasText(user.getPassword()) && passwordEncoder.matches(request.getPassword(), user.getPassword())).toList();
+        if (matching.isEmpty()) throw new BusinessException(ErrorCode.LOGIN_FAILED);
+        var active = matching.stream().filter(user -> "ACTIVE".equals(user.getWithdrawalStatus())).toList();
+        User user;
+        if (request.getUserNo() != null) {
+            user = matching.stream().filter(candidate -> request.getUserNo().equals(candidate.getUserNo())).findFirst()
+                .orElseThrow(() -> new BusinessException(ErrorCode.LOGIN_FAILED));
+        } else if (active.size() > 1) {
+            return TokenResponse.builder().selectionRequired(true).accounts(active.stream()
+                .map(candidate -> new TokenResponse.AccountChoice(candidate.getUserNo(), candidate.getNickname())).toList()).build();
+        } else user = active.isEmpty() ? matching.get(0) : active.get(0);
+        rejectClosedAccount(user);
+        if (!"ACTIVE".equals(user.getWithdrawalStatus())) throw new BusinessException(ErrorCode.USER_INACTIVE);
 
 		return issueTokens(user, httpRequest);
 	}
@@ -260,11 +264,6 @@ public class AuthService {
 			throw new BusinessException(ErrorCode.UNAUTHORIZED);
 		}
 
-		if (StringUtils.hasText(request.getEmail())
-				&& !request.getEmail().equals(user.getEmail())
-				&& userMapper.countByEmail(request.getEmail().trim(), user.getUserNo()) > 0) {
-			throw new BusinessException(ErrorCode.EMAIL_DUPLICATED);
-		}
 
 		applyNameFirstSet(user, request.getName());
 		if (request.getEmail() != null) {
@@ -328,10 +327,6 @@ public class AuthService {
 		if (tokenPhone == null || !nextPhone.equals(tokenPhone)) {
 			throw new BusinessException(ErrorCode.PHONE_AUTH_FAILED);
 		}
-		User owner = userMapper.findByPhone(nextPhone);
-		if (owner != null && !owner.getUserNo().equals(user.getUserNo())) {
-			throw new BusinessException(ErrorCode.PHONE_ALREADY_USED);
-		}
 		user.setPhone(nextPhone);
 	}
 
@@ -387,17 +382,11 @@ public class AuthService {
 		Claims claims = jwtTokenProvider.parsePhoneAuthCompleteToken(request.getPhoneAuthCompleteToken());
 		String phone = jwtTokenProvider.getPhone(claims);
 
-		if (userMapper.findByPhone(phone) != null) {
-			throw new BusinessException(ErrorCode.PHONE_ALREADY_USED);
-		}
 		if (userMapper.countByNickname(request.getNickname(), null) > 0) {
 			throw new BusinessException(ErrorCode.NICKNAME_DUPLICATED);
 		}
 
 		String email = StringUtils.hasText(request.getEmail()) ? request.getEmail().trim() : null;
-		if (email != null && userMapper.countByEmail(email, null) > 0) {
-			throw new BusinessException(ErrorCode.EMAIL_DUPLICATED);
-		}
 
 		User user = new User();
 		user.setPassword(passwordEncoder.encode(request.getPassword()));
@@ -444,19 +433,7 @@ public class AuthService {
 				&& !"SIGNUP".equals(purpose) && !"PROFILE".equals(purpose)) {
 			throw new BusinessException(ErrorCode.INVALID_INPUT, "휴대폰 인증 용도가 올바르지 않습니다.");
 		}
-		User owner = userMapper.findByPhone(phone);
-		if (owner == null) {
-			return;
-		}
-		if ("PROFILE".equals(purpose)) {
-			if (principal == null) {
-				throw new BusinessException(ErrorCode.UNAUTHORIZED);
-			}
-			if (owner.getUserNo().equals(principal.getUserNo())) {
-				return;
-			}
-		}
-		throw new BusinessException(ErrorCode.PHONE_ALREADY_USED);
+        if ("PROFILE".equals(purpose) && principal == null) throw new BusinessException(ErrorCode.UNAUTHORIZED);
 	}
 
 	public PhoneVerifyResponse verifyPhoneAuth(PhoneVerifyRequest request) {
@@ -482,16 +459,17 @@ public class AuthService {
 		Claims claims = jwtTokenProvider.parsePhoneAuthCompleteToken(request.getPhoneAuthCompleteToken());
 		String phone = PhoneRules.normalize(jwtTokenProvider.getPhone(claims));
 		String requestPhone = PhoneRules.normalize(request.getPhone());
-		System.out.println("phone = " + phone);
-		System.out.println("requestPhone = " + requestPhone);
 		if (phone == null || !phone.equals(requestPhone)) {
 			throw new BusinessException(ErrorCode.PHONE_AUTH_FAILED);
 		}
 
-		User user = userMapper.findByPhone(phone);
-		if (user == null || !"ACTIVE".equals(user.getWithdrawalStatus())) {
-			throw new BusinessException(ErrorCode.USER_NOT_FOUND);
-		}
+        var candidates = userMapper.findAllByPhoneForLogin(phone).stream().filter(user -> "ACTIVE".equals(user.getWithdrawalStatus())).toList();
+        if (candidates.isEmpty()) throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+        if (request.getUserNo() == null && candidates.size() > 1) return PasswordTokenResponse.builder().selectionRequired(true)
+            .accounts(candidates.stream().map(user -> new TokenResponse.AccountChoice(user.getUserNo(), user.getNickname())).toList()).build();
+        User user = request.getUserNo() == null ? candidates.get(0) : candidates.stream()
+            .filter(candidate -> request.getUserNo().equals(candidate.getUserNo())).findFirst()
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
 		String token = jwtTokenProvider.createPasswordChangeToken(user.getUserNo());
 		return PasswordTokenResponse.builder().passwordChangeToken(token).build();
@@ -536,11 +514,7 @@ public class AuthService {
 			String providerUserId,
 			String email,
 			String name) {
-		// email UNIQUE — 이미 다른 계정이 사용 중이면 신규 소셜 유저에는 넣지 않음
 		String resolvedEmail = email;
-		if (resolvedEmail != null && userMapper.findByEmail(resolvedEmail) != null) {
-			resolvedEmail = null;
-		}
 
 		User user = new User();
 		user.setPassword(null);
@@ -595,9 +569,9 @@ public class AuthService {
 		return sb.toString();
 	}
 
-	private User resolveLoginUser(LoginRequest request) {
+	private java.util.List<User> resolveLoginUsers(LoginRequest request) {
 		if (StringUtils.hasText(request.getEmail())) {
-			return userMapper.findByEmailForLogin(request.getEmail().trim());
+			return userMapper.findAllByEmailForLogin(request.getEmail().trim());
 		}
 		if (StringUtils.hasText(request.getPhone())) {
 			String raw = request.getPhone();
@@ -606,11 +580,11 @@ public class AuthService {
 					raw.trim().length(),
 					PhoneRules.maskForLog(phone));
 			if (!PhoneRules.isValid(phone)) {
-				return null;
+				return java.util.List.of();
 			}
-			return userMapper.findByPhoneForLogin(phone);
+			return userMapper.findAllByPhoneForLogin(phone);
 		}
-		return null;
+		return java.util.List.of();
 	}
 
 	private void rejectClosedAccount(User user) {

@@ -16,6 +16,8 @@ import lombok.Setter;
 @Getter
 @Setter
 public class CreateFeedRequest {
+    @Size(max = 20)
+    private List<@NotNull @jakarta.validation.constraints.Positive Long> subjectPetIds;
 
 	@Size(max = 100, message = "본문은 100자 이하여야 합니다.")
 	private String content;

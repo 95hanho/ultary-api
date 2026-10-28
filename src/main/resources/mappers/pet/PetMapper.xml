@@ -112,15 +112,7 @@
 		  AND is_deleted = 0
 	</update>
 
-	<update id="updateMentionIdChangedAt">
-		UPDATE ultary_pet
-		SET mention_id_changed_at = #{mentionIdChangedAt}
-		WHERE pet_id = #{petId}
-		  AND user_no = #{userNo}
-		  AND is_deleted = 0
-	</update>
-
-	<update id="updateMentionId">
+<update id="updateMentionId">
 		UPDATE ultary_pet
 		SET mention_id = #{mentionId},
 			mention_id_changed_at = NOW(),
@@ -139,17 +131,7 @@
 		  AND is_deleted = 0
 	</update>
 
-	<select id="countByMentionId" resultType="int">
-		SELECT COUNT(1)
-		FROM ultary_pet
-		WHERE mention_id = #{mentionId}
-		  AND is_deleted = 0
-		<if test="excludePetId != null">
-			AND pet_id != #{excludePetId}
-		</if>
-	</select>
-
-	<select id="countActiveByUserNo" resultType="int">
+<select id="countActiveByUserNo" resultType="int">
 		SELECT COUNT(1)
 		FROM ultary_pet
 		WHERE user_no = #{userNo}
@@ -181,8 +163,7 @@
 		WHERE p.is_deleted = 0
 		  AND p.user_no != #{viewerUserNo}
 		  AND (
-			p.mention_id LIKE CONCAT('%', #{q}, '%')
-			OR p.name LIKE CONCAT('%', #{q}, '%')
+			p.name LIKE CONCAT('%', #{q}, '%')
 			OR u.nickname LIKE CONCAT('%', #{q}, '%')
 		  )
 		  AND NOT EXISTS (
@@ -209,7 +190,6 @@
 		FROM ultary_pet
 		WHERE user_no = #{userNo}
 		  AND is_deleted = 0
-		  AND profile_file_id IS NOT NULL
 		ORDER BY priority ASC, pet_id ASC
 		LIMIT 1
 	</select>
@@ -220,7 +200,6 @@
 			p.profile_file_id AS profileFileId
 		FROM ultary_pet p
 		WHERE p.is_deleted = 0
-		  AND p.profile_file_id IS NOT NULL
 		  AND p.user_no IN
 		<foreach collection="userNos" item="userNo" open="(" separator="," close=")">
 			#{userNo}
@@ -230,7 +209,6 @@
 			FROM ultary_pet p2
 			WHERE p2.user_no = p.user_no
 			  AND p2.is_deleted = 0
-			  AND p2.profile_file_id IS NOT NULL
 			  AND (
 				p2.priority &lt; p.priority
 				OR (p2.priority = p.priority AND p2.pet_id &lt; p.pet_id)
@@ -242,7 +220,8 @@
 		SELECT
 			pet_id AS petId,
 			user_no AS userNo,
-			mention_id AS mentionId
+			mention_id AS mentionId,
+            name AS name
 		FROM ultary_pet
 		WHERE is_deleted = 0
 		  AND user_no IN

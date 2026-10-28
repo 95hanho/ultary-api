@@ -7,7 +7,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -20,10 +19,8 @@ import me._hanho.ultary.common.exception.BusinessException;
 import me._hanho.ultary.common.exception.ErrorCode;
 import me._hanho.ultary.common.response.ApiResponse;
 import me._hanho.ultary.domain.auth.TokenMapper;
-import me._hanho.ultary.domain.pet.PetMapper;
 import me._hanho.ultary.domain.story.StoryMapper;
 import me._hanho.ultary.domain.test.dto.request.PasswordEncodeRequest;
-import me._hanho.ultary.domain.test.dto.response.MentionIdCooldownResetResponse;
 import me._hanho.ultary.domain.test.dto.response.NicknameCooldownResetResponse;
 import me._hanho.ultary.domain.test.dto.response.PasswordEncodeResponse;
 import me._hanho.ultary.domain.test.dto.response.StoryViewResetResponse;
@@ -46,7 +43,6 @@ public class TestController {
 	private final PasswordEncoder passwordEncoder;
 	private final StoryMapper storyMapper;
 	private final UserMapper userMapper;
-	private final PetMapper petMapper;
 	private final TokenMapper tokenMapper;
 
 	@PostMapping("/password/encode")
@@ -95,29 +91,7 @@ public class TestController {
 		return ApiResponse.ok(NicknameCooldownResetResponse.builder()
 				.userNo(principal.getUserNo())
 				.nicknameChangedAt(changedAt)
-				.build(), "닉네임 변경 기간 초기화 성공");
-	}
-
-	/**
-	 * 내 펫의 {@code mention_id_changed_at}을 올해 1월 1일로 되돌려 30일 쿨다운을 푼다.
-	 */
-	@PostMapping("/pets/{petId}/mention-id-cooldown")
-	public ApiResponse<MentionIdCooldownResetResponse> resetMentionIdCooldown(
-			@AuthenticationPrincipal UserPrincipal principal,
-			@PathVariable Long petId) {
-		if (principal == null) {
-			throw new BusinessException(ErrorCode.UNAUTHORIZED);
-		}
-		LocalDateTime changedAt = LocalDateTime.of(LocalDateTime.now().getYear(), 1, 1, 0, 0);
-		int updated = petMapper.updateMentionIdChangedAt(petId, principal.getUserNo(), changedAt);
-		if (updated == 0) {
-			throw new BusinessException(ErrorCode.PET_NOT_FOUND);
-		}
-		log.info("[resetMentionIdCooldown] petId={} mentionIdChangedAt={}", petId, changedAt);
-		return ApiResponse.ok(MentionIdCooldownResetResponse.builder()
-				.petId(petId)
-				.mentionIdChangedAt(changedAt)
-				.build(), "멘션 ID 변경 기간 초기화 성공");
+				.build(), "닉네임태그 변경 기간 초기화 성공");
 	}
 
 	/**

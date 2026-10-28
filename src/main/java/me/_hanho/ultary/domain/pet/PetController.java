@@ -17,8 +17,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.response.ApiResponse;
-import me._hanho.ultary.common.response.ChangeAvailabilityResponse;
-import me._hanho.ultary.domain.pet.dto.request.ChangeMentionIdRequest;
 import me._hanho.ultary.domain.pet.dto.request.CreatePetRequest;
 import me._hanho.ultary.domain.pet.dto.request.UpdatePetRequest;
 import me._hanho.ultary.domain.pet.dto.response.PetResponse;
@@ -44,25 +42,8 @@ public class PetController {
 	public ApiResponse<PetResponse> create(
 			@AuthenticationPrincipal UserPrincipal principal,
 			@Valid @RequestBody CreatePetRequest request) {
-		log.info("[create] mentionId={} name={}", request.getMentionId(), request.getName());
+		log.info("[create] name={}", request.getName());
 		return ApiResponse.ok(petService.create(principal, request), "반려동물 등록 성공");
-	}
-
-	@GetMapping("/{petId}/mention-id/change-availability")
-	public ApiResponse<ChangeAvailabilityResponse> mentionIdChangeAvailability(
-			@AuthenticationPrincipal UserPrincipal principal,
-			@PathVariable Long petId) {
-		log.info("[mentionIdChangeAvailability] petId={}", petId);
-		return ApiResponse.ok(petService.mentionIdChangeAvailability(principal, petId), "멘션 ID 변경 가능 여부 조회 성공");
-	}
-
-	@PatchMapping("/{petId}/mention-id")
-	public ApiResponse<PetResponse> changeMentionId(
-			@AuthenticationPrincipal UserPrincipal principal,
-			@PathVariable Long petId,
-			@Valid @RequestBody ChangeMentionIdRequest request) {
-		log.info("[changeMentionId] petId={} mentionId={}", petId, request.getMentionId());
-		return ApiResponse.ok(petService.changeMentionId(principal, petId, request), "멘션 ID 변경 성공");
 	}
 
 	@PatchMapping("/{petId}")

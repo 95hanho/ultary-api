@@ -15,8 +15,7 @@
 	</select>
 	<select id="findAiLogComments" resultType="me._hanho.ultary.domain.feed.model.FeedComment">
 		SELECT c.*, u.nickname AS authorNickname,
-		 (SELECT p.profile_file_id FROM ultary_pet p WHERE p.user_no=c.user_no AND p.is_deleted=0
-		  AND p.profile_file_id IS NOT NULL ORDER BY p.priority,p.pet_id LIMIT 1) AS authorProfileFileId
+		 (SELECT p.profile_file_id FROM ultary_pet p WHERE p.user_no=c.user_no AND p.is_deleted=0 ORDER BY p.priority,p.pet_id LIMIT 1) AS authorProfileFileId
 		FROM ultary_feed_comment c LEFT JOIN ultary_user u ON u.user_no=c.user_no
 		JOIN ultary_ai_request_log l ON l.ai_request_id=#{aiRequestId}
 		LEFT JOIN ultary_feed_reply rp ON l.target_type='REPLY' AND rp.feed_reply_id=l.target_id
@@ -26,8 +25,7 @@
 	</select>
 	<select id="findAiLogReplies" resultType="me._hanho.ultary.domain.feed.model.FeedReply">
 		SELECT rp.*, u.nickname AS authorNickname,
-		 (SELECT p.profile_file_id FROM ultary_pet p WHERE p.user_no=rp.user_no AND p.is_deleted=0
-		  AND p.profile_file_id IS NOT NULL ORDER BY p.priority,p.pet_id LIMIT 1) AS authorProfileFileId
+		 (SELECT p.profile_file_id FROM ultary_pet p WHERE p.user_no=rp.user_no AND p.is_deleted=0 ORDER BY p.priority,p.pet_id LIMIT 1) AS authorProfileFileId
 		FROM ultary_feed_reply rp LEFT JOIN ultary_user u ON u.user_no=rp.user_no
 		JOIN ultary_ai_request_log l ON l.ai_request_id=#{aiRequestId}
 		WHERE rp.feed_comment_id=#{commentId} AND (rp.is_deleted=0 OR (l.target_type='REPLY' AND rp.feed_reply_id=l.target_id))
@@ -45,8 +43,7 @@
 	</select>
 	<select id="findReportComments" resultType="me._hanho.ultary.domain.feed.model.FeedComment">
 		SELECT c.*, u.nickname AS authorNickname,
-		 (SELECT p.profile_file_id FROM ultary_pet p WHERE p.user_no = c.user_no AND p.is_deleted = 0
-		  AND p.profile_file_id IS NOT NULL ORDER BY p.priority, p.pet_id LIMIT 1) AS authorProfileFileId
+		 (SELECT p.profile_file_id FROM ultary_pet p WHERE p.user_no = c.user_no AND p.is_deleted = 0 ORDER BY p.priority, p.pet_id LIMIT 1) AS authorProfileFileId
 		FROM ultary_feed_comment c LEFT JOIN ultary_user u ON u.user_no = c.user_no
 		JOIN ultary_report r ON r.report_id = #{reportId}
 		LEFT JOIN ultary_feed_reply rp ON r.target_type = 'REPLY' AND rp.feed_reply_id = r.target_reply_id
@@ -56,8 +53,7 @@
 	</select>
 	<select id="findReportReplies" resultType="me._hanho.ultary.domain.feed.model.FeedReply">
 		SELECT rp.*, u.nickname AS authorNickname,
-		 (SELECT p.profile_file_id FROM ultary_pet p WHERE p.user_no = rp.user_no AND p.is_deleted = 0
-		  AND p.profile_file_id IS NOT NULL ORDER BY p.priority, p.pet_id LIMIT 1) AS authorProfileFileId
+		 (SELECT p.profile_file_id FROM ultary_pet p WHERE p.user_no = rp.user_no AND p.is_deleted = 0 ORDER BY p.priority, p.pet_id LIMIT 1) AS authorProfileFileId
 		FROM ultary_feed_reply rp LEFT JOIN ultary_user u ON u.user_no = rp.user_no
 		JOIN ultary_report r ON r.report_id = #{reportId}
 		WHERE rp.feed_comment_id = #{commentId} AND (rp.is_deleted = 0 OR rp.feed_reply_id = r.target_reply_id)
@@ -888,7 +884,6 @@
 				FROM ultary_pet rp
 				WHERE rp.user_no = u.user_no
 				  AND rp.is_deleted = 0
-				  AND rp.profile_file_id IS NOT NULL
 				ORDER BY rp.priority ASC, rp.pet_id ASC
 				LIMIT 1
 			) AS authorProfileFileId
@@ -917,7 +912,6 @@
 				FROM ultary_pet rp
 				WHERE rp.user_no = u.user_no
 				  AND rp.is_deleted = 0
-				  AND rp.profile_file_id IS NOT NULL
 				ORDER BY rp.priority ASC, rp.pet_id ASC
 				LIMIT 1
 			) AS authorProfileFileId
@@ -1084,7 +1078,6 @@
 				FROM ultary_pet rp
 				WHERE rp.user_no = u.user_no
 				  AND rp.is_deleted = 0
-				  AND rp.profile_file_id IS NOT NULL
 				ORDER BY rp.priority ASC, rp.pet_id ASC
 				LIMIT 1
 			) AS authorProfileFileId
@@ -1113,7 +1106,6 @@
 				FROM ultary_pet rp
 				WHERE rp.user_no = u.user_no
 				  AND rp.is_deleted = 0
-				  AND rp.profile_file_id IS NOT NULL
 				ORDER BY rp.priority ASC, rp.pet_id ASC
 				LIMIT 1
 			) AS authorProfileFileId
@@ -1356,5 +1348,21 @@
 
     <select id="countPublicByUserNo" resultType="int">
         SELECT COUNT(*) FROM ultary_feed WHERE user_no = #{userNo} AND is_deleted = 0 AND visibility = 'PUBLIC'
+    </select>
+    <select id="findPetFeeds" resultType="me._hanho.ultary.domain.feed.model.Feed">
+        SELECT f.* FROM ultary_feed f
+        JOIN ultary_user u ON u.user_no = f.user_no
+        WHERE <include refid="visibleToViewerAndNotBlocked"/>
+        <choose>
+          <when test="tagged">AND f.user_no != #{ownerUserNo}</when>
+          <otherwise>AND f.user_no = #{ownerUserNo}</otherwise>
+        </choose>
+        AND (
+          EXISTS (SELECT 1 FROM ultary_content_pet cp WHERE cp.content_type='FEED' AND cp.content_id=f.feed_id AND cp.pet_id=#{petId})
+          OR EXISTS (SELECT 1 FROM ultary_feed_pet fp WHERE fp.feed_id=f.feed_id AND fp.pet_id=#{petId} AND fp.role IN ('OWNER','COLLABORATOR'))
+          OR EXISTS (SELECT 1 FROM ultary_feed_media m JOIN ultary_feed_media_mention mm ON mm.feed_media_id=m.feed_media_id WHERE m.feed_id=f.feed_id AND mm.pet_id=#{petId})
+        )
+        ORDER BY f.created_at DESC, f.feed_id DESC
+        LIMIT #{limit}
     </select>
 </mapper>

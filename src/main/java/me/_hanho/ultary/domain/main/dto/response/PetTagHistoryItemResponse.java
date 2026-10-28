@@ -11,6 +11,7 @@ import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
 public class PetTagHistoryItemResponse {
 
 	private Long petId;
+	@com.fasterxml.jackson.annotation.JsonIgnore
 	private String mentionId;
 	private String name;
 	private Long userNo;

@@ -15,7 +15,7 @@ public interface ReportMapper {
 
 	Report findById(@Param("reportId") Long reportId);
 
-	/** 목록과 같은 대상 닉네임·본문·정지 여부 */
+	/** 목록과 같은 대상 닉네임태그·본문·정지 여부 */
 	Report findAdminById(@Param("reportId") Long reportId);
 
 	Report findOpenByReporterAndTarget(

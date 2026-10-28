@@ -10,6 +10,6 @@ public class NicknameConstraintValidator implements ConstraintValidator<ValidNic
 		if (value == null || value.isBlank()) {
 			return true;
 		}
-		return NicknameRules.isValid(value.trim());
+		return NicknameRules.isValid(value);
 	}
 }

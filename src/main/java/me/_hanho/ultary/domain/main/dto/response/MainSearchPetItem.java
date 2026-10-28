@@ -11,6 +11,7 @@ public class MainSearchPetItem {
 	private Long petId;
 	private Long userNo;
 	private String ownerNickname;
+	@com.fasterxml.jackson.annotation.JsonIgnore
 	private String mentionId;
 	private String name;
 	private String species;

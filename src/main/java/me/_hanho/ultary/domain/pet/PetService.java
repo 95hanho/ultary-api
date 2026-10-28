@@ -14,10 +14,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.exception.BusinessException;
 import me._hanho.ultary.common.exception.ErrorCode;
-import me._hanho.ultary.common.response.ChangeAvailabilityResponse;
-import me._hanho.ultary.common.validation.IdentityChangeCooldown;
 import me._hanho.ultary.domain.file.FileService;
-import me._hanho.ultary.domain.pet.dto.request.ChangeMentionIdRequest;
 import me._hanho.ultary.domain.pet.dto.request.CreatePetRequest;
 import me._hanho.ultary.domain.pet.dto.request.UpdatePetRequest;
 import me._hanho.ultary.domain.pet.dto.response.PetResponse;
@@ -32,6 +29,7 @@ import me._hanho.ultary.security.principal.UserPrincipal;
 public class PetService {
 
 	private final PetMapper petMapper;
+    private final me._hanho.ultary.domain.user.UserMapper userMapper;
 	private final FileService fileService;
 
 	@Transactional(readOnly = true)
@@ -49,9 +47,10 @@ public class PetService {
 
 	@Transactional
 	public PetResponse create(UserPrincipal principal, CreatePetRequest request) {
-		validateProfileFile(request.getProfileFileId());
-		String mentionId = request.getMentionId().trim();
-		ensureMentionAvailable(mentionId, null);
+        if (userMapper.lockActiveUser(principal.getUserNo()) == null) throw new BusinessException(ErrorCode.UNAUTHORIZED);
+        if (petMapper.countActiveByUserNo(principal.getUserNo()) >= 3) throw new BusinessException(ErrorCode.INVALID_INPUT, "반려동물은 계정당 최대 3마리까지 등록할 수 있습니다.");
+        validateProfileFile(request.getProfileFileId());
+        String mentionId = "pet_" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 20);
 
 		Pet pet = new Pet();
 		pet.setUserNo(principal.getUserNo());
@@ -67,7 +66,7 @@ public class PetService {
 		pet.setBio(blankToNull(request.getBio()));
 
 		petMapper.insert(pet);
-		log.info("[create] petId={} mentionId={} userNo={}", pet.getPetId(), mentionId, principal.getUserNo());
+		log.info("[create] petId={} userNo={}", pet.getPetId(), principal.getUserNo());
 		return toResponse(requireOwned(pet.getPetId(), principal.getUserNo()));
 	}
 
@@ -132,37 +131,6 @@ public class PetService {
 				&& !request.getProfileFileId().equals(previousProfileFileId);
 	}
 
-	@Transactional(readOnly = true)
-	public ChangeAvailabilityResponse mentionIdChangeAvailability(UserPrincipal principal, Long petId) {
-		Pet pet = requireOwned(petId, principal.getUserNo());
-		return IdentityChangeCooldown.availability(
-				pet.getMentionIdChangedAt(),
-				IdentityChangeCooldown.MENTION_ID_DAYS);
-	}
-
-	@Transactional
-	public PetResponse changeMentionId(UserPrincipal principal, Long petId, ChangeMentionIdRequest request) {
-		Pet pet = requireOwned(petId, principal.getUserNo());
-		String mentionId = request.getMentionId().trim();
-		if (mentionId.equalsIgnoreCase(pet.getMentionId())) {
-			return toResponse(pet);
-		}
-
-		IdentityChangeCooldown.requireChangeable(
-				pet.getMentionIdChangedAt(),
-				IdentityChangeCooldown.MENTION_ID_DAYS,
-				ErrorCode.PET_MENTION_CHANGE_COOLDOWN);
-
-		ensureMentionAvailable(mentionId, petId);
-
-		int updated = petMapper.updateMentionId(petId, principal.getUserNo(), mentionId);
-		if (updated == 0) {
-			throw new BusinessException(ErrorCode.PET_NOT_FOUND);
-		}
-		log.info("[changeMentionId] petId={} mentionId={}", petId, mentionId);
-		return toResponse(requireOwned(petId, principal.getUserNo()));
-	}
-
 	@Transactional
 	public void delete(UserPrincipal principal, Long petId) {
 		int deleted = petMapper.softDelete(petId, principal.getUserNo());
@@ -172,7 +140,7 @@ public class PetService {
 		log.info("[delete] petId={} userNo={}", petId, principal.getUserNo());
 	}
 
-	/** 사진 있는 활성 펫 중 priority가 가장 높은 profile_file_id. 없으면 null */
+	/** 관리 순서 첫 번째 활성 펫의 profile_file_id. 사진이 없으면 null (다음 펫으로 대체하지 않음) */
 	@Transactional(readOnly = true)
 	public Integer representativeProfileFileId(Long userNo) {
 		if (userNo == null) {
@@ -199,18 +167,22 @@ public class PetService {
 		return result;
 	}
 
+    @Transactional(readOnly = true)
+    public Map<Long, List<String>> petNamesByUser(Collection<Long> userNos) {
+        if (userNos == null || userNos.isEmpty()) return Map.of();
+        Map<Long, List<String>> names = new HashMap<>();
+        for (var pet : petMapper.findActiveMentions(userNos.stream().distinct().toList())) {
+            names.computeIfAbsent(pet.getUserNo(), key -> new java.util.ArrayList<>()).add(pet.getName());
+        }
+        return names;
+    }
+
 	private Integer resolveCreatePriority(Long userNo, Integer requested) {
 		if (requested != null) {
 			return requested;
 		}
 		Integer max = petMapper.findMaxPriority(userNo);
 		return max == null ? 1 : max + 1;
-	}
-
-	private void ensureMentionAvailable(String mentionId, Long excludePetId) {
-		if (petMapper.countByMentionId(mentionId, excludePetId) > 0) {
-			throw new BusinessException(ErrorCode.PET_MENTION_DUPLICATED);
-		}
 	}
 
 	private Pet requireOwned(Long petId, Long userNo) {

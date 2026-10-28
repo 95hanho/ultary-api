@@ -145,6 +145,7 @@ public class NeighborService {
 			userNos.add(row.getUserNo());
 		}
 		Map<Long, List<String>> petTags = petTagsByUser(userNos);
+        Map<Long, List<String>> petNames = petNamesByUser(userNos);
 		Set<Long> followed = userNos.isEmpty()
 				? Set.of()
 				: new HashSet<>(neighborMapper.findFollowedUserNos(me, userNos));
@@ -163,6 +164,7 @@ public class NeighborService {
 					.hasStory(hasStory)
 					.hasUnviewed(hasStory && storyService.hasUnviewedStory(row.getUserNo(), me))
 					.petTags(petTags.getOrDefault(row.getUserNo(), List.of()))
+                    .petNames(petNames.getOrDefault(row.getUserNo(), List.of()))
 					.following(followed.contains(row.getUserNo()))
 					.build());
 		}
@@ -505,6 +507,13 @@ public class NeighborService {
 		}
 		return me.equals(neighbor.getRequesterUserNo()) && Boolean.TRUE.equals(neighbor.getFollowedBack());
 	}
+
+    private Map<Long, List<String>> petNamesByUser(List<Long> userNos) {
+        if (userNos.isEmpty()) return Map.of();
+        Map<Long, List<String>> names = new HashMap<>();
+        for (var pet : petMapper.findActiveMentions(userNos)) names.computeIfAbsent(pet.getUserNo(), key -> new ArrayList<>()).add(pet.getName());
+        return names;
+    }
 
 	private Map<Long, List<String>> petTagsByUser(List<Long> userNos) {
 		if (userNos.isEmpty()) {
