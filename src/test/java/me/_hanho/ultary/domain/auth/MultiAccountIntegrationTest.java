@@ -103,6 +103,26 @@ class MultiAccountIntegrationTest {
         assertThatThrownBy(()->links.add(first,second)).isInstanceOf(BusinessException.class);
         assertThatThrownBy(()->links.list(second,first)).isInstanceOf(BusinessException.class);
     }
+    @Test void linkedAccountSearchIncludesOrderedPetNamesAndHidesPrivateTargetDetails() {
+        var request=new CreatePetRequest(); request.setName("초코");
+        pets.create(new UserPrincipal(second,"test"),request);
+        request.setName("달이"); pets.create(new UserPrincipal(second,"test"),request);
+        assertThat(links.search(first,"초코")).filteredOn(row->row.userNo().equals(second)).singleElement().satisfies(row->{
+            assertThat(row.userNo()).isEqualTo(second);
+            assertThat(row.petNames()).containsExactly("초코","달이");
+            assertThat(row.hasStory()).isFalse();
+            assertThat(row.hasUnviewed()).isFalse();
+        });
+        links.add(first,second);
+        assertThat(links.list(first,null)).singleElement().satisfies(row->assertThat(row.petNames()).containsExactly("초코","달이"));
+        var settings=new me._hanho.ultary.domain.settings.dto.request.UpdatePrivacyRequest(); settings.setPrivateAccount(true);
+        privacy.update(new UserPrincipal(second,"test"),settings);
+        assertThat(links.list(first,first)).singleElement().satisfies(row->{
+            assertThat(row.available()).isFalse();
+            assertThat(row.petNames()).isEmpty();
+            assertThat(row.profileFile()).isNull();
+        });
+    }
     String storedPassword(Long id){return jdbc.queryForObject("SELECT password FROM ultary_user WHERE user_no=?",String.class,id);}
     LoginRequest login(String value){var r=new LoginRequest();r.setEmail(email);r.setPassword(value);return r;}
     Long user(String value){jdbc.update("INSERT INTO ultary_user(nickname,email,phone,password) VALUES(?,?,?,?)","a"+UUID.randomUUID().toString().replace("-","").substring(0,8),email,phone,passwords.encode(value));return jdbc.queryForObject("SELECT LAST_INSERT_ID()",Long.class);}

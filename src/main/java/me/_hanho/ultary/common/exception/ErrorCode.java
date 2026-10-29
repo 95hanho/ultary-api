@@ -34,7 +34,7 @@ public enum ErrorCode {
 	TOKEN_EXPIRED("TOKEN_EXPIRED", "토큰이 만료되었습니다.", HttpStatus.UNAUTHORIZED),
 	INVALID_TOKEN("INVALID_TOKEN", "유효하지 않은 토큰입니다.", HttpStatus.UNAUTHORIZED),
 	NICKNAME_DUPLICATED("NICKNAME_DUPLICATED", "이미 사용 중인 닉네임태그입니다.", HttpStatus.CONFLICT),
-	NICKNAME_CHANGE_COOLDOWN("NICKNAME_CHANGE_COOLDOWN", "닉네임태그는 변경 후 7일간 다시 변경할 수 없습니다.", HttpStatus.BAD_REQUEST),
+	NICKNAME_CHANGE_COOLDOWN("NICKNAME_CHANGE_COOLDOWN", "닉네임태그는 변경 후 30일간 다시 변경할 수 없습니다.", HttpStatus.BAD_REQUEST),
 	NAME_ALREADY_SET("NAME_ALREADY_SET", "이름은 최초 등록 후 변경할 수 없습니다.", HttpStatus.BAD_REQUEST),
 	EMAIL_DUPLICATED("EMAIL_DUPLICATED", "이미 사용 중인 이메일입니다.", HttpStatus.CONFLICT),
 	PHONE_AUTH_FAILED("PHONE_AUTH_FAILED", "휴대폰 인증에 실패했습니다.", HttpStatus.BAD_REQUEST),

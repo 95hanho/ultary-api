@@ -74,7 +74,7 @@ public class TestController {
 	}
 
 	/**
-	 * 로그인 유저의 {@code nickname_changed_at}을 올해 1월 1일로 되돌려 7일 쿨다운을 푼다.
+	 * 로그인 유저의 {@code nickname_changed_at}을 올해 1월 1일로 되돌려 30일 쿨다운을 푼다.
 	 */
 	@PostMapping("/nickname-cooldown")
 	public ApiResponse<NicknameCooldownResetResponse> resetNicknameCooldown(

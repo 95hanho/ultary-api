@@ -9,7 +9,7 @@ import me._hanho.ultary.common.response.ChangeAvailabilityResponse;
 /** 검색용 식별자(nickname / mention_id / handle) 변경 쿨다운 */
 public final class IdentityChangeCooldown {
 
-	public static final int NICKNAME_DAYS = 7;
+	public static final int NICKNAME_DAYS = 30;
 	public static final int MENTION_ID_DAYS = 30;
 	public static final int HANDLE_DAYS = 30;
 

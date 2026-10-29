@@ -7,6 +7,11 @@ import lombok.RequiredArgsConstructor;
 import me._hanho.ultary.common.exception.*;
 import me._hanho.ultary.domain.user.*;
 import me._hanho.ultary.domain.settings.PrivacyService;
+import me._hanho.ultary.domain.pet.PetMapper;
+import me._hanho.ultary.domain.pet.model.Pet;
+import me._hanho.ultary.domain.file.FileService;
+import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
+import me._hanho.ultary.domain.story.StoryService;
 
 @Service @RequiredArgsConstructor
 public class UltaryLinkService {
@@ -14,15 +19,28 @@ public class UltaryLinkService {
     private final UserMapper users;
     private final UserBlockMapper blocks;
     private final PrivacyService privacy;
-    public record Link(Long userNo, String nickname, boolean available) {}
+    private final PetMapper pets;
+    private final FileService files;
+    private final StoryService stories;
+    public record Link(Long userNo, String nickname, boolean available,
+        List<String> petNames, FileSummaryResponse profileFile, boolean hasStory, boolean hasUnviewed) {}
+    private Link toLink(Long userNo, String nickname, boolean available, Long viewer) {
+        if (!available) return new Link(userNo, nickname, false, List.of(), null, false, false);
+        List<Pet> ownedPets = pets.findActiveByUserNo(userNo);
+        Long profileFileId = ownedPets.isEmpty() ? null : ownedPets.get(0).getProfileFileId();
+        boolean hasStory = stories.hasVisibleStory(viewer, userNo);
+        return new Link(userNo, nickname, true, ownedPets.stream().map(Pet::getName).toList(),
+            files.findSummary(profileFileId), hasStory,
+            hasStory && viewer != null && stories.hasUnviewedStory(userNo, viewer));
+    }
     @Transactional(readOnly=true)
     public List<Link> list(Long owner, Long viewer) {
         if (users.findActiveByUserNo(owner) == null || (viewer == null && privacy.isPrivateAccount(owner))
             || (viewer != null && blocks.findActiveByPair(owner,viewer) != null)) throw new BusinessException(ErrorCode.USER_NOT_FOUND);
         boolean own = owner.equals(viewer);
-        return mapper.list(owner).stream().map(row -> new Link(row.userNo(), row.nickname(),
+        return mapper.list(owner).stream().map(row -> toLink(row.userNo(), row.nickname(),
             "ACTIVE".equals(row.withdrawalStatus()) && !privacy.isPrivateAccount(row.userNo())
-            && (viewer == null || blocks.findActiveByPair(row.userNo(), viewer) == null)))
+            && (viewer == null || blocks.findActiveByPair(row.userNo(), viewer) == null), viewer))
             .filter(link -> own || link.available()).toList();
     }
     @Transactional(readOnly=true)
@@ -32,7 +50,7 @@ public class UltaryLinkService {
         return users.searchActiveByNickname(viewer, term, 50).stream()
             .filter(user -> !user.getUserNo().equals(viewer) && !privacy.isPrivateAccount(user.getUserNo())
                 && blocks.findActiveEitherWay(viewer,user.getUserNo()) == null)
-            .map(user -> new Link(user.getUserNo(),user.getNickname(),true)).toList();
+            .map(user -> toLink(user.getUserNo(),user.getNickname(),true,viewer)).toList();
     }
     @Transactional
     public void add(Long owner, Long target) {
