@@ -60,6 +60,18 @@
 		)
 	</insert>
 
+	<delete id="deleteByUserNo">
+		DELETE FROM ultary_user_social WHERE user_no = #{userNo}
+	</delete>
+
+	<delete id="deleteWithdrawnLink">
+		DELETE s FROM ultary_user_social s
+		INNER JOIN ultary_user u ON u.user_no = s.user_no
+		WHERE s.provider = #{provider}
+		  AND s.provider_user_id = #{providerUserId}
+		  AND u.withdrawal_status = 'WITHDRAWN'
+	</delete>
+
 	<delete id="deleteByUserNoAndProvider">
 		DELETE FROM ultary_user_social
 		WHERE user_no = #{userNo}

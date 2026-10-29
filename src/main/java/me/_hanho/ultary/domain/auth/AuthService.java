@@ -93,6 +93,7 @@ public class AuthService {
 		String email = truncate(trimToNull(request.getEmail()), USER_EMAIL_MAX);
 		String name = truncate(trimToNull(request.getName()), USER_NAME_MAX);
 
+		userSocialMapper.deleteWithdrawnLink(provider.name(), providerUserId);
 		UserSocial linked = userSocialMapper.findByProviderAndProviderUserId(provider.name(), providerUserId);
 		boolean newUser = false;
 		User user;
@@ -130,6 +131,9 @@ public class AuthService {
 		String providerUserId = request.getProviderUserId().trim();
 		String email = truncate(trimToNull(request.getEmail()), PROVIDER_EMAIL_MAX);
 
+		if (userMapper.lockActiveUser(principal.getUserNo()) == null) {
+			throw new BusinessException(ErrorCode.UNAUTHORIZED);
+		}
 		User user = userMapper.findActiveByUserNo(principal.getUserNo());
 		if (user == null) {
 			throw new BusinessException(ErrorCode.UNAUTHORIZED);
@@ -139,6 +143,7 @@ public class AuthService {
 			throw new BusinessException(ErrorCode.SOCIAL_ALREADY_LINKED);
 		}
 
+		userSocialMapper.deleteWithdrawnLink(provider.name(), providerUserId);
 		UserSocial existing = userSocialMapper.findByProviderAndProviderUserId(provider.name(), providerUserId);
 		if (existing != null) {
 			throw new BusinessException(ErrorCode.SOCIAL_ACCOUNT_IN_USE);
@@ -374,6 +379,7 @@ public class AuthService {
 		}
 
 		userMapper.updateWithdrawalStatus(user.getUserNo(), "WITHDRAWN");
+		userSocialMapper.deleteByUserNo(user.getUserNo());
 		tokenMapper.revokeAllByUserNo(user.getUserNo());
 	}
 

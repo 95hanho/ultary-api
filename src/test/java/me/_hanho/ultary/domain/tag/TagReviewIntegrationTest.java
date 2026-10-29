@@ -31,6 +31,7 @@ class TagReviewIntegrationTest {
     @Autowired MockMvc mvc;
     @Autowired JwtTokenProvider jwt;
     @Autowired BffSecurityProperties bff;
+    @Autowired me._hanho.ultary.domain.file.FileService files;
     Long user, admin, tag, request, feed;
     String hashtag;
     UserPrincipal principal;
@@ -44,6 +45,27 @@ class TagReviewIntegrationTest {
         jdbc.update("INSERT INTO ultary_feed(user_no,visibility) VALUES(?,'PUBLIC')", user); feed = id();
         jdbc.update("INSERT INTO ultary_notification_setting(user_no) VALUES(?)", user);
     }
+    @Test void requestOnlyImageIsRetainedEvenAfterRejection() {
+        jdbc.update("INSERT INTO ultary_file(store_name,file_path,uploaded_by_user_no) VALUES('request-only.png','https://example.invalid/request-only.png',?)", user);
+        Long file = id();
+        jdbc.update("INSERT INTO ultary_tag_profile_request_image(tag_profile_request_id,file_id,sort_order) VALUES(?,?,0)", request, file);
+        tags.rejectProfile(admin, tag, "설명을 확인해 주세요", request);
+
+        files.releaseIfUnused(file);
+
+        assertThat(jdbc.queryForObject("SELECT is_deleted FROM ultary_file WHERE file_id=?", Integer.class, file)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ultary_tag_profile_request_image WHERE file_id=?", Integer.class, file)).isEqualTo(1);
+    }
+
+    @Test void unreferencedImageCanStillBeReleased() {
+        jdbc.update("INSERT INTO ultary_file(store_name,file_path,uploaded_by_user_no) VALUES('unused.png','https://example.invalid/unused.png',?)", user);
+        Long file = id();
+
+        files.releaseIfUnused(file);
+
+        assertThat(jdbc.queryForObject("SELECT is_deleted FROM ultary_file WHERE file_id=?", Integer.class, file)).isEqualTo(1);
+    }
+
     @Test void decisionsNotifyRequesterAndBothReviewedStatesCanReturnToPending() {
         assertThat(tags.search(hashtag, 20)).isEmpty();
         assertThat(tags.approveProfile(admin, tag).getStatus()).isEqualTo("APPROVED");

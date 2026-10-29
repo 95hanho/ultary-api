@@ -99,6 +99,9 @@
 			+ (SELECT COUNT(1)
 			   FROM ultary_tag_image
 			   WHERE file_id = #{fileId})
+			+ (SELECT COUNT(1)
+			   FROM ultary_tag_profile_request_image
+			   WHERE file_id = #{fileId})
 	</select>
 
     <select id="hasPublicReference" resultType="boolean">

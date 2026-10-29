@@ -24,6 +24,12 @@ public interface UserSocialMapper {
 
 	int insert(UserSocial userSocial);
 
+	int deleteByUserNo(@Param("userNo") Long userNo);
+
+	int deleteWithdrawnLink(
+			@Param("provider") String provider,
+			@Param("providerUserId") String providerUserId);
+
 	int deleteByUserNoAndProvider(
 			@Param("userNo") Long userNo,
 			@Param("provider") String provider);
