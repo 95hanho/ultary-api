@@ -11,6 +11,7 @@ import me._hanho.ultary.domain.admin.dto.response.*;
 @RequiredArgsConstructor
 public class AdminAiLogController {
     private final AdminAiLogService service;
+    private final AdminManagementService management;
     private final AdminAiLogPreviewService previews;
     private final me._hanho.ultary.domain.file.FileService files;
 
@@ -60,6 +61,7 @@ public class AdminAiLogController {
     public ApiResponse<AdminAiLogResponse> review(@PathVariable Long aiRequestId,
             @org.springframework.security.core.annotation.AuthenticationPrincipal me._hanho.ultary.security.principal.AdminPrincipal principal,
             @RequestBody ReviewRequest request) {
-        return ApiResponse.ok(service.review(aiRequestId, principal.getAdminNo(), request.status()));
+        return ApiResponse.ok(management.execute(principal.getAdminNo(), "AI_REVIEW", "AI_REVIEW", aiRequestId, null, null,
+                () -> service.review(aiRequestId, principal.getAdminNo(), request.status())));
     }
 }

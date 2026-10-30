@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="me._hanho.ultary.domain.admin.AdminManagementMapper">
+  <sql id="reportOwner">
+    FROM ultary_report r
+    LEFT JOIN ultary_feed f ON r.target_type='FEED' AND f.feed_id=r.target_feed_id
+    LEFT JOIN ultary_feed_comment c ON r.target_type='COMMENT' AND c.feed_comment_id=r.target_comment_id
+    LEFT JOIN ultary_feed_reply rp ON r.target_type='REPLY' AND rp.feed_reply_id=r.target_reply_id
+    WHERE CASE r.target_type WHEN 'USER' THEN r.target_user_no WHEN 'FEED' THEN f.user_no
+      WHEN 'COMMENT' THEN c.user_no WHEN 'REPLY' THEN rp.user_no END =
+  </sql>
+  <sql id="userColumns">
+    u.user_no,u.nickname,u.name,u.withdrawal_status AS status,u.created_at,u.suspended_at,u.withdrawal_completed_at,
+    CASE WHEN u.email IS NULL OR u.email='' THEN NULL ELSE CONCAT(LEFT(u.email,1),'***@',SUBSTRING_INDEX(u.email,'@',-1)) END AS masked_email,
+    CASE WHEN u.phone IS NULL OR u.phone='' THEN NULL ELSE CONCAT('***-****-',RIGHT(REPLACE(u.phone,'-',''),4)) END AS masked_phone,
+    (SELECT COUNT(*) FROM ultary_pet p WHERE p.user_no=u.user_no AND p.is_deleted=0) AS pet_count,
+    (SELECT COUNT(*) FROM ultary_feed f WHERE f.user_no=u.user_no AND f.is_deleted=0) AS feed_count,
+    (SELECT COUNT(*) <include refid="reportOwner"/> u.user_no) AS report_count,
+    EXISTS(SELECT 1 FROM ultary_user_social s WHERE s.user_no=u.user_no AND s.provider='GOOGLE') AS google_linked,
+    EXISTS(SELECT 1 FROM ultary_user_social s WHERE s.user_no=u.user_no AND s.provider='KAKAO') AS kakao_linked,
+    (SELECT p.profile_file_id FROM ultary_pet p WHERE p.user_no=u.user_no AND p.is_deleted=0 ORDER BY p.priority,p.pet_id LIMIT 1) AS profile_file_id
+  </sql>
+  <sql id="userFilters">
+    <where>
+      <if test="status != null">u.withdrawal_status=#{status}</if>
+      <if test="q != null">AND (LOCATE(#{q},u.nickname)&gt;0 OR CAST(u.user_no AS CHAR)=#{q}
+        OR EXISTS(SELECT 1 FROM ultary_pet p WHERE p.user_no=u.user_no AND p.is_deleted=0 AND LOCATE(#{q},p.name)&gt;0))</if>
+    </where>
+  </sql>
+  <select id="users" resultType="me._hanho.ultary.domain.admin.dto.response.AdminUserResponse">
+    SELECT <include refid="userColumns"/> FROM ultary_user u <include refid="userFilters"/>
+    ORDER BY u.user_no DESC LIMIT #{limit} OFFSET #{offset}
+  </select>
+  <select id="countUsers" resultType="int">SELECT COUNT(*) FROM ultary_user u <include refid="userFilters"/></select>
+  <select id="user" resultType="me._hanho.ultary.domain.admin.dto.response.AdminUserResponse">
+    SELECT <include refid="userColumns"/> FROM ultary_user u WHERE u.user_no=#{userNo}
+  </select>
+  <select id="feeds" resultType="me._hanho.ultary.domain.admin.dto.response.AdminUserDetailResponse$FeedItem">
+    SELECT feed_id,content,visibility,is_deleted AS deleted,created_at FROM ultary_feed WHERE user_no=#{userNo} ORDER BY feed_id DESC LIMIT 20
+  </select>
+  <select id="reports" resultType="me._hanho.ultary.domain.admin.dto.response.AdminUserDetailResponse$ReportItem">
+    SELECT r.report_id,r.target_type,r.status,r.reason,r.created_at <include refid="reportOwner"/> #{userNo}
+    ORDER BY r.report_id DESC LIMIT 20
+  </select>
+  <sql id="actionFilters">
+    <where>
+      <if test="targetType != null">target_type=#{targetType}</if>
+      <if test="q != null">AND (LOCATE(#{q},admin_login_id)&gt;0 OR LOCATE(#{q},admin_name)&gt;0
+        OR LOCATE(#{q},target_label)&gt;0 OR CAST(target_id AS CHAR)=#{q} OR CAST(admin_no AS CHAR)=#{q})</if>
+    </where>
+  </sql>
+  <select id="actions" resultType="me._hanho.ultary.domain.admin.dto.response.AdminActionLogResponse">
+    SELECT action_log_id,admin_no,admin_login_id,admin_name,action,target_type,target_id,request_id,target_label,
+      before_status,after_status,reason,created_at,is_sample AS sample
+    FROM ultary_admin_action_log <include refid="actionFilters"/> ORDER BY created_at DESC,action_log_id DESC LIMIT #{limit} OFFSET #{offset}
+  </select>
+  <select id="countActions" resultType="int">SELECT COUNT(*) FROM ultary_admin_action_log <include refid="actionFilters"/></select>
+  <select id="target" resultType="me._hanho.ultary.domain.admin.dto.response.AdminActionLogResponse">
+    <choose>
+      <when test="kind == 'USER'">SELECT withdrawal_status AS after_status,CONCAT('@',nickname) AS target_label FROM ultary_user WHERE user_no=#{id}</when>
+      <when test="kind == 'TAG'">
+        SELECT r.status AS after_status,CONCAT('#',t.hashtag) AS target_label FROM ultary_tag_profile_request r
+        JOIN ultary_tag t ON t.tag_id=r.tag_id WHERE r.tag_id=#{id}
+        <if test="requestId != null">AND r.tag_profile_request_id=#{requestId}</if>
+        ORDER BY r.tag_profile_request_id DESC LIMIT 1
+      </when>
+      <when test="kind == 'REPORT'">SELECT status AS after_status,CONCAT('신고 #',report_id) AS target_label FROM ultary_report WHERE report_id=#{id}</when>
+      <otherwise>
+        SELECT j.admin_review_status AS after_status,CONCAT(l.target_type,' #',l.target_id) AS target_label FROM ultary_ai_request_log l
+        LEFT JOIN ultary_ai_moderation_job j ON j.job_id=l.moderation_job_id WHERE l.ai_request_id=#{id}
+      </otherwise>
+    </choose>
+  </select>
+  <insert id="insertAction">
+    INSERT INTO ultary_admin_action_log(admin_no,admin_login_id,admin_name,action,target_type,target_id,request_id,target_label,before_status,after_status,reason)
+    SELECT a.admin_no,a.login_id,a.name,#{action},#{targetType},#{targetId},#{requestId},#{targetLabel},#{beforeStatus},#{afterStatus},#{reason}
+    FROM ultary_admin a WHERE a.admin_no=#{adminNo}
+  </insert>
+</mapper>

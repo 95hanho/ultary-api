@@ -31,6 +31,7 @@ import me._hanho.ultary.security.principal.AdminPrincipal;
 public class AdminController {
 
 	private final AdminService adminService;
+	private final AdminManagementService management;
 	private final me._hanho.ultary.domain.file.FileService fileService;
 
 	@GetMapping("/menu-counts")
@@ -54,7 +55,8 @@ public class AdminController {
 			@AuthenticationPrincipal AdminPrincipal principal,
 			@PathVariable Long tagId, @RequestParam(required = false) Long requestId) {
 		log.info("[approveTag] tagId={}", tagId);
-		return ApiResponse.ok(adminService.approveTag(principal.getAdminNo(), tagId, requestId), "태그 설명 승인 성공");
+		return ApiResponse.ok(management.execute(principal.getAdminNo(), "TAG_APPROVED", "TAG", tagId, requestId, null,
+				() -> adminService.approveTag(principal.getAdminNo(), tagId, requestId)), "태그 설명 승인 성공");
 	}
 
 	@PostMapping("/tags/{tagId}/reject")
@@ -65,26 +67,35 @@ public class AdminController {
 		log.info("[rejectTag] tagId={}", tagId);
 		String rejectMessage = request == null ? null : request.getRejectMessage();
 		return ApiResponse.ok(
-				adminService.rejectTag(principal.getAdminNo(), tagId, rejectMessage, request == null ? null : request.getRequestId()),
+				management.execute(principal.getAdminNo(), "TAG_REJECTED", "TAG", tagId, request == null ? null : request.getRequestId(), rejectMessage,
+						() -> adminService.rejectTag(principal.getAdminNo(), tagId, rejectMessage, request == null ? null : request.getRequestId())),
 				"태그 설명 거절 성공");
 	}
 
 	@PostMapping("/tags/{tagId}/pending")
-	public ApiResponse<TagProfileRequestResponse> reopenTag(@PathVariable Long tagId, @RequestParam(required = false) Long requestId) {
+	public ApiResponse<TagProfileRequestResponse> reopenTag(@AuthenticationPrincipal AdminPrincipal principal,
+			@PathVariable Long tagId, @RequestParam(required = false) Long requestId) {
 		log.info("[reopenTag] tagId={}", tagId);
-		return ApiResponse.ok(adminService.reopenTag(tagId, requestId), "태그 설명 대기 성공");
+		return ApiResponse.ok(management.execute(principal.getAdminNo(), "TAG_PENDING", "TAG", tagId, requestId, null,
+				() -> adminService.reopenTag(tagId, requestId)), "태그 설명 대기 성공");
 	}
 
+	public record UserStatusRequest(@jakarta.validation.constraints.Size(max=500) String reason) {}
+
 	@PostMapping("/users/{userNo}/suspend")
-	public ApiResponse<UserSuspendResponse> suspendUser(@PathVariable Long userNo) {
+	public ApiResponse<UserSuspendResponse> suspendUser(@AuthenticationPrincipal AdminPrincipal principal,
+			@PathVariable Long userNo, @Valid @RequestBody(required=false) UserStatusRequest request) {
 		log.info("[suspendUser] userNo={}", userNo);
-		return ApiResponse.ok(adminService.suspendUser(userNo), "회원 정지 성공");
+		return ApiResponse.ok(management.execute(principal.getAdminNo(), "USER_SUSPENDED", "USER", userNo, null, request==null?null:request.reason(),
+				() -> adminService.suspendUser(userNo)), "회원 정지 성공");
 	}
 
 	@PostMapping("/users/{userNo}/unsuspend")
-	public ApiResponse<UserSuspendResponse> unsuspendUser(@PathVariable Long userNo) {
+	public ApiResponse<UserSuspendResponse> unsuspendUser(@AuthenticationPrincipal AdminPrincipal principal,
+			@PathVariable Long userNo, @Valid @RequestBody(required=false) UserStatusRequest request) {
 		log.info("[unsuspendUser] userNo={}", userNo);
-		return ApiResponse.ok(adminService.unsuspendUser(userNo), "회원 정지 해제 성공");
+		return ApiResponse.ok(management.execute(principal.getAdminNo(), "USER_UNSUSPENDED", "USER", userNo, null, request==null?null:request.reason(),
+				() -> adminService.unsuspendUser(userNo)), "회원 정지 해제 성공");
 	}
 
 	@GetMapping("/reports/{reportId}")
@@ -120,26 +131,30 @@ public class AdminController {
 	}
 
 	@PostMapping("/reports/{reportId}/delete-content")
-	public ApiResponse<ReportResponse> deleteReportedContent(@PathVariable Long reportId) {
+	public ApiResponse<ReportResponse> deleteReportedContent(@AuthenticationPrincipal AdminPrincipal principal, @PathVariable Long reportId) {
 		log.info("[deleteReportedContent] reportId={}", reportId);
-		return ApiResponse.ok(adminService.deleteReportedContent(reportId), "신고 대상 삭제 성공");
+		return ApiResponse.ok(management.execute(principal.getAdminNo(), "REPORT_DELETED", "REPORT", reportId, null, null,
+				() -> adminService.deleteReportedContent(reportId)), "신고 대상 삭제 성공");
 	}
 
 	@PostMapping("/reports/{reportId}/suspend")
-	public ApiResponse<ReportResponse> suspendReportedUser(@PathVariable Long reportId) {
+	public ApiResponse<ReportResponse> suspendReportedUser(@AuthenticationPrincipal AdminPrincipal principal, @PathVariable Long reportId) {
 		log.info("[suspendReportedUser] reportId={}", reportId);
-		return ApiResponse.ok(adminService.suspendReportedUser(reportId), "신고 회원 정지 성공");
+		return ApiResponse.ok(management.execute(principal.getAdminNo(), "REPORT_SUSPENDED", "REPORT", reportId, null, null,
+				() -> adminService.suspendReportedUser(reportId)), "신고 회원 정지 성공");
 	}
 
 	@PostMapping("/reports/{reportId}/confirm")
-	public ApiResponse<ReportResponse> confirmReport(@PathVariable Long reportId) {
+	public ApiResponse<ReportResponse> confirmReport(@AuthenticationPrincipal AdminPrincipal principal, @PathVariable Long reportId) {
 		log.info("[confirmReport] reportId={}", reportId);
-		return ApiResponse.ok(adminService.confirmReport(reportId), "신고 확인 성공");
+		return ApiResponse.ok(management.execute(principal.getAdminNo(), "REPORT_CONFIRMED", "REPORT", reportId, null, null,
+				() -> adminService.confirmReport(reportId)), "신고 확인 성공");
 	}
 
 	@PostMapping("/reports/{reportId}/reject")
-	public ApiResponse<ReportResponse> rejectReport(@PathVariable Long reportId) {
+	public ApiResponse<ReportResponse> rejectReport(@AuthenticationPrincipal AdminPrincipal principal, @PathVariable Long reportId) {
 		log.info("[rejectReport] reportId={}", reportId);
-		return ApiResponse.ok(adminService.rejectReport(reportId), "신고 거절 성공");
+		return ApiResponse.ok(management.execute(principal.getAdminNo(), "REPORT_REJECTED", "REPORT", reportId, null, null,
+				() -> adminService.rejectReport(reportId)), "신고 거절 성공");
 	}
 }
