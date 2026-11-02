@@ -22,6 +22,8 @@ import me._hanho.ultary.security.principal.UserPrincipal;
 class FeedEditIntegrationTest {
     @Autowired FeedService feeds;
     @Autowired FeedMapper mapper;
+    @Autowired FeedCaptionTags captionTags;
+    @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
     @Autowired JdbcTemplate jdbc;
     @Autowired jakarta.validation.Validator validator;
     @Autowired me._hanho.ultary.domain.settings.PrivacyService privacy;
@@ -102,7 +104,7 @@ class FeedEditIntegrationTest {
         var initial=new UpdateFeedRequest();initial.setTagIds(List.of(a));feeds.update(principal,feed,initial);
         var ai=mock(me._hanho.ultary.domain.ai.AiService.class);
         // Keep the test's rollback transaction; only the external AI call is mocked.
-        var inspectedFeeds=new FeedCreationService(ai,feeds);
+        var inspectedFeeds=new FeedCreationService(ai,feeds,captionTags);
         var edit=new UpdateFeedRequest();edit.setContent(newText);edit.setTagIds(List.of(b));
         doThrow(new BusinessException(ErrorCode.AI_CONTENT_BLOCKED)).when(ai).assertFeedUpdateAllowed(owner,feed,newText);
         assertThatThrownBy(()->inspectedFeeds.update(principal,feed,edit))
@@ -160,6 +162,101 @@ class FeedEditIntegrationTest {
         request.setVisibility("PUBLIC");
         feeds.update(principal, feed, request);
         assertThat(feeds.getDetail(null, feed).getVisibility()).isEqualTo("PUBLIC");
+    }
+
+    @Test void reservedAccountCanEditAnotherFeedWithoutTakingOwnershipOrChangingSubjectOwner() {
+        var moderator = new UserPrincipal(100L, "administrator");
+        var request = new UpdateFeedRequest();
+        request.setContent("관리자가 수정한 게시글");
+        request.setSubjectPetIds(List.of(oldPet));
+        var ai = mock(me._hanho.ultary.domain.ai.AiService.class);
+        var result = new FeedCreationService(ai, feeds, captionTags).update(moderator, feed, request);
+        assertThat(result.getContent()).isEqualTo(request.getContent());
+        assertThat(result.getUserNo()).isEqualTo(owner);
+        assertThat(result.getSubjectPets()).extracting(x -> x.petId()).containsExactly(oldPet);
+        verify(ai).assertFeedUpdateAllowed(100L, feed, request.getContent());
+        assertThatThrownBy(() -> feeds.delete(moderator, feed)).isInstanceOf(BusinessException.class);
+    }
+
+    @Test void reservedAccountEditsCommentsAndRepliesButOtherUsersCannot() {
+        jdbc.update("INSERT INTO ultary_feed_comment(feed_id,user_no,content) VALUES(?,?,'before')", feed, owner);
+        Long comment = id();
+        jdbc.update("INSERT INTO ultary_feed_reply(feed_comment_id,user_no,content) VALUES(?,?,'before')", comment, owner);
+        Long reply = id();
+        var commentRequest = new me._hanho.ultary.domain.feed.dto.request.UpdateCommentRequest();
+        commentRequest.setContent("수정된 댓글");
+        var replyRequest = new me._hanho.ultary.domain.feed.dto.request.UpdateReplyRequest();
+        replyRequest.setContent("수정된 답글");
+        var stranger = new UserPrincipal(other, "administrator");
+        assertThatThrownBy(() -> feeds.updateComment(stranger, feed, comment, commentRequest))
+            .isInstanceOfSatisfying(BusinessException.class, e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN));
+        assertThatThrownBy(() -> feeds.updateReply(stranger, feed, comment, reply, replyRequest))
+            .isInstanceOfSatisfying(BusinessException.class, e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN));
+        var moderator = new UserPrincipal(100L, "administrator");
+        feeds.updateComment(moderator, feed, comment, commentRequest);
+        feeds.updateReply(moderator, feed, comment, reply, replyRequest);
+        assertThat(jdbc.queryForObject("SELECT content FROM ultary_feed_comment WHERE feed_comment_id=?", String.class, comment)).isEqualTo(commentRequest.getContent());
+        assertThat(jdbc.queryForObject("SELECT content FROM ultary_feed_reply WHERE feed_reply_id=?", String.class, reply)).isEqualTo(replyRequest.getContent());
+        assertThat(jdbc.queryForObject("SELECT user_no FROM ultary_feed_comment WHERE feed_comment_id=?", Long.class, comment)).isEqualTo(owner);
+        assertThat(jdbc.queryForObject("SELECT user_no FROM ultary_feed_reply WHERE feed_reply_id=?", Long.class, reply)).isEqualTo(owner);
+        assertThatThrownBy(() -> feeds.deleteComment(moderator, feed, comment)).isInstanceOf(BusinessException.class);
+        assertThatThrownBy(() -> feeds.deleteReply(moderator, feed, comment, reply)).isInstanceOf(BusinessException.class);
+    }
+
+    @Test void rejectedCaptionCreatesNeitherNewTagsNorFeedChanges() {
+        String hashtag="new"+UUID.randomUUID().toString().replace("-", "").substring(0,12);
+        var ai=mock(me._hanho.ultary.domain.ai.AiService.class);
+        var inspected=new FeedCreationService(ai,feeds,captionTags);
+        var edit=new UpdateFeedRequest();edit.setContent("본문 #"+hashtag);
+        doThrow(new BusinessException(ErrorCode.AI_CONTENT_BLOCKED)).when(ai)
+            .assertFeedUpdateAllowed(owner,feed,edit.getContent());
+        assertThatThrownBy(()->inspected.update(principal,feed,edit)).isInstanceOf(BusinessException.class);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ultary_tag WHERE hashtag=?",Integer.class,hashtag)).isZero();
+        assertThat(jdbc.queryForObject("SELECT content FROM ultary_feed WHERE feed_id=?",String.class,feed)).isEqualTo("original");
+        doNothing().when(ai).assertFeedUpdateAllowed(owner,feed,edit.getContent());
+        inspected.update(principal,feed,edit);
+        assertThat(mapper.findTagIdsByFeedId(feed)).hasSize(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ultary_tag WHERE hashtag=?",Integer.class,hashtag)).isEqualTo(1);
+        inspected.update(principal,feed,edit);
+        assertThat(jdbc.queryForObject("SELECT use_count FROM ultary_tag WHERE hashtag=?",Integer.class,hashtag)).isEqualTo(1);
+        edit.setContent("태그를 지웠어요");inspected.update(principal,feed,edit);
+        assertThat(mapper.findTagIdsByFeedId(feed)).isEmpty();
+    }
+
+    @Test void approvedCreateDerivesAndDeduplicatesTagsFromTheWholeCaption() {
+        String hashtag="new"+UUID.randomUUID().toString().replace("-", "").substring(0,12);
+        var ai=mock(me._hanho.ultary.domain.ai.AiService.class);
+        var request=new CreateFeedRequest();request.setContent("본문 #"+hashtag+" #"+hashtag.toUpperCase());
+        var item=new CreateFeedRequest.MediaItem();item.setFileId(file);request.setMedia(List.of(item));
+        var result=new FeedCreationService(ai,feeds,captionTags).create(principal,request);
+        verify(ai).assertFeedCreationAllowed(owner,request.getContent());
+        assertThat(result.getTagIds()).hasSize(1);
+        assertThat(jdbc.queryForObject("SELECT use_count FROM ultary_tag WHERE tag_id=?",Integer.class,result.getTagIds().get(0))).isEqualTo(1);
+    }
+
+    @Test void captionOnlyEditRetainsAnAlreadyLinkedPendingTagWithoutRecreatingIt() {
+        Long existing=tag();
+        String body=jdbc.queryForObject("SELECT hashtag FROM ultary_tag WHERE tag_id=?",String.class,existing);
+        jdbc.update("UPDATE ultary_tag SET purpose='COMMERCIAL',profile_status='PENDING',use_count=1 WHERE tag_id=?",existing);
+        jdbc.update("INSERT INTO ultary_feed_tag(feed_id,tag_id) VALUES(?,?)",feed,existing);
+        var edit=new UpdateFeedRequest();edit.setContent("본문 수정 #"+body);
+        feeds.update(principal,feed,edit);
+        assertThat(mapper.findTagIdsByFeedId(feed)).containsExactly(existing);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ultary_tag WHERE hashtag=?",Integer.class,body)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT use_count FROM ultary_tag WHERE tag_id=?",Integer.class,existing)).isEqualTo(1);
+    }
+
+    @Test void failedFeedWriteRollsBackItsNewTagsToo() {
+        String hashtag="new"+UUID.randomUUID().toString().replace("-", "").substring(0,12);
+        int count=jdbc.queryForObject("SELECT COUNT(*) FROM ultary_feed",Integer.class);
+        var request=new CreateFeedRequest();request.setContent("본문 #"+hashtag);
+        request.setTagIds(List.of(Long.MAX_VALUE));
+        var item=new CreateFeedRequest.MediaItem();item.setFileId(file);request.setMedia(List.of(item));
+        var nested=new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+        nested.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_NESTED);
+        assertThatThrownBy(()->nested.execute(status->feeds.create(principal,request))).isInstanceOf(BusinessException.class);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ultary_tag WHERE hashtag=?",Integer.class,hashtag)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ultary_feed",Integer.class)).isEqualTo(count);
     }
 
     UpdateFeedRequest.MediaTags tags(Long slot,Long pet) {

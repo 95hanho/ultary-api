@@ -36,6 +36,11 @@ public interface TagMapper {
 	/** hashtag 정확 일치. use_count 높은 것 1건 */
 	Tag findActiveByHashtag(@Param("hashtag") String hashtag);
 
+	List<TagSearchHit> suggestHashtags(
+			@Param("viewerUserNo") Long viewerUserNo,
+			@Param("q") String q,
+			@Param("limit") int limit);
+
 	int countByHandle(
 			@Param("handle") String handle,
 			@Param("excludeTagId") Long excludeTagId);

@@ -35,6 +35,8 @@ public class AiService {
 	private static final int PROMPT_SUMMARY_MAX = 200;
 	private static final int RESULT_SUMMARY_MAX = 500;
 	private static final Pattern HASHTAG_PATTERN = Pattern.compile(HashtagRules.REGEX);
+	private static final Pattern DOG_TERMS = Pattern.compile("강아지|반려견|애견|멍멍|(?:^|[^a-z])(?:dog|puppy|canine)", Pattern.CASE_INSENSITIVE);
+	private static final Pattern CAT_TERMS = Pattern.compile("고양이|반려묘|애묘|냥냥|캣|(?:^|[^a-z])(?:cat|kitten|feline)", Pattern.CASE_INSENSITIVE);
 	private static final Set<String> MODERATION_CATEGORIES = Set.of(
 			"SPAM", "ABUSE", "HARASSMENT", "SEXUAL", "VIOLENCE", "HATE", "PRIVACY", "OTHER");
 
@@ -44,9 +46,20 @@ public class AiService {
 
 	/**
 	 * 태그 추천은 총 3회 시도하고 최종 실패는 서비스 오류로 전달한다.
-	 * 정상 응답이 빈 목록일 때만 호출자가 DB 추천으로 보완한다.
+	 * 관련 DB 후보와 일반 추천을 한 번의 AI 호출에서 함께 선별한다.
 	 */
 	public List<String> recommendHashtags(Long userNo, String content) {
+		return recommendHashtags(userNo, content, List.of());
+	}
+
+	public record ExistingHashtag(String hashtag, String title, String description) {}
+	public record SelectedPet(String name, String species, String breed) {}
+
+	public List<String> recommendHashtags(Long userNo, String content, List<ExistingHashtag> candidates) {
+		return recommendHashtags(userNo, content, candidates, List.of());
+	}
+
+	public List<String> recommendHashtags(Long userNo, String content, List<ExistingHashtag> candidates, List<SelectedPet> selectedPets) {
 		if (!StringUtils.hasText(content)) {
 			return List.of();
 		}
@@ -56,9 +69,12 @@ public class AiService {
 		try {
 			String json = geminiClient.generateJson(
 					AiPrompts.hashtagRecommendSystem(),
-					AiPrompts.hashtagRecommendUser(content.trim()));
+					AiPrompts.hashtagRecommendUser(content.trim()) + "\nExisting tag candidates (JSON data):\n"
+							+ objectMapper.writeValueAsString(candidates)
+							+ "\nSelected pets (authoritative species/breed data, JSON):\n" + objectMapper.writeValueAsString(selectedPets));
 			GeminiHashtagResult parsed = objectMapper.readValue(json, GeminiHashtagResult.class);
-			List<String> cleaned = sanitizeHashtags(parsed != null ? parsed.getHashtags() : null);
+			List<String> cleaned = mergeHashtags(parsed, candidates).stream()
+					.filter(tag -> matchesSelectedSpecies(tag, null, selectedPets)).toList();
 			saveLog(userNo, AiFeatureTypes.HASHTAG, null,
 					summaryPrompt("HASHTAG", content),
 					truncate("latencyMs=" + (System.currentTimeMillis() - started) + "; tags=" + cleaned, RESULT_SUMMARY_MAX),
@@ -160,6 +176,33 @@ public class AiService {
 		row.setStatus(result.failed() ? "FAILED" : "SUCCESS"); row.setErrorCode(result.errorCode()); row.setErrorMessage(result.error());
 		row.setResult(result.failed() ? null : "safe=" + result.safe() + "; category=" + result.category());
 		aiLogService.write(row);
+		return result;
+	}
+
+	/** Obvious opposite-species tags are excluded even if the model ignores the selected pets. */
+	public static boolean matchesSelectedSpecies(String hashtag, String description, List<SelectedPet> pets) {
+		if (pets.isEmpty()) return true;
+		boolean catsOnly=pets.stream().allMatch(p -> "CAT".equals(p.species()));
+		boolean dogsOnly=pets.stream().allMatch(p -> "DOG".equals(p.species()));
+		if (!catsOnly && !dogsOnly) return true;
+		Pattern opposite=catsOnly ? DOG_TERMS : CAT_TERMS;
+		Pattern selected=catsOnly ? CAT_TERMS : DOG_TERMS;
+		if (opposite.matcher(hashtag == null ? "" : hashtag).find()) return false;
+		String details=description == null ? "" : description;
+		return !opposite.matcher(details).find() || selected.matcher(details).find();
+	}
+
+	private List<String> mergeHashtags(GeminiHashtagResult parsed, List<ExistingHashtag> candidates) {
+		if (parsed == null) return List.of();
+		Set<String> allowed = candidates.stream().map(ExistingHashtag::hashtag).collect(java.util.stream.Collectors.toSet());
+		List<String> result = new ArrayList<>();
+		Set<String> seen = new LinkedHashSet<>();
+		for (String tag : sanitizeHashtags(parsed.getExistingHashtags())) {
+			if (allowed.contains(tag) && seen.add(tag.toLowerCase(Locale.ROOT))) result.add(tag);
+		}
+		for (String tag : sanitizeHashtags(parsed.getHashtags())) {
+			if (seen.add(tag.toLowerCase(Locale.ROOT))) result.add(tag);
+		}
 		return result;
 	}
 

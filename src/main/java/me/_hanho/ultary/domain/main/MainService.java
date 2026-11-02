@@ -27,6 +27,7 @@ import me._hanho.ultary.domain.feed.model.Feed;
 import me._hanho.ultary.domain.file.FileService;
 import me._hanho.ultary.domain.file.dto.response.FileSummaryResponse;
 import me._hanho.ultary.domain.main.dto.response.MainFeedPageResponse;
+import me._hanho.ultary.domain.main.dto.response.RecommendedFeedPageResponse;
 import me._hanho.ultary.domain.main.dto.response.PetTagHistoryItemResponse;
 import me._hanho.ultary.domain.main.dto.response.PetTagHistoryPageResponse;
 import me._hanho.ultary.domain.main.dto.response.MainSearchPetItem;
@@ -76,6 +77,7 @@ public class MainService {
 	private final StoryService storyService;
 	private final FeedMapper feedMapper;
 	private final FeedService feedService;
+	private final RecommendedFeedService recommendedFeedService;
 	private final UserMapper userMapper;
 	private final UserBlockMapper userBlockMapper;
 	private final UserSearchHistoryMapper userSearchHistoryMapper;
@@ -110,7 +112,8 @@ public class MainService {
 				principal.getUserNo(),
 				cursor == null ? null : cursor.getCreatedAt(),
 				cursor == null ? null : cursor.getFeedId(),
-				pageSize + 1);
+				pageSize + 1,
+				me._hanho.ultary.domain.feed.FeedAdvertisementPolicy.SELLER_USER_NOS);
 		Long nextCursor = null;
 		if (rows.size() > pageSize) {
 			rows = List.copyOf(rows.subList(0, pageSize));
@@ -124,27 +127,20 @@ public class MainService {
 
 	/**
 	 * 메인 추천 게시글.
-	 * 나중에 추천 알고리즘 추가해야함. 지금은 조회 가능한 전체 피드를 최신순 limit건.
+	 * 팔로우 외 공개 게시글을 작성자별 분산해 조회한다. 판매자 광고는 별도로 삽입한다.
 	 */
 	@Transactional(readOnly = true)
-	public List<FeedResponse> getRecommendedFeeds(UserPrincipal principal, Integer limit) {
-		return listVisibleFeeds(principal, limit);
+	public RecommendedFeedPageResponse getRecommendedFeeds(UserPrincipal principal, Integer limit, String cursor) {
+		return recommendedFeedService.list(principal.getUserNo(), false, limit, cursor);
 	}
 
 	/**
 	 * 검색 화면 추천 게시글.
-	 * 나중에 추천 알고리즘 추가해야함. 지금은 조회 가능한 전체 피드를 최신순 limit건.
+	 * 공개 게시글을 탐색하며 팔로우한 작성자는 후순위로 배치한다.
 	 */
 	@Transactional(readOnly = true)
-	public List<FeedResponse> getSearchRecommendedFeeds(UserPrincipal principal, Integer limit) {
-		return listVisibleFeeds(principal, limit);
-	}
-
-	private List<FeedResponse> listVisibleFeeds(UserPrincipal principal, Integer limit) {
-		int pageSize = resolveLimit(limit, DEFAULT_FEED_LIMIT, MAX_FEED_LIMIT);
-		return feedService.toResponses(
-				feedMapper.findVisibleFeeds(principal.getUserNo(), pageSize),
-				principal.getUserNo());
+	public RecommendedFeedPageResponse getSearchRecommendedFeeds(UserPrincipal principal, Integer limit, String cursor) {
+		return recommendedFeedService.list(principal.getUserNo(), true, limit, cursor);
 	}
 
 	/** 검색창을 열었을 때 최근 울타리·태그 5건 */

@@ -14,4 +14,5 @@ import lombok.Setter;
 public class GeminiHashtagResult {
 
 	private List<String> hashtags = new ArrayList<>();
+	private List<String> existingHashtags = new ArrayList<>();
 }

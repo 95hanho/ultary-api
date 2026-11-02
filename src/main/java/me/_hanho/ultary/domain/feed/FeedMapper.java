@@ -85,7 +85,8 @@ public interface FeedMapper {
 			@Param("viewerUserNo") Long viewerUserNo,
 			@Param("cursorCreatedAt") LocalDateTime cursorCreatedAt,
 			@Param("cursorFeedId") Long cursorFeedId,
-			@Param("limit") int limit);
+			@Param("limit") int limit,
+			@Param("advertiserUserNos") java.util.Set<Long> advertiserUserNos);
 
 	/**
 	 * 조회 가능한 전체 피드 최신순 limit건.
@@ -94,6 +95,9 @@ public interface FeedMapper {
 	List<Feed> findVisibleFeeds(
 			@Param("viewerUserNo") Long viewerUserNo,
 			@Param("limit") int limit);
+
+	List<me._hanho.ultary.domain.main.RecommendedFeedCandidate> findRecommendedCandidates(
+			@Param("viewerUserNo") Long viewerUserNo, @Param("search") boolean search);
 
 	List<Feed> searchVisible(
 			@Param("viewerUserNo") Long viewerUserNo,

@@ -15,7 +15,8 @@ import me._hanho.ultary.security.principal.UserPrincipal;
 class FeedCreationServiceTest {
     AiService ai = mock(AiService.class);
     FeedService feeds = mock(FeedService.class);
-    FeedCreationService service = new FeedCreationService(ai, feeds);
+    me._hanho.ultary.domain.tag.TagMapper tags = mock(me._hanho.ultary.domain.tag.TagMapper.class);
+    FeedCreationService service = new FeedCreationService(ai, feeds, new FeedCaptionTags(tags));
     UserPrincipal user = new UserPrincipal(101L,"test");
     CreateFeedRequest request;
 
@@ -63,5 +64,26 @@ class FeedCreationServiceTest {
         assertThatThrownBy(() -> service.create(user,request)).isInstanceOfSatisfying(BusinessException.class,
                 error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.FEED_MEDIA_REQUIRED));
         verifyNoInteractions(ai,feeds);
+    }
+
+    @Test void inspectsCaptionAndExplicitTagsTogetherWithoutCreatingTags() {
+        var tag = new me._hanho.ultary.domain.tag.model.Tag();
+        tag.setTagId(7L); tag.setHashtag("숨긴태그");
+        when(tags.findActiveByTagId(7L)).thenReturn(tag);
+        request.setContent("본문 #새태그"); request.setTagIds(List.of(7L));
+        doThrow(new BusinessException(ErrorCode.AI_CONTENT_BLOCKED)).when(ai)
+            .assertFeedCreationAllowed(user.getUserNo(), "본문 #새태그\n#숨긴태그");
+        assertThatThrownBy(() -> service.create(user,request)).isInstanceOf(BusinessException.class);
+        verify(feeds,never()).create(any(),any());
+        verify(tags,never()).insert(any());
+    }
+
+    @Test void providerFailureNeverSavesFeedOrTags() {
+        request.setContent("내용 #새태그");
+        doThrow(new BusinessException(ErrorCode.AI_CHECK_UNAVAILABLE)).when(ai)
+            .assertFeedCreationAllowed(user.getUserNo(), request.getContent());
+        assertThatThrownBy(() -> service.create(user, request)).isInstanceOf(BusinessException.class);
+        verifyNoInteractions(feeds);
+        verify(tags,never()).insert(any());
     }
 }

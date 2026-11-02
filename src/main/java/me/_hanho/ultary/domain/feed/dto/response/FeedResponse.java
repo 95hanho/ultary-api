@@ -16,6 +16,7 @@ public class FeedResponse {
 
 	private Long feedId;
 	private Long userNo;
+	private boolean advertisement;
 	private String authorNickname;
 	private boolean authorHasStory;
 	private boolean authorHasUnviewedStory;

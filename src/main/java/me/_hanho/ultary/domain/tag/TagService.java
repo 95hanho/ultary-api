@@ -15,6 +15,7 @@ import me._hanho.ultary.common.exception.BusinessException;
 import me._hanho.ultary.common.exception.ErrorCode;
 import me._hanho.ultary.common.response.ChangeAvailabilityResponse;
 import me._hanho.ultary.common.validation.IdentityChangeCooldown;
+import me._hanho.ultary.common.validation.HashtagRules;
 import me._hanho.ultary.domain.ai.AiService;
 import me._hanho.ultary.domain.notification.NotificationService;
 import me._hanho.ultary.domain.file.FileService;
@@ -40,7 +41,8 @@ public class TagService {
 	private static final int DEFAULT_LIMIT = 20;
 	private static final int MAX_LIMIT = 50;
 	/** 게시글 내용 기반 추천 상한 */
-	private static final int RECOMMEND_MAX = 5;
+	private static final int RECOMMEND_MAX = 10;
+	private static final int RECOMMEND_CANDIDATES = 100;
 	private static final int REQUEST_DEFAULT_LIMIT = 30;
 	private static final Set<String> REQUEST_STATUSES = Set.of("PENDING", "APPROVED", "REJECTED");
 
@@ -48,6 +50,8 @@ public class TagService {
 	private final FileService fileService;
 	private final AiService aiService;
 	private final NotificationService notificationService;
+	private final me._hanho.ultary.domain.pet.PetMapper petMapper;
+	private final me._hanho.ultary.domain.feed.FeedService feedService;
 
 	@Transactional
 	public TagResponse create(UserPrincipal principal, CreateTagRequest request) {
@@ -265,24 +269,68 @@ public class TagService {
 		return tagMapper.searchByHashtag(viewerUserNo, q, limit);
 	}
 
+	/** 작성·수정 자동완성: 일치 비율, 보이는 게시글 수, 태그명 오름차순. */
+	@Transactional(readOnly = true)
+	public List<TagSearchHit> suggestHashtags(Long viewerUserNo, String q, Integer limit) {
+		String query = HashtagRules.normalize(q);
+		if (query == null || !query.matches(HashtagRules.REGEX)) return List.of();
+		return tagMapper.suggestHashtags(viewerUserNo, query, resolveLimit(limit));
+	}
+
 	/**
 	 * 게시글 작성 중 내용(q) 기반 태그 추천.
-	 * Gemini 우선, 실패·비활성·빈 결과면 기존 DB LIKE 추천으로 fallback.
-	 * 최대 5개. 기존 DB 태그가 있으면 tagId 등을 채운다.
+	 * 사용 가능한 DB 후보를 AI에 함께 전달하고 기존 DB 태그를 먼저 배치한다.
+	 * DB 후보 최대 5개와 일반 추천 최대 5개를 중복 없이 합친다. AI 실패 정책은 유지한다.
 	 */
 	@Transactional(readOnly = true)
 	public List<TagResponse> recommend(UserPrincipal principal, String q, Integer limit) {
+		return recommend(principal, q, limit, List.of(), null);
+	}
+
+	@Transactional(readOnly = true)
+	public List<TagResponse> recommend(UserPrincipal principal, String q, Integer limit, List<Long> selectedPetIds, Long editFeedId) {
 		int capped = Math.min(resolveLimit(limit), RECOMMEND_MAX);
 		String query = StringUtils.hasText(q) ? q.trim() : null;
 		Long userNo = principal != null ? principal.getUserNo() : null;
+		var pets = selectedPets(principal, selectedPetIds, editFeedId);
 
 		if (query != null) {
-			List<String> aiTags = aiService.recommendHashtags(userNo, query);
+			var candidates = tagMapper.recommend(null, RECOMMEND_CANDIDATES).stream()
+					.filter(tag -> AiService.matchesSelectedSpecies(tag.getHashtag(), tag.getTitle()+" "+tag.getContent(), pets))
+					.map(tag -> new AiService.ExistingHashtag(tag.getHashtag(), tag.getTitle(), tag.getContent()))
+					.toList();
+			List<String> aiTags = pets.isEmpty() ? aiService.recommendHashtags(userNo, query, candidates)
+					: aiService.recommendHashtags(userNo, query, candidates, pets);
 			if (!aiTags.isEmpty()) {
-				return toRecommendResponses(aiTags, capped);
+				return filterBySelectedPets(toRecommendResponses(aiTags, RECOMMEND_MAX), pets, capped);
 			}
 		}
-		return recommendFromDb(query, capped);
+		return filterBySelectedPets(recommendFromDb(query, capped), pets, capped);
+	}
+
+	private List<AiService.SelectedPet> selectedPets(UserPrincipal principal, List<Long> ids, Long editFeedId) {
+		if (ids == null || ids.isEmpty()) return List.of();
+		if (principal == null) throw new BusinessException(ErrorCode.UNAUTHORIZED);
+		if (ids.size()>20 || ids.stream().anyMatch(id -> id==null || id<=0)) throw new BusinessException(ErrorCode.INVALID_INPUT);
+		Long owner=principal.getUserNo();
+		if (editFeedId != null) {
+			if (editFeedId<=0) throw new BusinessException(ErrorCode.INVALID_INPUT);
+			var feed=feedService.getDetail(principal, editFeedId);
+			if (!me._hanho.ultary.security.ContentEditPolicy.canEdit(owner, feed.getUserNo())) throw new BusinessException(ErrorCode.FORBIDDEN);
+			owner=feed.getUserNo();
+		}
+		List<AiService.SelectedPet> pets=new ArrayList<>();
+		for (Long id : new java.util.LinkedHashSet<>(ids)) {
+			var pet=petMapper.findActiveByPetIdAndUserNo(id, owner);
+			if (pet==null) throw new BusinessException(ErrorCode.INVALID_INPUT, "선택한 반려동물 정보를 확인할 수 없습니다.");
+			pets.add(new AiService.SelectedPet(pet.getName(), pet.getSpecies(), pet.getBreed()));
+		}
+		return pets;
+	}
+
+	private List<TagResponse> filterBySelectedPets(List<TagResponse> tags, List<AiService.SelectedPet> pets, int limit) {
+		return tags.stream().filter(tag -> AiService.matchesSelectedSpecies(tag.getHashtag(), tag.getTitle()+" "+tag.getContent(), pets))
+				.limit(limit).toList();
 	}
 
 	private List<TagResponse> recommendFromDb(String query, int limit) {
@@ -293,10 +341,9 @@ public class TagService {
 
 	private List<TagResponse> toRecommendResponses(List<String> hashtags, int limit) {
 		List<TagResponse> result = new ArrayList<>();
+		Set<String> seen = new java.util.HashSet<>();
 		for (String hashtag : hashtags) {
-			if (result.size() >= limit) {
-				break;
-			}
+			if (!seen.add(hashtag.toLowerCase(java.util.Locale.ROOT))) continue;
 			Tag existing = tagMapper.findActiveByHashtag(hashtag);
 			if (existing != null) {
 				if (!"REJECTED".equals(existing.getProfileStatus()) && (!"COMMERCIAL".equals(existing.getPurpose()) || "APPROVED".equals(existing.getProfileStatus()))) result.add(toResponse(existing));
@@ -312,7 +359,8 @@ public class TagService {
 						.build());
 			}
 		}
-		return result;
+		result.sort(java.util.Comparator.comparing(tag -> tag.getTagId() == null));
+		return result.stream().limit(limit).toList();
 	}
 
 	@Transactional(readOnly = true)

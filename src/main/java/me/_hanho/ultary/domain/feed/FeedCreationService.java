@@ -18,22 +18,27 @@ import me._hanho.ultary.security.principal.UserPrincipal;
 public class FeedCreationService {
     private final AiService ai;
     private final FeedService feeds;
+    private final FeedCaptionTags captionTags;
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public FeedResponse create(UserPrincipal principal, CreateFeedRequest request) {
         if (request.getMedia() == null || request.getMedia().isEmpty()) {
             throw new BusinessException(ErrorCode.FEED_MEDIA_REQUIRED);
         }
-        ai.assertFeedCreationAllowed(principal.getUserNo(), request.getContent());
+        ai.assertFeedCreationAllowed(principal.getUserNo(), captionTags.inspectionText(request.getContent(), request.getTagIds()));
         return feeds.create(principal, request);
     }
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public FeedResponse update(UserPrincipal principal, Long feedId, UpdateFeedRequest request) {
         FeedResponse current = feeds.getDetail(principal, feedId);
-        if (!principal.getUserNo().equals(current.getUserNo())) throw new BusinessException(ErrorCode.FORBIDDEN);
+        if (!me._hanho.ultary.security.ContentEditPolicy.canEdit(principal.getUserNo(), current.getUserNo())) throw new BusinessException(ErrorCode.FORBIDDEN);
         String content = Boolean.TRUE.equals(request.getClearContent()) ? null
                 : request.getContent() != null ? request.getContent() : current.getContent();
-        ai.assertFeedUpdateAllowed(principal.getUserNo(), feedId, content);
+        var tagIds = request.getTagIds();
+        if (tagIds == null && request.getContent() == null && !Boolean.TRUE.equals(request.getClearContent())) {
+            tagIds = current.getTagIds();
+        }
+        ai.assertFeedUpdateAllowed(principal.getUserNo(), feedId, captionTags.inspectionText(content, tagIds));
         return feeds.update(principal, feedId, request);
     }
 }

@@ -383,6 +383,10 @@
 				  )
 			)
 		  )
+		<if test="advertiserUserNos != null and advertiserUserNos.size() > 0">
+		  AND f.user_no NOT IN
+		  <foreach collection="advertiserUserNos" item="advertiser" open="(" separator="," close=")">#{advertiser}</foreach>
+		</if>
 		<if test="cursorCreatedAt != null and cursorFeedId != null">
 		  AND (
 			f.created_at &lt; #{cursorCreatedAt}
@@ -393,7 +397,26 @@
 		LIMIT #{limit}
 	</select>
 
-	<!-- 나중에 추천 알고리즘 추가해야함. 지금은 조회 가능한 전체 피드를 최신순 limit건 -->
+	<!-- 추천 후보는 본인 제외·공개 계정·전체공개·활성 미디어·차단 조건을 먼저 적용한다. -->
+	<select id="findRecommendedCandidates" resultType="me._hanho.ultary.domain.main.RecommendedFeedCandidate">
+      SELECT candidate.* FROM (
+        SELECT f.*,
+          EXISTS(SELECT 1 FROM ultary_neighbor n WHERE n.status='ACCEPTED' AND
+            ((n.requester_user_no=#{viewerUserNo} AND n.receiver_user_no=f.user_no) OR
+             (n.receiver_user_no=#{viewerUserNo} AND n.followed_back=1 AND n.requester_user_no=f.user_no))) AS following,
+          EXISTS(SELECT 1 FROM ultary_feed_tag ft JOIN ultary_tag t ON t.tag_id=ft.tag_id
+            WHERE ft.feed_id=f.feed_id AND ft.is_deleted=0 AND t.is_deleted=0
+              AND t.purpose='COMMERCIAL' AND t.profile_status='APPROVED') AS commercial
+        FROM ultary_feed f JOIN ultary_user u ON u.user_no=f.user_no
+        WHERE <include refid="visibleToViewerAndNotBlocked"/>
+          AND f.user_no != #{viewerUserNo} AND f.visibility='PUBLIC'
+          AND NOT EXISTS(SELECT 1 FROM ultary_user_privacy p WHERE p.user_no=f.user_no AND p.private_account=1)
+          AND EXISTS(SELECT 1 FROM ultary_feed_media m JOIN ultary_file file ON file.file_id=m.file_id AND file.is_deleted=0
+            WHERE m.feed_id=f.feed_id)
+      ) candidate
+      <if test="!search">WHERE candidate.following=0</if>
+      ORDER BY candidate.following ASC, candidate.created_at DESC, candidate.feed_id DESC
+    </select>
 	<select id="findVisibleFeeds" resultType="me._hanho.ultary.domain.feed.model.Feed">
 		SELECT
 			f.feed_id,

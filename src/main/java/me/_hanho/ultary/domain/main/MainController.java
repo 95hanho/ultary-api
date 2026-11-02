@@ -16,7 +16,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import me._hanho.ultary.common.response.ApiResponse;
-import me._hanho.ultary.domain.feed.dto.response.FeedResponse;
+import me._hanho.ultary.domain.main.dto.response.RecommendedFeedPageResponse;
 import me._hanho.ultary.domain.myultary.dto.response.FeedGridItemResponse;
 import me._hanho.ultary.domain.main.dto.request.SavePetTagHistoryRequest;
 import me._hanho.ultary.domain.main.dto.request.SaveSearchHistoryRequest;
@@ -38,6 +38,13 @@ import me._hanho.ultary.security.principal.UserPrincipal;
 public class MainController {
 
 	private final MainService mainService;
+	private final RecommendedFeedService recommendedFeedService;
+
+	@GetMapping("/feeds/advertisements")
+	public ApiResponse<List<me._hanho.ultary.domain.feed.dto.response.FeedResponse>> advertisements(
+			@AuthenticationPrincipal UserPrincipal principal) {
+		return ApiResponse.ok(recommendedFeedService.advertisements(principal.getUserNo()), "광고 게시글 조회 성공");
+	}
 
 	/** 내 활성 스토리를 맨 앞에 두고, 이어서 팔로우 중 활성 스토리 있는 목록 */
 	@GetMapping("/stories/owners")
@@ -66,13 +73,14 @@ public class MainController {
 		return ApiResponse.ok(mainService.getFeeds(principal, cursorFeedId, limit), "팔로우 게시글 조회 성공");
 	}
 
-	/** 나중에 추천 알고리즘 추가해야함. 지금은 조회 가능한 전체 피드를 limit건 */
+	/** 팔로우 외 공개 피드 추천. */
 	@GetMapping("/feeds/recommended")
-	public ApiResponse<List<FeedResponse>> recommendedFeeds(
+	public ApiResponse<RecommendedFeedPageResponse> recommendedFeeds(
 			@AuthenticationPrincipal UserPrincipal principal,
-			@RequestParam(required = false) Integer limit) {
+			@RequestParam(required = false) Integer limit,
+			@RequestParam(required = false) String cursor) {
 		log.info("[recommendedFeeds] userNo={} limit={}", principal.getUserNo(), limit);
-		return ApiResponse.ok(mainService.getRecommendedFeeds(principal, limit), "메인 추천 게시글 조회 성공");
+		return ApiResponse.ok(mainService.getRecommendedFeeds(principal, limit, cursor), "메인 추천 게시글 조회 성공");
 	}
 
 	@GetMapping("/search")
@@ -97,14 +105,15 @@ public class MainController {
 				"태그 게시글 조회 성공");
 	}
 
-	/** 나중에 추천 알고리즘 추가해야함. 지금은 조회 가능한 전체 피드를 limit건 */
+	/** 공개 피드 탐색. */
 	@GetMapping("/search/recommended")
-	public ApiResponse<List<FeedResponse>> searchRecommendedFeeds(
+	public ApiResponse<RecommendedFeedPageResponse> searchRecommendedFeeds(
 			@AuthenticationPrincipal UserPrincipal principal,
-			@RequestParam(required = false) Integer limit) {
+			@RequestParam(required = false) Integer limit,
+			@RequestParam(required = false) String cursor) {
 		log.info("[searchRecommendedFeeds] userNo={} limit={}", principal.getUserNo(), limit);
 		return ApiResponse.ok(
-				mainService.getSearchRecommendedFeeds(principal, limit),
+				mainService.getSearchRecommendedFeeds(principal, limit, cursor),
 				"검색 추천 게시글 조회 성공");
 	}
 

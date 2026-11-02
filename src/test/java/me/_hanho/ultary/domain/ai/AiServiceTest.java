@@ -65,6 +65,41 @@ class AiServiceTest {
         verify(client,times(3)).generateJson(anyString(),anyString());
     }
 
+    @Test void selectedCatDetailsReachThePromptAndOppositeSpeciesTagsAreRemoved() {
+        when(client.isEnabled()).thenReturn(true);
+        when(client.generateJson(anyString(),anyString())).thenReturn("""
+            {"hashtags":["반려견","강아지산책","고양이일상","빗질","doglover"]}
+            """);
+        var pets=java.util.List.of(new AiService.SelectedPet("별이","CAT","코리안 숏헤어"));
+        assertThat(service.recommendHashtags(101L,"오늘 빗질을 했어요",java.util.List.of(),pets))
+            .containsExactly("고양이일상","빗질");
+        var prompt=ArgumentCaptor.forClass(String.class);
+        verify(client).generateJson(anyString(),prompt.capture());
+        assertThat(prompt.getValue()).contains("별이","CAT","코리안 숏헤어");
+    }
+
+    @Test void speciesGuardAllowsMixedPetsAndNeutralProductsButRejectsOppositeOnlyProducts() {
+        var cat=new AiService.SelectedPet("별이","CAT","코리안 숏헤어");
+        var dog=new AiService.SelectedPet("코코","DOG","웰시 코기");
+        assertThat(AiService.matchesSelectedSpecies("산책하네스","반려견 전용",java.util.List.of(cat))).isFalse();
+        assertThat(AiService.matchesSelectedSpecies("펫샴푸","반려견과 반려묘 공용",java.util.List.of(cat))).isTrue();
+        assertThat(AiService.matchesSelectedSpecies("고양이일상",null,java.util.List.of(dog))).isFalse();
+        assertThat(AiService.matchesSelectedSpecies("vacation",null,java.util.List.of(dog))).isTrue();
+        assertThat(AiService.matchesSelectedSpecies("강아지산책",null,java.util.List.of(cat,dog))).isTrue();
+    }
+
+    @Test void recommendsOnlySuppliedExistingCandidatesAndMergesGeneralSuggestionsWithoutDuplicates() {
+        when(client.isEnabled()).thenReturn(true);
+        when(client.generateJson(anyString(),anyString())).thenReturn("""
+            {"existingHashtags":["펫브러시","없는상품","#산책"],"hashtags":["펫브러시","Walk","walk","털관리","기분좋은날"]}
+            """);
+        var candidates = java.util.List.of(new AiService.ExistingHashtag("펫브러시", "슬리커 브러시", "털 정돈용"),
+            new AiService.ExistingHashtag("산책", null, null));
+        assertThat(service.recommendHashtags(101L, "털을 빗겨주고 산책했어요", candidates))
+            .containsExactly("펫브러시", "산책", "Walk", "털관리", "기분좋은날");
+        verify(client).generateJson(anyString(), contains("슬리커 브러시"));
+    }
+
     @Test void feedCreationRejectsUnsafeTextWithAReasonAndKeepsTheInspectionLog() {
         when(client.generateJson(anyString(),anyString())).thenReturn("{\"safe\":false,\"category\":\"ABUSE\"}");
         assertThatThrownBy(() -> service.assertFeedCreationAllowed(101L,"unsafe"))

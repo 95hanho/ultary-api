@@ -24,6 +24,7 @@ import me._hanho.ultary.domain.tag.dto.request.SubmitTagProfileRequest;
 import me._hanho.ultary.domain.tag.dto.request.UpdateTagRequest;
 import me._hanho.ultary.domain.tag.dto.response.TagProfileRequestResponse;
 import me._hanho.ultary.domain.tag.dto.response.TagResponse;
+import me._hanho.ultary.domain.tag.model.TagSearchHit;
 import me._hanho.ultary.security.principal.UserPrincipal;
 
 /** 경로 원본: springEndpoints.tags / api-memo.md §6 */
@@ -52,6 +53,14 @@ public class TagController {
 		return ApiResponse.ok(tagService.search(q, limit), "태그 검색 성공");
 	}
 
+	@GetMapping("/suggest")
+	public ApiResponse<List<TagSearchHit>> suggest(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@RequestParam(required = false) String q,
+			@RequestParam(required = false) Integer limit) {
+		return ApiResponse.ok(tagService.suggestHashtags(principal == null ? null : principal.getUserNo(), q, limit), "태그 자동완성 조회 성공");
+	}
+
 	@GetMapping("/profile-requests")
 	public ApiResponse<List<TagProfileRequestResponse>> myProfileRequests(
 			@AuthenticationPrincipal UserPrincipal principal,
@@ -76,9 +85,11 @@ public class TagController {
 	public ApiResponse<List<TagResponse>> recommend(
 			@AuthenticationPrincipal UserPrincipal principal,
 			@RequestParam(required = false) String q,
-			@RequestParam(required = false) Integer limit) {
+			@RequestParam(required = false) Integer limit,
+			@RequestParam(required = false) List<Long> selectedPetIds,
+			@RequestParam(required = false) Long editFeedId) {
 		log.info("[recommend] q={} limit={}", q, limit);
-		return ApiResponse.ok(tagService.recommend(principal, q, limit), "태그 추천 조회 성공");
+		return ApiResponse.ok(tagService.recommend(principal, q, limit, selectedPetIds, editFeedId), "태그 추천 조회 성공");
 	}
 
 	@GetMapping("/{tagId}/handle/change-availability")

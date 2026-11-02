@@ -85,10 +85,11 @@ public class FeedService {
 	private final NotificationService notificationService;
 	private final PrivacyService privacyService;
 	private final ModerationQueue moderationQueue;
+	private final FeedCaptionTags captionTags;
 	private final ReportService reportService;
 	private final CommentMentionService commentMentions;
 
-	/** Persist the feed and its durable inspection job together. */
+	/** Persist an approved feed and its caption tags in one transaction. */
 	@Transactional
 	public FeedResponse create(UserPrincipal principal, CreateFeedRequest request) {
 		if (request.getMedia() == null || request.getMedia().isEmpty()) {
@@ -105,7 +106,7 @@ public class FeedService {
 
 		insertMedia(feed.getFeedId(), principal.getUserNo(), request.getMedia());
 		insertPets(feed.getFeedId(), principal.getUserNo(), request.getPets());
-		insertTags(feed.getFeedId(), request.getTagIds());
+		insertTags(feed.getFeedId(), captionTags.resolve(principal.getUserNo(), feed.getContent(), request.getTagIds()));
 		notificationService.syncFeedTags(feed.getFeedId());
 		moderationQueue.approveCreatedFeed(feed.getFeedId(), feed.getContent());
 
@@ -209,13 +210,13 @@ public class FeedService {
 	@Transactional
 	public FeedResponse update(UserPrincipal principal, Long feedId, UpdateFeedRequest request) {
 		moderationQueue.lock("FEED", feedId, feedId);
-		requireAuthor(feedId, principal.getUserNo());
+		Feed original = requireEditor(feedId, principal.getUserNo());
 
-        contentPetService.replace("FEED", feedId, principal.getUserNo(), request.getSubjectPetIds());
+        contentPetService.replace("FEED", feedId, original.getUserNo(), request.getSubjectPetIds());
 
 		Feed patch = new Feed();
 		patch.setFeedId(feedId);
-		patch.setUserNo(principal.getUserNo());
+		patch.setUserNo(original.getUserNo());
 		patch.setClearContent(Boolean.TRUE.equals(request.getClearContent()));
 		if (!Boolean.TRUE.equals(request.getClearContent()) && request.getContent() != null) {
 			patch.setContent(request.getContent().trim());
@@ -235,7 +236,11 @@ public class FeedService {
 		if (request.getMediaTags() != null && replacePhotoTags(feedId, principal.getUserNo(), request.getMediaTags())) {
 			notificationService.syncFeedTags(feedId);
 		}
-		if (request.getTagIds() != null) replaceCaptionTags(feedId, request.getTagIds());
+		boolean captionChanged = request.getContent() != null || Boolean.TRUE.equals(request.getClearContent());
+		if (captionChanged || request.getTagIds() != null) {
+			String caption = captionChanged && !Boolean.TRUE.equals(request.getClearContent()) ? request.getContent() : null;
+			replaceCaptionTags(feedId, captionTags.resolve(principal.getUserNo(), caption, request.getTagIds(), feedMapper.findTagIdsByFeedId(feedId)));
+		}
 		log.info("[update] feedId={} userNo={}", feedId, principal.getUserNo());
 		return toResponse(requireVisible(feedId, principal.getUserNo()), principal.getUserNo());
 	}
@@ -427,18 +432,21 @@ public class FeedService {
 			UserPrincipal principal, Long feedId, Long commentId, UpdateCommentRequest request) {
 		var previous = moderationQueue.lock("COMMENT", commentId, feedId);
 		requireVisible(feedId, principal.getUserNo());
-		requireComment(feedId, commentId);
+		FeedComment original = requireComment(feedId, commentId);
+		if (!me._hanho.ultary.security.ContentEditPolicy.canEdit(principal.getUserNo(), original.getUserNo()))
+			throw new BusinessException(ErrorCode.FORBIDDEN);
 		String content = request.getContent().trim();
 		commentMentions.capture(commentId, null, previous.getContent());
-		int updated = feedMapper.updateCommentContent(commentId, principal.getUserNo(), content);
+		int updated = feedMapper.updateCommentContent(commentId, original.getUserNo(), content);
 		if (updated == 0) {
 			throw new BusinessException(ErrorCode.FORBIDDEN);
 		}
-		commentMentions.replace(principal.getUserNo(), commentId, null, content, request.getMentions());
+		commentMentions.replace(original.getUserNo(), commentId, null, content, request.getMentions());
 		notificationService.syncCommentMentions(commentId);
 		notificationService.refreshCommentSnippet(commentId);
 		notificationService.syncFeedThread(feedId, false);
-		moderationQueue.enqueue("COMMENT", commentId, feedId, principal.getUserNo(), previous.getContent(), content, false);
+		moderationQueue.enqueue("COMMENT", commentId, feedId, original.getUserNo(), previous.getContent(), content, false);
+		log.info("[updateComment] commentId={} actor={} author={}", commentId, principal.getUserNo(), original.getUserNo());
 		return toCommentResponse(requireComment(feedId, commentId), false, principal.getUserNo(), null);
 	}
 
@@ -555,18 +563,21 @@ public class FeedService {
 		var previous = moderationQueue.lock("REPLY", replyId, feedId);
 		requireVisible(feedId, principal.getUserNo());
 		requireComment(feedId, commentId);
-		requireReply(commentId, replyId);
+		FeedReply original = requireReply(commentId, replyId);
+		if (!me._hanho.ultary.security.ContentEditPolicy.canEdit(principal.getUserNo(), original.getUserNo()))
+			throw new BusinessException(ErrorCode.FORBIDDEN);
 		String content = request.getContent().trim();
 		commentMentions.capture(null, replyId, previous.getContent());
-		int updated = feedMapper.updateReplyContent(replyId, principal.getUserNo(), content);
+		int updated = feedMapper.updateReplyContent(replyId, original.getUserNo(), content);
 		if (updated == 0) {
 			throw new BusinessException(ErrorCode.FORBIDDEN);
 		}
-		commentMentions.replace(principal.getUserNo(), null, replyId, content, request.getMentions());
+		commentMentions.replace(original.getUserNo(), null, replyId, content, request.getMentions());
 		notificationService.syncReplyMentions(replyId, false);
 		notificationService.refreshReplySnippet(replyId);
 		notificationService.syncFeedThread(feedId, false);
-		moderationQueue.enqueue("REPLY", replyId, feedId, principal.getUserNo(), previous.getContent(), content, false);
+		moderationQueue.enqueue("REPLY", replyId, feedId, original.getUserNo(), previous.getContent(), content, false);
+		log.info("[updateReply] replyId={} actor={} author={}", replyId, principal.getUserNo(), original.getUserNo());
 		return toReplyResponse(requireReply(commentId, replyId), principal.getUserNo(), null);
 	}
 
@@ -965,9 +976,9 @@ public class FeedService {
 		return feed;
 	}
 
-	private Feed requireAuthor(Long feedId, Long userNo) {
+	private Feed requireEditor(Long feedId, Long userNo) {
 		Feed feed = requireActive(feedId);
-		if (!feed.getUserNo().equals(userNo)) {
+		if (!me._hanho.ultary.security.ContentEditPolicy.canEdit(userNo, feed.getUserNo())) {
 			throw new BusinessException(ErrorCode.FORBIDDEN);
 		}
 		return feed;
@@ -1087,6 +1098,7 @@ public class FeedService {
                 .subjectPets(contentPetService.list("FEED", feed.getFeedId()))
 				.feedId(feed.getFeedId())
 				.userNo(feed.getUserNo())
+				.advertisement(FeedAdvertisementPolicy.isAdvertisement(feed.getUserNo()))
 				.authorNickname(author != null ? author.getNickname() : null)
 				.authorHasStory(viewerUserNo != null && storyService.hasVisibleStory(viewerUserNo, feed.getUserNo()))
 				.authorHasUnviewedStory(viewerUserNo != null && storyService.hasVisibleStory(viewerUserNo, feed.getUserNo()) && storyService.hasUnviewedStory(feed.getUserNo(), viewerUserNo))
