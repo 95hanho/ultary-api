@@ -45,6 +45,7 @@ public class SecurityConfig {
 						.authenticationEntryPoint(jwtAuthenticationEntryPoint)
 						.accessDeniedHandler(jwtAccessDeniedHandler))
 				.authorizeHttpRequests(auth -> auth
+						.requestMatchers("/api/v1/test/story-views", "/api/v1/test/nickname-cooldown").authenticated()
 						.requestMatchers(
 								"/api/v1/health/**",
 								"/api/v1/auth/login",

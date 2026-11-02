@@ -1,7 +1,5 @@
 package me._hanho.ultary.domain.test;
 
-import java.time.LocalDateTime;
-
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -19,13 +17,13 @@ import me._hanho.ultary.common.exception.BusinessException;
 import me._hanho.ultary.common.exception.ErrorCode;
 import me._hanho.ultary.common.response.ApiResponse;
 import me._hanho.ultary.domain.auth.TokenMapper;
-import me._hanho.ultary.domain.story.StoryMapper;
+
 import me._hanho.ultary.domain.test.dto.request.PasswordEncodeRequest;
-import me._hanho.ultary.domain.test.dto.response.NicknameCooldownResetResponse;
+
 import me._hanho.ultary.domain.test.dto.response.PasswordEncodeResponse;
-import me._hanho.ultary.domain.test.dto.response.StoryViewResetResponse;
+
 import me._hanho.ultary.domain.test.dto.response.TokenResetResponse;
-import me._hanho.ultary.domain.user.UserMapper;
+
 import me._hanho.ultary.security.principal.UserPrincipal;
 
 /**
@@ -41,8 +39,7 @@ import me._hanho.ultary.security.principal.UserPrincipal;
 public class TestController {
 
 	private final PasswordEncoder passwordEncoder;
-	private final StoryMapper storyMapper;
-	private final UserMapper userMapper;
+
 	private final TokenMapper tokenMapper;
 
 	@PostMapping("/password/encode")
@@ -53,45 +50,6 @@ public class TestController {
 		return ApiResponse.ok(PasswordEncodeResponse.builder()
 				.encodedPassword(encoded)
 				.build(), "비밀번호 인코딩 성공");
-	}
-
-	/**
-	 * 현재 로그인 유저의 스토리 읽음({@code ultary_story_view}) 전부 삭제.
-	 * FE: development에서만 버튼 노출 → Bearer 필수.
-	 */
-	@DeleteMapping("/story-views")
-	public ApiResponse<StoryViewResetResponse> resetStoryViews(
-			@AuthenticationPrincipal UserPrincipal principal) {
-		if (principal == null) {
-			throw new BusinessException(ErrorCode.UNAUTHORIZED);
-		}
-		int deleted = storyMapper.deleteViewsByViewerUserNo(principal.getUserNo());
-		log.info("[resetStoryViews] userNo={} deleted={}", principal.getUserNo(), deleted);
-		return ApiResponse.ok(StoryViewResetResponse.builder()
-				.viewerUserNo(principal.getUserNo())
-				.deletedCount(deleted)
-				.build(), "스토리 읽음 초기화 성공");
-	}
-
-	/**
-	 * 로그인 유저의 {@code nickname_changed_at}을 올해 1월 1일로 되돌려 30일 쿨다운을 푼다.
-	 */
-	@PostMapping("/nickname-cooldown")
-	public ApiResponse<NicknameCooldownResetResponse> resetNicknameCooldown(
-			@AuthenticationPrincipal UserPrincipal principal) {
-		if (principal == null) {
-			throw new BusinessException(ErrorCode.UNAUTHORIZED);
-		}
-		LocalDateTime changedAt = LocalDateTime.of(LocalDateTime.now().getYear(), 1, 1, 0, 0);
-		int updated = userMapper.updateNicknameChangedAt(principal.getUserNo(), changedAt);
-		if (updated == 0) {
-			throw new BusinessException(ErrorCode.UNAUTHORIZED);
-		}
-		log.info("[resetNicknameCooldown] userNo={} nicknameChangedAt={}", principal.getUserNo(), changedAt);
-		return ApiResponse.ok(NicknameCooldownResetResponse.builder()
-				.userNo(principal.getUserNo())
-				.nicknameChangedAt(changedAt)
-				.build(), "닉네임태그 변경 기간 초기화 성공");
 	}
 
 	/**
