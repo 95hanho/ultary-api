@@ -835,7 +835,7 @@ public class FeedService {
 	@Transactional
 	public void restoreCaptionTags(Long feedId, String approvedContent) {
 		Set<Long> tags = new HashSet<>();
-		var matcher = java.util.regex.Pattern.compile("#([0-9A-Za-z가-힣_]+)").matcher(approvedContent == null ? "" : approvedContent);
+		var matcher = java.util.regex.Pattern.compile("(?<!\\S)#([0-9A-Za-z가-힣_]{2,})").matcher(approvedContent == null ? "" : approvedContent);
 		while (matcher.find()) {
 			Tag tag = tagMapper.findActiveByHashtag(matcher.group(1));
 			if (tag != null) tags.add(tag.getTagId());

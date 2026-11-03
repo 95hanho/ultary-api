@@ -122,6 +122,36 @@ class FeedEditIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ultary_ai_moderation_job WHERE target_type='FEED' AND target_id=?",Integer.class,feed)).isZero();
     }
 
+    @Test void singleCharacterHashtagsRemainTextWithoutCreatingOrLinkingTags() {
+        jdbc.update("INSERT INTO ultary_tag(hashtag,purpose,created_by_user_no) VALUES('힣','USER',?)", owner);
+        Long legacy = id(), valid = tag();
+        String body = jdbc.queryForObject("SELECT hashtag FROM ultary_tag WHERE tag_id=?", String.class, valid);
+        Integer before = jdbc.queryForObject("SELECT COUNT(*) FROM ultary_tag", Integer.class);
+        String content = "본문 #힣 #a #1 #_ #" + body;
+        var request = new CreateFeedRequest();
+        var image = new CreateFeedRequest.MediaItem();
+        image.setFileId(file); image.setMediaType("IMAGE");
+        request.setMedia(List.of(image)); request.setContent(content); request.setTagIds(List.of(legacy));
+        assertThat(captionTags.inspectionText(content, List.of(legacy))).isEqualTo(content);
+        var created = feeds.create(principal, request);
+        assertThat(created.getContent()).isEqualTo(content);
+        assertThat(mapper.findTagIdsByFeedId(created.getFeedId())).containsExactly(valid);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ultary_tag", Integer.class)).isEqualTo(before);
+
+        var update = new UpdateFeedRequest(); update.setContent("수정 #힣 #a #1 #_");
+        update.setTagIds(List.of(legacy));
+        var updated = feeds.update(principal, created.getFeedId(), update);
+        assertThat(updated.getContent()).isEqualTo(update.getContent());
+        assertThat(mapper.findTagIdsByFeedId(created.getFeedId())).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT use_count FROM ultary_tag WHERE tag_id=?", Integer.class, valid)).isZero();
+        assertThat(jdbc.queryForObject("SELECT use_count FROM ultary_tag WHERE tag_id=?", Integer.class, legacy)).isZero();
+        feeds.restoreCaptionTags(created.getFeedId(), content);
+        assertThat(mapper.findTagIdsByFeedId(created.getFeedId())).containsExactly(valid);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ultary_tag", Integer.class)).isEqualTo(before);
+        assertThat("힣".matches(me._hanho.ultary.common.validation.HashtagRules.REGEX)).isFalse();
+        assertThat("산책".matches(me._hanho.ultary.common.validation.HashtagRules.REGEX)).isTrue();
+    }
+
     @Test void createsWithAccountDefaultOrExplicitPostVisibility() {
         var defaults = new me._hanho.ultary.domain.settings.dto.request.UpdatePrivacyRequest();
         defaults.setFeedVisibility("PRIVATE");

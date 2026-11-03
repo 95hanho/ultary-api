@@ -31,6 +31,7 @@ public class FeedCaptionTags {
             Tag tag = mapper.findActiveByTagId(id);
             if (tag == null) throw new BusinessException(ErrorCode.TAG_NOT_FOUND);
             String body = tag.getHashtag();
+            if (body.length() < 2) continue;
             if (bodies.putIfAbsent(body.toLowerCase(Locale.ROOT), body) == null) {
                 if (!text.isEmpty()) text.append('\n');
                 text.append('#').append(body);
@@ -53,6 +54,10 @@ public class FeedCaptionTags {
         candidates.addAll(retainedIds);
         for (Long id : candidates) {
             Tag tag = mapper.findActiveByTagId(id);
+            if (tag != null && tag.getHashtag().length() < 2) {
+                ids.remove(id);
+                continue;
+            }
             if (tag != null) preferred.putIfAbsent(tag.getHashtag().toLowerCase(Locale.ROOT), tag);
         }
         for (String body : bodies(content).values()) {
@@ -77,6 +82,7 @@ public class FeedCaptionTags {
         var matcher = TOKEN.matcher(content == null ? "" : content);
         while (matcher.find()) {
             String body = matcher.group(1);
+            if (body.length() < 2) continue;
             if (!body.matches(HashtagRules.REGEX)) throw new BusinessException(ErrorCode.INVALID_INPUT, HashtagRules.MESSAGE);
             result.putIfAbsent(body.toLowerCase(Locale.ROOT), body);
         }
