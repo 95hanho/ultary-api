@@ -191,7 +191,8 @@
 				ORDER BY rp.priority ASC, rp.pet_id ASC
 				LIMIT 1
 			) AS profileFileId,
-			COUNT(s.story_id) AS storyCount
+			COUNT(s.story_id) AS storyCount,
+			MAX(s.created_at) AS latestStoryAt
 		FROM ultary_neighbor n
 		INNER JOIN ultary_user u ON u.withdrawal_status = 'ACTIVE'
 			AND (
@@ -226,7 +227,8 @@
 				ORDER BY rp.priority ASC, rp.pet_id ASC
 				LIMIT 1
 			) AS profileFileId,
-			COUNT(s.story_id) AS storyCount
+			COUNT(s.story_id) AS storyCount,
+			MAX(s.created_at) AS latestStoryAt
 		FROM ultary_user u
 		INNER JOIN ultary_story s ON s.user_no = u.user_no
 			AND s.is_deleted = 0

@@ -12,4 +12,5 @@ public class StoryOwnerRow {
 	private String nickname;
 	private Integer profileFileId;
 	private Integer storyCount;
+	private java.time.LocalDateTime latestStoryAt;
 }

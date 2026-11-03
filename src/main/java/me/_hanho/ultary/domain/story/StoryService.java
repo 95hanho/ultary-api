@@ -164,11 +164,14 @@ public class StoryService {
 		for (StoryOwnerRow row : rows) {
 			result.add(toOwnerResponse(row, me, files));
 		}
-		// 미열람 링 먼저, 같은 그룹은 최신 스토리 순(SQL ORDER) 유지
-		result.sort(Comparator.comparing(o -> !Boolean.TRUE.equals(o.getHasUnviewed())));
 		if (mine != null) {
-			result.add(0, toOwnerResponse(mine, me, files));
+			result.add(toOwnerResponse(mine, me, files));
 		}
+		result.sort(Comparator
+				.comparing((StoryOwnerResponse o) -> !(me.equals(o.getUserNo()) && Boolean.TRUE.equals(o.getHasUnviewed())))
+				.thenComparing(o -> !Boolean.TRUE.equals(o.getHasUnviewed()))
+				.thenComparing(StoryOwnerResponse::getLatestStoryAt, Comparator.nullsLast(Comparator.reverseOrder()))
+				.thenComparing(StoryOwnerResponse::getUserNo));
 		return result;
 	}
 
@@ -183,6 +186,7 @@ public class StoryService {
 				.profileFileId(row.getProfileFileId())
 				.profileFile(profileId == null ? null : files.get(profileId))
 				.storyCount(row.getStoryCount())
+				.latestStoryAt(row.getLatestStoryAt())
 				.hasUnviewed(unviewed > 0)
 				.build();
 	}

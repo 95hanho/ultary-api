@@ -21,6 +21,7 @@ public class StoryOwnerResponse {
 	private FileSummaryResponse profileFile;
 	/** 활성 스토리 개수 */
 	private Integer storyCount;
+	private java.time.LocalDateTime latestStoryAt;
 	/** 내가 아직 안 본 활성 스토리가 하나라도 있으면 true ({@code ultary_story_view} 기준) */
 	private Boolean hasUnviewed;
 }

@@ -80,6 +80,26 @@ class SearchStoryIntegrationTest {
         });
     }
 
+    @Test void ownUnreadIsFirstButReadOwnStoriesJoinUnreadThenLatestOrdering() {
+        Long other=user();
+        Long file=jdbc.queryForObject("SELECT file_id FROM ultary_story WHERE story_id=?",Long.class,story);
+        jdbc.update("UPDATE ultary_story SET created_at='2026-01-01 10:00:00' WHERE story_id=?",story);
+        jdbc.update("INSERT INTO ultary_story(user_no,file_id,media_type,created_at,expires_at) VALUES(?,?,'IMAGE','2026-01-01 11:00:00',DATE_ADD(NOW(),INTERVAL 1 DAY))",viewer,file);
+        Long mine=id();
+        jdbc.update("INSERT INTO ultary_story(user_no,file_id,media_type,created_at,expires_at) VALUES(?,?,'IMAGE','2026-01-01 12:00:00',DATE_ADD(NOW(),INTERVAL 1 DAY))",other,file);
+        Long newest=id();
+        for(Long owner:java.util.List.of(author,other)) jdbc.update("INSERT INTO ultary_neighbor(requester_user_no,receiver_user_no,pair_key,status) VALUES(?,?,?,'ACCEPTED')",viewer,owner,Math.min(viewer,owner)+":"+Math.max(viewer,owner));
+        assertThat(stories.listResidentOwners(principal)).extracting(x->x.getUserNo()).containsExactly(viewer,other,author);
+        stories.markViewed(principal,mine);
+        assertThat(stories.listResidentOwners(principal)).extracting(x->x.getUserNo()).containsExactly(other,author,viewer);
+        stories.markViewed(principal,newest);
+        assertThat(stories.listResidentOwners(principal)).extracting(x->x.getUserNo()).containsExactly(author,other,viewer);
+        stories.markViewed(principal,story);
+        var allRead=stories.listResidentOwners(principal);
+        assertThat(allRead).extracting(x->x.getUserNo()).containsExactly(other,viewer,author);
+        assertThat(allRead.get(0).getLatestStoryAt()).isEqualTo(java.time.LocalDateTime.of(2026,1,1,12,0));
+    }
+
     void assertAllChannels(boolean available, boolean unread) {
         for (String type : new String[] {"USER", "MENTION"}) {
             var results = main.search(principal, type.equals("USER") ? nickname : mention, type, 20).getUsers();
