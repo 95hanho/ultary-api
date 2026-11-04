@@ -10,5 +10,7 @@ public class TagSearchHit {
 
 	private Long tagId;
 	private String hashtag;
+	/** 상업 설명 제목. 없으면 null. 동일 hashtag 구분용 */
+	private String title;
 	private Integer feedCount;
 }

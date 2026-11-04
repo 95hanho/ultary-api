@@ -69,11 +69,20 @@ class TagReviewIntegrationTest {
         tags.cancelProfileRequest(principal, request);
         assertThat(jdbc.queryForObject(
                 "SELECT COUNT(*) FROM ultary_tag_profile_request WHERE tag_profile_request_id=?",
-                Integer.class, request)).isZero();
-        assertThat(jdbc.queryForObject("SELECT purpose FROM ultary_tag WHERE tag_id=?", String.class, tag))
-                .isEqualTo("USER");
-        assertThat(jdbc.queryForObject("SELECT profile_status FROM ultary_tag WHERE tag_id=?", String.class, tag))
-                .isEqualTo("NONE");
+                Integer.class, request)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT is_deleted FROM ultary_tag WHERE tag_id=?", Integer.class, tag))
+                .isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT deleted_at FROM ultary_tag WHERE tag_id=?", Object.class, tag))
+                .isNotNull();
+        assertThat(tags.listMyProfileRequests(user, "PENDING", 30)).isEmpty();
+        assertThatThrownBy(() -> tags.getDetail(tag, user))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.TAG_NOT_FOUND));
+        assertThat(tags.listProfileRequestsForAdmin("PENDING", null, 50).getItems())
+                .anySatisfy(row -> {
+                    assertThat(row.getRequestId()).isEqualTo(request);
+                    assertThat(row.getIsDeleted()).isTrue();
+                });
     }
 
     @Test void requesterCannotCancelAfterAdminDecision() {

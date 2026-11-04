@@ -13,6 +13,8 @@ public class TagProfileRequest {
 	private Long tagProfileRequestId;
 	private Long tagId;
 	private String hashtag;
+	/** 태그(ultary_tag) 소프트 삭제 여부 */
+	private Boolean tagDeleted;
 	private Integer feedCount;
 	private Long requesterUserNo;
 	private String requesterNickname;

@@ -161,7 +161,7 @@ public class TagService {
 	@Transactional(readOnly = true)
 	public List<TagProfileRequestResponse> listMyProfileRequests(Long userNo, String status, int limit) {
 		return tagMapper.findProfileRequests(
-						userNo, normalizeRequestStatus(status), null, resolveRequestLimit(limit))
+						userNo, normalizeRequestStatus(status), null, resolveRequestLimit(limit), true)
 				.stream()
 				.map(this::toRequestResponse)
 				.toList();
@@ -188,20 +188,21 @@ public class TagService {
 				|| row.getStatusChangedAt() != null) {
 			throw new BusinessException(ErrorCode.TAG_PROFILE_REQUEST_NOT_PENDING);
 		}
-		tagMapper.deleteRequestImages(requestId);
-		int deleted = tagMapper.deleteProfileRequest(requestId);
-		if (deleted == 0) {
-			throw new BusinessException(ErrorCode.TAG_PROFILE_REQUEST_NOT_PENDING);
+		Tag tag = tagMapper.findActiveByTagId(row.getTagId());
+		if (tag == null) {
+			throw new BusinessException(ErrorCode.TAG_NOT_FOUND);
 		}
-		tagMapper.deleteImagesByTagId(row.getTagId());
-		tagMapper.clearPendingCommercialProfile(row.getTagId());
-		log.info("[cancelProfileRequest] requestId={} tagId={} userNo={}",
+		int softDeleted = tagMapper.softDeleteTag(row.getTagId());
+		if (softDeleted == 0) {
+			throw new BusinessException(ErrorCode.TAG_NOT_FOUND);
+		}
+		log.info("[cancelProfileRequest] requestId={} tagId={} userNo={} softDeleted",
 				requestId, row.getTagId(), principal.getUserNo());
 	}
 
 	@Transactional(readOnly = true)
 	public int countPendingProfileRequests() {
-		return tagMapper.countProfileRequests("PENDING");
+		return tagMapper.countProfileRequests("PENDING", true);
 	}
 
 	@Transactional(readOnly = true)
@@ -209,7 +210,7 @@ public class TagService {
 		String normalized = normalizeRequestStatus(status);
 		int size = resolveRequestLimit(limit);
 		List<TagProfileRequest> rows = tagMapper.findProfileRequests(
-				null, normalized, cursorRequestId, size + 1);
+				null, normalized, cursorRequestId, size + 1, false);
 		Long nextCursorRequestId = null;
 		if (rows.size() > size) {
 			rows = rows.subList(0, size);
@@ -218,7 +219,7 @@ public class TagService {
 		return TagProfileRequestPageResponse.builder()
 				.items(rows.stream().map(this::toRequestResponse).toList())
 				.nextCursorRequestId(nextCursorRequestId)
-				.totalCount(tagMapper.countProfileRequests(normalized))
+				.totalCount(tagMapper.countProfileRequests(normalized, false))
 				.build();
 	}
 
@@ -627,6 +628,7 @@ public class TagService {
 				.requestId(row.getTagProfileRequestId())
 				.tagId(row.getTagId())
 				.hashtag(row.getHashtag())
+				.isDeleted(Boolean.TRUE.equals(row.getTagDeleted()))
 				.feedCount(row.getFeedCount() == null ? 0 : row.getFeedCount())
 				.requesterUserNo(row.getRequesterUserNo())
 				.requesterNickname(row.getRequesterNickname())

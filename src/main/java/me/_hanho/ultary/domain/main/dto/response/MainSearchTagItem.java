@@ -10,6 +10,8 @@ public class MainSearchTagItem {
 
 	private Long tagId;
 	private String hashtag;
+	/** 상업 설명 제목. 없으면 null. 동일 hashtag 구분용 */
+	private String title;
 	/** 이 조회자에게 보이는 게시글 수. 없으면 0 */
 	private Integer feedCount;
 }

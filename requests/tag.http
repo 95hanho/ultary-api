@@ -28,6 +28,11 @@ GET {{baseUrl}}/api/v1/tags/search?q=royal&limit=20
 X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
+### 0c2. 작성·수정 태그 자동완성 (hashtag·title·feedCount)
+GET {{baseUrl}}/api/v1/tags/suggest?q=펫쿠션&limit=20
+X-BFF-Key: {{bffKey}}
+Authorization: Bearer {{accessToken}}
+
 ### 0d. 내용 기반 태그 추천 (Gemini → 실패 시 DB). 최대 5
 GET {{baseUrl}}/api/v1/tags/recommend?q=오늘 몽이랑 한강공원에서 산책&limit=5
 X-BFF-Key: {{bffKey}}
@@ -112,8 +117,9 @@ GET {{baseUrl}}/api/v1/tags/profile-requests?status=PENDING&limit=30
 X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
-### 5d. 내 태그 설명 요청 삭제 (PENDING·관리자 검토 전만)
+### 5d. 내 태그 설명 요청 취소 (PENDING·관리자 검토 전만)
 # requestId 는 5c 목록의 requestId. 승인·거절·재대기 이력이 있으면 409 TAG_PROFILE_REQUEST_NOT_PENDING
+# 요청 행은 남기고 ultary_tag 를 is_deleted=1 소프트 삭제. 목록·검색에서 빠짐
 DELETE {{baseUrl}}/api/v1/tags/profile-requests/{{requestId}}
 X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}

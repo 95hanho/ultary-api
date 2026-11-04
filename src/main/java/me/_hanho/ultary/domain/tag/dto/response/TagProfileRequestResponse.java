@@ -14,6 +14,8 @@ public class TagProfileRequestResponse {
 	private Long requestId;
 	private Long tagId;
 	private String hashtag;
+	/** 태그가 소프트 삭제됐는지. 관리자 목록에서 사용 */
+	private Boolean isDeleted;
 	private Integer feedCount;
 	private Long requesterUserNo;
 	private String requesterNickname;

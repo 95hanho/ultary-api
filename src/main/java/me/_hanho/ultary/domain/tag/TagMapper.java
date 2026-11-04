@@ -88,10 +88,13 @@ public interface TagMapper {
 			@Param("requesterUserNo") Long requesterUserNo,
 			@Param("status") String status,
 			@Param("cursorRequestId") Long cursorRequestId,
-			@Param("limit") int limit);
+			@Param("limit") int limit,
+			@Param("activeTagOnly") boolean activeTagOnly);
 
-	/** 관리자 목록. status가 없으면 전부. 커서와 limit는 세지 않는다 */
-	int countProfileRequests(@Param("status") String status);
+	/** status가 없으면 전부. 커서와 limit는 세지 않는다. activeTagOnly면 삭제 태그 제외 */
+	int countProfileRequests(
+			@Param("status") String status,
+			@Param("activeTagOnly") boolean activeTagOnly);
 
 	int insertRequestImage(
 			@Param("tagProfileRequestId") Long tagProfileRequestId,
@@ -100,10 +103,8 @@ public interface TagMapper {
 
 	int deleteRequestImages(@Param("tagProfileRequestId") Long tagProfileRequestId);
 
-	int deleteProfileRequest(@Param("tagProfileRequestId") Long tagProfileRequestId);
-
-	/** 대기 요청 취소 후 일반 해시태그로 되돌림 */
-	int clearPendingCommercialProfile(@Param("tagId") Long tagId);
+	/** 태그 소프트 삭제 (설명 요청 취소 등) */
+	int softDeleteTag(@Param("tagId") Long tagId);
 
 	List<Long> findRequestImageFileIds(@Param("tagProfileRequestId") Long tagProfileRequestId);
 

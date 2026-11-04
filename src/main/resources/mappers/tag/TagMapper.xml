@@ -104,6 +104,7 @@
 		SELECT
 			t.tag_id AS tagId,
 			t.hashtag AS hashtag,
+			t.title AS title,
 			(
 				SELECT COUNT(*)
 				FROM ultary_feed_tag ft
@@ -125,6 +126,7 @@
 		SELECT
 			t.tag_id AS tagId,
 			t.hashtag AS hashtag,
+			t.title AS title,
 			(
 				SELECT COUNT(*)
 				FROM ultary_feed_tag ft
@@ -222,6 +224,7 @@
 		r.tag_profile_request_id,
 		r.tag_id,
 		t.hashtag,
+		(t.is_deleted = 1) AS tag_deleted,
 		(SELECT COUNT(DISTINCT ft.feed_id) FROM ultary_feed_tag ft
 		 JOIN ultary_feed f ON f.feed_id = ft.feed_id
 		 WHERE ft.tag_id = r.tag_id AND ft.is_deleted = 0 AND f.is_deleted = 0) AS feed_count,
@@ -303,6 +306,7 @@
 		LEFT JOIN ultary_user u ON u.user_no = r.requester_user_no
 		WHERE r.tag_id = #{tagId}
 		  AND r.status = 'PENDING'
+		  AND t.is_deleted = 0
 		ORDER BY r.tag_profile_request_id DESC
 		LIMIT 1
 	</select>
@@ -328,12 +332,24 @@
 		LIMIT 1
 	</select>
 
+	<!-- 요청일·확인일·삭제일 중 가장 최근 (NULL은 무시) -->
+	<sql id="profileRequestActivityAt">
+		GREATEST(
+			r.created_at,
+			COALESCE(r.reviewed_at, r.created_at),
+			COALESCE(t.deleted_at, r.created_at)
+		)
+	</sql>
+
 	<select id="findProfileRequests" resultType="me._hanho.ultary.domain.tag.model.TagProfileRequest">
 		SELECT <include refid="profileRequestColumns"/>
 		FROM ultary_tag_profile_request r
 		JOIN ultary_tag t ON t.tag_id = r.tag_id
 		LEFT JOIN ultary_user u ON u.user_no = r.requester_user_no
 		WHERE 1 = 1
+		<if test="activeTagOnly">
+			AND t.is_deleted = 0
+		</if>
 		<if test="requesterUserNo != null">
 			AND r.requester_user_no = #{requesterUserNo}
 		</if>
@@ -344,29 +360,73 @@
 			AND r.status = #{status}
 		</if>
 		<if test="cursorRequestId != null">
-			AND (
-				r.created_at &lt; (
-					SELECT c.created_at FROM ultary_tag_profile_request c
-					WHERE c.tag_profile_request_id = #{cursorRequestId}
-				)
-				OR (
-					r.created_at = (
-						SELECT c.created_at FROM ultary_tag_profile_request c
-						WHERE c.tag_profile_request_id = #{cursorRequestId}
+			<choose>
+				<!-- 관리자: 활동 시각(요청/확인/삭제 최신) 커서 -->
+				<when test="!activeTagOnly">
+					AND (
+						(<include refid="profileRequestActivityAt"/>) &lt; (
+							SELECT GREATEST(
+								c.created_at,
+								COALESCE(c.reviewed_at, c.created_at),
+								COALESCE(ct.deleted_at, c.created_at)
+							)
+							FROM ultary_tag_profile_request c
+							JOIN ultary_tag ct ON ct.tag_id = c.tag_id
+							WHERE c.tag_profile_request_id = #{cursorRequestId}
+						)
+						OR (
+							(<include refid="profileRequestActivityAt"/>) = (
+								SELECT GREATEST(
+									c.created_at,
+									COALESCE(c.reviewed_at, c.created_at),
+									COALESCE(ct.deleted_at, c.created_at)
+								)
+								FROM ultary_tag_profile_request c
+								JOIN ultary_tag ct ON ct.tag_id = c.tag_id
+								WHERE c.tag_profile_request_id = #{cursorRequestId}
+							)
+							AND r.tag_profile_request_id &lt; #{cursorRequestId}
+						)
 					)
-					AND r.tag_profile_request_id &lt; #{cursorRequestId}
-				)
-			)
+				</when>
+				<!-- 유저 내 목록: 요청일 커서 -->
+				<otherwise>
+					AND (
+						r.created_at &lt; (
+							SELECT c.created_at FROM ultary_tag_profile_request c
+							WHERE c.tag_profile_request_id = #{cursorRequestId}
+						)
+						OR (
+							r.created_at = (
+								SELECT c.created_at FROM ultary_tag_profile_request c
+								WHERE c.tag_profile_request_id = #{cursorRequestId}
+							)
+							AND r.tag_profile_request_id &lt; #{cursorRequestId}
+						)
+					)
+				</otherwise>
+			</choose>
 		</if>
-		ORDER BY r.created_at DESC, r.tag_profile_request_id DESC
+		<choose>
+			<when test="!activeTagOnly">
+				ORDER BY <include refid="profileRequestActivityAt"/> DESC, r.tag_profile_request_id DESC
+			</when>
+			<otherwise>
+				ORDER BY r.created_at DESC, r.tag_profile_request_id DESC
+			</otherwise>
+		</choose>
 		LIMIT #{limit}
 	</select>
 
 	<select id="countProfileRequests" resultType="int">
 		SELECT COUNT(*)
 		FROM ultary_tag_profile_request r
+		JOIN ultary_tag t ON t.tag_id = r.tag_id
 		LEFT JOIN ultary_user u ON u.user_no = r.requester_user_no
 		WHERE (u.withdrawal_status IS NULL OR u.withdrawal_status &lt;&gt; 'SUSPENDED')
+		<if test="activeTagOnly">
+			AND t.is_deleted = 0
+		</if>
 		<if test="status != null and status != ''">
 			AND r.status = #{status}
 		</if>
@@ -398,25 +458,13 @@
 		WHERE tag_profile_request_id = #{tagProfileRequestId}
 	</delete>
 
-	<delete id="deleteProfileRequest">
-		DELETE FROM ultary_tag_profile_request
-		WHERE tag_profile_request_id = #{tagProfileRequestId}
-		  AND status = 'PENDING'
-		  AND reviewed_at IS NULL
-		  AND status_changed_at IS NULL
-	</delete>
-
-	<update id="clearPendingCommercialProfile">
+	<update id="softDeleteTag">
 		UPDATE ultary_tag
-		SET purpose = 'USER',
-			profile_status = 'NONE',
-			title = NULL,
-			content = NULL,
-			link = NULL,
+		SET is_deleted = 1,
+			deleted_at = NOW(),
 			updated_at = NOW()
 		WHERE tag_id = #{tagId}
 		  AND is_deleted = 0
-		  AND profile_status = 'PENDING'
 	</update>
 
 	<select id="findRequestImageFileIds" resultType="long">

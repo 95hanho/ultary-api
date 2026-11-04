@@ -445,6 +445,7 @@ public class MainService {
 					.map(hit -> MainSearchTagItem.builder()
 							.tagId(hit.getTagId())
 							.hashtag(hit.getHashtag())
+							.title(hit.getTitle())
 							.feedCount(hit.getFeedCount() == null ? 0 : hit.getFeedCount())
 							.build())
 					.toList();
