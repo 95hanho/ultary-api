@@ -18,7 +18,7 @@ public class UpdateFeedRequest {
     @Size(max = 20)
     private List<@NotNull @Positive Long> subjectPetIds;
 
-	@Size(max = 100, message = "본문은 100자 이하여야 합니다.")
+	@Size(max = 500, message = "본문은 500자 이하여야 합니다.")
 	private String content;
 
 	@Pattern(regexp = "PUBLIC|NEIGHBORS|PRIVATE", message = "visibility는 PUBLIC, NEIGHBORS, PRIVATE만 가능합니다.")
