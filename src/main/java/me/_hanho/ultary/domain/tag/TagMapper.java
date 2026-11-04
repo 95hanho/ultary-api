@@ -100,6 +100,11 @@ public interface TagMapper {
 
 	int deleteRequestImages(@Param("tagProfileRequestId") Long tagProfileRequestId);
 
+	int deleteProfileRequest(@Param("tagProfileRequestId") Long tagProfileRequestId);
+
+	/** 대기 요청 취소 후 일반 해시태그로 되돌림 */
+	int clearPendingCommercialProfile(@Param("tagId") Long tagId);
+
 	List<Long> findRequestImageFileIds(@Param("tagProfileRequestId") Long tagProfileRequestId);
 
 	int deleteImagesByTagId(@Param("tagId") Long tagId);

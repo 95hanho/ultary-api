@@ -92,8 +92,9 @@ Content-Type: application/json
   "link": "https://example.com/http-tag-updated"
 }
 
-### 5b. 상업 태그 설명 요청
+### 5b. 상업 태그 설명 요청 (대기 중이면 같은 요청 수정, 승인·거절 후면 새 요청)
 # 승인 전에는 GET /tags/{tagId} 의 title·content·link·images 가 비어 있다.
+# 대기(PENDING)가 아니면 기존 요청을 덮어쓰지 않는다. 동시 승인 시 409 TAG_PROFILE_REQUEST_NOT_PENDING
 POST {{baseUrl}}/api/v1/tags/{{tagId}}/profile-requests
 X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
@@ -108,6 +109,12 @@ Content-Type: application/json
 
 ### 5c. 내 태그 설명 요청
 GET {{baseUrl}}/api/v1/tags/profile-requests?status=PENDING&limit=30
+X-BFF-Key: {{bffKey}}
+Authorization: Bearer {{accessToken}}
+
+### 5d. 내 태그 설명 요청 삭제 (PENDING·관리자 검토 전만)
+# requestId 는 5c 목록의 requestId. 승인·거절·재대기 이력이 있으면 409 TAG_PROFILE_REQUEST_NOT_PENDING
+DELETE {{baseUrl}}/api/v1/tags/profile-requests/{{requestId}}
 X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 

@@ -398,6 +398,27 @@
 		WHERE tag_profile_request_id = #{tagProfileRequestId}
 	</delete>
 
+	<delete id="deleteProfileRequest">
+		DELETE FROM ultary_tag_profile_request
+		WHERE tag_profile_request_id = #{tagProfileRequestId}
+		  AND status = 'PENDING'
+		  AND reviewed_at IS NULL
+		  AND status_changed_at IS NULL
+	</delete>
+
+	<update id="clearPendingCommercialProfile">
+		UPDATE ultary_tag
+		SET purpose = 'USER',
+			profile_status = 'NONE',
+			title = NULL,
+			content = NULL,
+			link = NULL,
+			updated_at = NOW()
+		WHERE tag_id = #{tagId}
+		  AND is_deleted = 0
+		  AND profile_status = 'PENDING'
+	</update>
+
 	<select id="findRequestImageFileIds" resultType="long">
 		SELECT file_id
 		FROM ultary_tag_profile_request_image

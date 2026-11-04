@@ -167,6 +167,38 @@ public class TagService {
 				.toList();
 	}
 
+	/**
+	 * 내가 올린 상업 태그 설명 요청 취소.
+	 * 관리자가 승인·거절한 적 없는 PENDING만 가능.
+	 */
+	@Transactional
+	public void cancelProfileRequest(UserPrincipal principal, Long requestId) {
+		if (requestId == null) {
+			throw new BusinessException(ErrorCode.TAG_PROFILE_REQUEST_NOT_FOUND);
+		}
+		TagProfileRequest row = tagMapper.findProfileRequestById(requestId);
+		if (row == null) {
+			throw new BusinessException(ErrorCode.TAG_PROFILE_REQUEST_NOT_FOUND);
+		}
+		if (!principal.getUserNo().equals(row.getRequesterUserNo())) {
+			throw new BusinessException(ErrorCode.FORBIDDEN);
+		}
+		if (!"PENDING".equals(row.getStatus())
+				|| row.getReviewedAt() != null
+				|| row.getStatusChangedAt() != null) {
+			throw new BusinessException(ErrorCode.TAG_PROFILE_REQUEST_NOT_PENDING);
+		}
+		tagMapper.deleteRequestImages(requestId);
+		int deleted = tagMapper.deleteProfileRequest(requestId);
+		if (deleted == 0) {
+			throw new BusinessException(ErrorCode.TAG_PROFILE_REQUEST_NOT_PENDING);
+		}
+		tagMapper.deleteImagesByTagId(row.getTagId());
+		tagMapper.clearPendingCommercialProfile(row.getTagId());
+		log.info("[cancelProfileRequest] requestId={} tagId={} userNo={}",
+				requestId, row.getTagId(), principal.getUserNo());
+	}
+
 	@Transactional(readOnly = true)
 	public int countPendingProfileRequests() {
 		return tagMapper.countProfileRequests("PENDING");
@@ -409,10 +441,16 @@ public class TagService {
 			throw new BusinessException(ErrorCode.TAG_PROFILE_REQUEST_OPEN);
 		}
 		if (pending != null) {
+			if (!"PENDING".equals(pending.getStatus())) {
+				throw new BusinessException(ErrorCode.TAG_PROFILE_REQUEST_NOT_PENDING);
+			}
 			pending.setTitle(title);
 			pending.setContent(content);
 			pending.setLink(link);
-			tagMapper.updatePendingProfileRequest(pending);
+			int updated = tagMapper.updatePendingProfileRequest(pending);
+			if (updated == 0) {
+				throw new BusinessException(ErrorCode.TAG_PROFILE_REQUEST_NOT_PENDING);
+			}
 			tagMapper.deleteRequestImages(pending.getTagProfileRequestId());
 			insertRequestImages(pending.getTagProfileRequestId(), imageFileIds);
 			return pending;

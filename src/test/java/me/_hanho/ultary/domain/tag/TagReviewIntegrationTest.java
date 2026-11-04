@@ -45,6 +45,57 @@ class TagReviewIntegrationTest {
         jdbc.update("INSERT INTO ultary_feed(user_no,visibility) VALUES(?,'PUBLIC')", user); feed = id();
         jdbc.update("INSERT INTO ultary_notification_setting(user_no) VALUES(?)", user);
     }
+    @Test void requesterCanUpdateOnlyWhilePending() {
+        var body = new me._hanho.ultary.domain.tag.dto.request.SubmitTagProfileRequest();
+        body.setTitle("대기 중 수정");
+        assertThat(tags.submitProfile(principal, tag, body).getTitle()).isEqualTo("대기 중 수정");
+        assertThat(jdbc.queryForObject(
+                "SELECT title FROM ultary_tag_profile_request WHERE tag_profile_request_id=?",
+                String.class, request)).isEqualTo("대기 중 수정");
+
+        tags.approveProfile(admin, tag, request);
+        body.setTitle("승인 후 같은 요청 수정 시도");
+        Long newer = tags.submitProfile(principal, tag, body).getRequestId();
+        assertThat(newer).isNotEqualTo(request);
+        assertThat(jdbc.queryForObject(
+                "SELECT title FROM ultary_tag_profile_request WHERE tag_profile_request_id=?",
+                String.class, request)).isEqualTo("대기 중 수정");
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM ultary_tag_profile_request WHERE tag_profile_request_id=?",
+                String.class, newer)).isEqualTo("PENDING");
+    }
+
+    @Test void requesterCanCancelUnusedPendingRequest() {
+        tags.cancelProfileRequest(principal, request);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM ultary_tag_profile_request WHERE tag_profile_request_id=?",
+                Integer.class, request)).isZero();
+        assertThat(jdbc.queryForObject("SELECT purpose FROM ultary_tag WHERE tag_id=?", String.class, tag))
+                .isEqualTo("USER");
+        assertThat(jdbc.queryForObject("SELECT profile_status FROM ultary_tag WHERE tag_id=?", String.class, tag))
+                .isEqualTo("NONE");
+    }
+
+    @Test void requesterCannotCancelAfterAdminDecision() {
+        tags.approveProfile(admin, tag, request);
+        assertThatThrownBy(() -> tags.cancelProfileRequest(principal, request))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.TAG_PROFILE_REQUEST_NOT_PENDING));
+        tags.reopenProfile(tag, request);
+        assertThatThrownBy(() -> tags.cancelProfileRequest(principal, request))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.TAG_PROFILE_REQUEST_NOT_PENDING));
+    }
+
+    @Test void otherUserCannotCancelProfileRequest() {
+        jdbc.update("INSERT INTO ultary_user(nickname) VALUES(?)", "other_" + hashtag);
+        Long other = id();
+        UserPrincipal stranger = new UserPrincipal(other, "other_" + hashtag);
+        assertThatThrownBy(() -> tags.cancelProfileRequest(stranger, request))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN));
+    }
+
     @Test void requestOnlyImageIsRetainedEvenAfterRejection() {
         jdbc.update("INSERT INTO ultary_file(store_name,file_path,uploaded_by_user_no) VALUES('request-only.png','https://example.invalid/request-only.png',?)", user);
         Long file = id();

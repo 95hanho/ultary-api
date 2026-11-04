@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -79,6 +80,16 @@ public class TagController {
 			@Valid @RequestBody SubmitTagProfileRequest request) {
 		log.info("[submitProfile] tagId={}", tagId);
 		return ApiResponse.ok(tagService.submitProfile(principal, tagId, request), "태그 설명 요청 성공");
+	}
+
+	/** 내 PENDING 설명 요청 취소. 관리자 승인·거절 이력이 있으면 불가 */
+	@DeleteMapping("/profile-requests/{requestId}")
+	public ApiResponse<Void> cancelProfileRequest(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@PathVariable Long requestId) {
+		log.info("[cancelProfileRequest] requestId={}", requestId);
+		tagService.cancelProfileRequest(principal, requestId);
+		return ApiResponse.okEmpty("태그 설명 요청 삭제 성공");
 	}
 
 	@GetMapping("/recommend")
