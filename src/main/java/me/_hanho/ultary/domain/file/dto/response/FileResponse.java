@@ -16,7 +16,7 @@ public class FileResponse {
 	private String mimeType;
 	private Integer fileSize;
 	/**
-	 * uploadDir 기준 상대 경로({@code images/uuid.jpg}) 또는 CDN 절대 URL.
+	 * uploadDir 기준 상대 경로({@code images/feed/uuid.jpg} 등 purpose 하위) 또는 CDN 절대 URL.
 	 * 목록 임베드는 {@link FileSummaryResponse} 참고.
 	 */
 	private String filePath;

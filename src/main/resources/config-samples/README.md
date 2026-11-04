@@ -18,5 +18,7 @@ FE는 공통 `.env`, 로컬 `.env.local`, 운영 `.env.production`을 사용하�
 
 세 샘플은 대응하는 실제 yml과 설정 항목을 동일하게 유지한다. DB 연결 정보·JWT·AI/BFF 키·개인 업로드 경로는 환경변수 참조 또는 예시로 대체한다. `resources/` 바로 아래의 실제 `application*.yml`은 Git에서 제외하며 이 폴더의 샘플만 공유한다.
 
+이모지(utf8mb4) 이슈 점검 시 JDBC URL에 `characterEncoding=utf8mb4`(또는 드라이버 기본 UTF-8)와 DB 컬럼/테이블 charset이 함께 utf8mb4인지 확인한다. 스키마 SoT는 `share/database/schema/mariadb_10_1/040_utf8mb4_user_content.sql`(v42).
+
 Spring Boot는 classpath **루트**의 `application*.yml`만 설정으로 읽는다.  
 이 하위 폴더 파일은 **자동 로드되지 않는다** (이름과 무관).

@@ -47,10 +47,12 @@ public class FileService {
 	private final FileMapper fileMapper;
 
 	/**
-	 * 이미지/영상 업로드. mediaTypeHint: IMAGE | VIDEO | AUTO(또는 null)
+	 * 이미지/영상 업로드.
+	 * mediaTypeHint: IMAGE | VIDEO | AUTO(또는 null)
+	 * purpose: FEED | STORY | PET | TAG (null/blank → FEED). 경로는 {@code images|videos/{purpose}/uuid.ext}.
 	 */
 	@Transactional
-	public FileResponse upload(MultipartFile file, String mediaTypeHint, Long userNo) {
+	public FileResponse upload(MultipartFile file, String mediaTypeHint, String purposeHint, Long userNo) {
 		if (file == null || file.isEmpty()) {
 			throw new BusinessException(ErrorCode.FILE_EMPTY);
 		}
@@ -62,11 +64,12 @@ public class FileService {
 
 		String extension = extractExt(originalName).toLowerCase(Locale.ROOT);
 		MediaKind kind = resolveMediaKind(mediaTypeHint, extension, file.getContentType());
+		FileUploadPurpose purpose = FileUploadPurpose.fromParam(purposeHint);
 		validateSize(kind, file.getSize());
 		validateMime(kind, file.getContentType());
 
 		String storeName = UUID.randomUUID() + "." + extension;
-		String relativePath = kind.subdir + "/" + storeName;
+		String relativePath = kind.subdir + "/" + purpose.folder() + "/" + storeName;
 		Path absolutePath = resolveAbsolutePath(relativePath);
 
 		saveToDisk(file, absolutePath);
@@ -82,7 +85,8 @@ public class FileService {
 		meta.setUploadedByUserNo(userNo);
 
 		fileMapper.insert(meta);
-		log.info("[upload] fileId={} kind={} size={} path={}", meta.getFileId(), kind, meta.getFileSize(), relativePath);
+		log.info("[upload] fileId={} kind={} purpose={} size={} path={}",
+				meta.getFileId(), kind, purpose, meta.getFileSize(), relativePath);
 		return toResponse(meta);
 	}
 

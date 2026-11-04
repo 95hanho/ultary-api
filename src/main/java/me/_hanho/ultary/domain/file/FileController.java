@@ -36,10 +36,11 @@ public class FileController {
 	public ApiResponse<FileResponse> upload(
 			@AuthenticationPrincipal UserPrincipal principal,
 			@RequestParam("file") MultipartFile file,
-			@RequestParam(value = "mediaType", required = false, defaultValue = "AUTO") String mediaType) {
-		log.info("[upload] mediaType={} originalName={} size={}",
-				mediaType, file.getOriginalFilename(), file.getSize());
-		return ApiResponse.ok(fileService.upload(file, mediaType, principal.getUserNo()), "파일 업로드 성공");
+			@RequestParam(value = "mediaType", required = false, defaultValue = "AUTO") String mediaType,
+			@RequestParam(value = "purpose", required = false, defaultValue = "FEED") String purpose) {
+		log.info("[upload] mediaType={} purpose={} originalName={} size={}",
+				mediaType, purpose, file.getOriginalFilename(), file.getSize());
+		return ApiResponse.ok(fileService.upload(file, mediaType, purpose, principal.getUserNo()), "파일 업로드 성공");
 	}
 
 	@GetMapping("/{fileId}")

@@ -19,8 +19,9 @@ Content-Type: application/json
   "password": "Test1234!"
 }
 
-### 1. 이미지 업로드 (AUTO)
-# (= 2·3번과 동일 API) POST /api/v1/files · FileController.upload · mediaType=AUTO
+### 1. 이미지 업로드 (AUTO, purpose=FEED)
+# POST /api/v1/files · FileController.upload · mediaType=AUTO · purpose=FEED|STORY|PET|TAG (기본 FEED)
+# 저장 경로: images/{purpose}/uuid.ext 또는 videos/{purpose}/uuid.ext (uploadDir 하위)
 # @name uploadImage
 POST {{baseUrl}}/api/v1/files
 X-BFF-Key: {{bffKey}}
@@ -36,10 +37,14 @@ Content-Type: image/jpeg
 Content-Disposition: form-data; name="mediaType"
 
 AUTO
+--WebAppBoundary
+Content-Disposition: form-data; name="purpose"
+
+FEED
 --WebAppBoundary--
 
-### 2. 이미지 업로드 (mediaType=IMAGE 명시)
-# (= 1·3번과 동일 API) POST /api/v1/files · mediaType=IMAGE
+### 2. 이미지 업로드 (mediaType=IMAGE, purpose=PET)
+# POST /api/v1/files · mediaType=IMAGE · purpose=PET → images/pet/{uuid}.ext
 POST {{baseUrl}}/api/v1/files
 X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
@@ -54,10 +59,14 @@ Content-Type: image/png
 Content-Disposition: form-data; name="mediaType"
 
 IMAGE
+--WebAppBoundary
+Content-Disposition: form-data; name="purpose"
+
+PET
 --WebAppBoundary--
 
-### 3. 영상 업로드 (mediaType=VIDEO)
-# (= 1·2번과 동일 API) POST /api/v1/files · mediaType=VIDEO
+### 3. 영상 업로드 (mediaType=VIDEO, purpose=STORY)
+# POST /api/v1/files · mediaType=VIDEO · purpose=STORY → videos/story/{uuid}.ext
 # @name uploadVideo
 POST {{baseUrl}}/api/v1/files
 X-BFF-Key: {{bffKey}}
@@ -73,6 +82,10 @@ Content-Type: video/mp4
 Content-Disposition: form-data; name="mediaType"
 
 VIDEO
+--WebAppBoundary
+Content-Disposition: form-data; name="purpose"
+
+STORY
 --WebAppBoundary--
 
 ### 4. 메타 조회

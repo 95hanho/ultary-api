@@ -5,7 +5,7 @@ import lombok.Getter;
 
 /**
  * 목록·상세 응답에 임베드하는 파일 요약.
- * {@code filePath}는 uploadDir 상대경로({@code images/…}) 또는 CDN 절대 URL.
+ * {@code filePath}는 uploadDir 상대경로({@code images/feed/…} 등) 또는 CDN 절대 URL.
  */
 @Getter
 @Builder
