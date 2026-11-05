@@ -544,6 +544,7 @@ public class DmService {
 			throw new BusinessException(ErrorCode.INVALID_INPUT, "지원하지 않는 목록 모드입니다.");
 		}
 		boolean tagging = "STORY_TAG".equals(mode) || "FEED_TAG".equals(mode);
+		boolean excludeSelf = "FEED_TAG".equals(mode);
 		String defaultOrder = switch (mode) {
 			case "STORY_TAG" -> "OWN_STORY_TAG,DM,OWN_FEED_TAG";
 			case "FEED_TAG" -> "OWN_FEED_TAG,DM,OWN_STORY_TAG";
@@ -564,6 +565,10 @@ public class DmService {
 		List<RankedTarget> ranked = new ArrayList<>();
 		for (ShareTargetRow row : rows) {
 			if (row.getUserNo() == null) {
+				continue;
+			}
+			// 게시글 사진 태그: 본인 계정·본인 펫은 검색/선택 대상에서 제외
+			if (excludeSelf && row.getUserNo().equals(principal.getUserNo())) {
 				continue;
 			}
 			RankedTarget target = tagging && row.getUserNo().equals(principal.getUserNo())

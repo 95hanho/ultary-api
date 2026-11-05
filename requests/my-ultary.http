@@ -101,7 +101,20 @@ Content-Type: application/json
   "caption": "추가 스토리"
 }
 
-### 8d. 스토리 삭제
+### 8d. 스토리 수정 (본문=등록과 동일)
+PUT {{baseUrl}}/api/v1/my-ultary/stories/{{createStory.response.body.$.data.storyId}}
+X-BFF-Key: {{bffKey}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "fileId": 130,
+  "mediaType": "IMAGE",
+  "caption": "산책 수정",
+  "subjectPetIds": [101]
+}
+
+### 8e. 스토리 삭제
 DELETE {{baseUrl}}/api/v1/my-ultary/stories/{{createStory.response.body.$.data.storyId}}
 X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}

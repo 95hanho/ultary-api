@@ -94,6 +94,44 @@ public class StoryService {
 		return toResponse(requireActive(story.getStoryId()), principal.getUserNo());
 	}
 
+	/** 본인 활성 스토리만. 본문은 등록과 동일. 만료 시각은 유지 */
+	@Transactional
+	public StoryResponse update(UserPrincipal principal, Long storyId, CreateStoryRequest request) {
+		Story existing = requireOwnedActive(storyId, principal.getUserNo());
+		FileMeta file = fileService.requireActive(request.getFileId());
+		String mediaType = resolveMediaType(request.getMediaType(), file);
+		Long thumbnailFileId = request.getThumbnailFileId();
+		Integer durationSec = request.getDurationSec();
+		if ("IMAGE".equals(mediaType)) {
+			thumbnailFileId = null;
+			durationSec = null;
+		} else {
+			if (thumbnailFileId != null) {
+				fileService.requireActive(thumbnailFileId);
+			}
+			if (durationSec == null) {
+				throw new BusinessException(ErrorCode.INVALID_INPUT, "영상 스토리는 durationSec가 필요합니다.");
+			}
+		}
+
+		existing.setFileId(request.getFileId());
+		existing.setMediaType(mediaType);
+		existing.setThumbnailFileId(thumbnailFileId);
+		existing.setDurationSec(durationSec);
+		existing.setCaption(blankToNull(request.getCaption()));
+		int updated = storyMapper.updateOwned(existing);
+		if (updated == 0) {
+			throw new BusinessException(ErrorCode.STORY_NOT_FOUND);
+		}
+		contentPetService.replace("STORY", storyId, principal.getUserNo(), request.getSubjectPetIds());
+		storyMapper.deleteTextsByStoryId(storyId);
+		storyMapper.deleteMentionsByStoryId(storyId);
+		insertOverlays(storyId, principal.getUserNo(), request);
+		notificationService.syncStoryTags(storyId);
+		log.info("[update] storyId={} userNo={} mediaType={}", storyId, principal.getUserNo(), mediaType);
+		return toResponse(requireActive(storyId), principal.getUserNo());
+	}
+
 	@Transactional
 	public void delete(UserPrincipal principal, Long storyId) {
 		int deleted = storyMapper.softDelete(storyId, principal.getUserNo());
@@ -286,6 +324,14 @@ public class StoryService {
 		Story story = storyMapper.findActiveByStoryId(storyId);
 		if (story == null) {
 			// 만료/삭제 구분 위해 재조회는 생략 — 활성만 노출
+			throw new BusinessException(ErrorCode.STORY_NOT_FOUND);
+		}
+		return story;
+	}
+
+	private Story requireOwnedActive(Long storyId, Long userNo) {
+		Story story = requireActive(storyId);
+		if (!userNo.equals(story.getUserNo())) {
 			throw new BusinessException(ErrorCode.STORY_NOT_FOUND);
 		}
 		return story;

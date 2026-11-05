@@ -56,6 +56,38 @@ GET {{baseUrl}}/api/v1/my-ultary/stories
 X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
+### 2b. 스토리 수정 (본문=등록과 동일. createdAt/expiresAt 유지)
+PUT {{baseUrl}}/api/v1/my-ultary/stories/{{storyId}}
+X-BFF-Key: {{bffKey}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "fileId": 130,
+  "mediaType": "IMAGE",
+  "caption": "스토리 수정",
+  "subjectPetIds": [101],
+  "texts": [
+    {
+      "content": "수정됨",
+      "fontSize": 20,
+      "bold": false,
+      "underline": false,
+      "strikethrough": false,
+      "color": "#FFEE00",
+      "posX": 50,
+      "posY": 40
+    }
+  ],
+  "mentions": [
+    {
+      "petId": 101,
+      "posX": 60,
+      "posY": 65
+    }
+  ]
+}
+
 ### 3. 주민 중 스토리 있는 목록 (시드: 주민 102·103, profileFile=profile2/3)
 GET {{baseUrl}}/api/v1/main/stories/owners
 X-BFF-Key: {{bffKey}}

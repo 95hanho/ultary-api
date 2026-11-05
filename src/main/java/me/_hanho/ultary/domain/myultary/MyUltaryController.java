@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -111,6 +112,17 @@ public class MyUltaryController {
 			@Valid @RequestBody CreateStoryRequest request) {
 		log.info("[createStory] fileId={} mediaType={}", request.getFileId(), request.getMediaType());
 		return ApiResponse.ok(myUltaryService.createStory(principal, request), "스토리 등록 성공");
+	}
+
+	/** 스토리 수정 (본인 활성만. 본문은 등록과 동일. 만료 시각 유지) */
+	@PutMapping("/stories/{storyId}")
+	public ApiResponse<StoryResponse> updateStory(
+			@AuthenticationPrincipal UserPrincipal principal,
+			@PathVariable Long storyId,
+			@Valid @RequestBody CreateStoryRequest request) {
+		log.info("[updateStory] storyId={} fileId={} mediaType={}",
+				storyId, request.getFileId(), request.getMediaType());
+		return ApiResponse.ok(myUltaryService.updateStory(principal, storyId, request), "스토리 수정 성공");
 	}
 
 	/** 스토리 삭제 (본인만) */

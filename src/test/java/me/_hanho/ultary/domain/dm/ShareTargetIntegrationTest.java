@@ -119,24 +119,26 @@ class ShareTargetIntegrationTest {
             .containsExactly(storyPeer, dmPeer, feedPeer, me);
         assertThat(storyTargets.get(3).getPets()).extracting(DmShareTargetItemResponse.PetChoice::petId).containsExactly(ownPet);
         assertThat(service.shareTargets(principal, 50, null, null, "FEED_TAG").getItems())
-            .extracting(DmShareTargetItemResponse::getUserNo).containsExactly(feedPeer, dmPeer, storyPeer, me);
+            .extracting(DmShareTargetItemResponse::getUserNo).containsExactly(feedPeer, dmPeer, storyPeer);
         assertThatThrownBy(() -> service.shareTargets(principal, 50, null, null, "OTHER"))
             .isInstanceOf(BusinessException.class);
     }
 
-    @Test void tagPickersExcludeAccountsWithoutPetsAndDisallowedTagsButAllowOwnTags() {
+    @Test void tagPickersExcludeAccountsWithoutPetsAndDisallowedTagsButAllowOwnTagsOnStoryOnly() {
         Long noPets = user(), closed = user(), active = user();
         follow(me, noPets, now); follow(me, closed, now); follow(me, active, now);
         pet(closed); pet(active); Long ownPet=pet(me);
         jdbc.update("UPDATE ultary_pet SET name=? WHERE pet_id=?", "OwnPet"+me, ownPet);
         jdbc.update("INSERT INTO ultary_user_privacy(user_no,allow_tag) VALUES(?,0),(?,0)", closed, me);
-        var result = service.shareTargets(principal, 50, null, null, "FEED_TAG").getItems();
-        assertThat(result).extracting(DmShareTargetItemResponse::getUserNo).containsExactly(active, me);
+        var feedResult = service.shareTargets(principal, 50, null, null, "FEED_TAG").getItems();
+        assertThat(feedResult).extracting(DmShareTargetItemResponse::getUserNo).containsExactly(active);
         assertThat(service.shareTargets(principal, 50, null, null, "DM").getItems())
             .extracting(DmShareTargetItemResponse::getUserNo).contains(noPets, closed, active).doesNotContain(me);
-        String ownTag = result.get(1).getPets().get(0).name();
+        String ownTag = "OwnPet" + me;
         assertThat(service.shareTargets(principal, 1, "@" + ownTag.toUpperCase(), null, "STORY_TAG").getItems())
             .extracting(DmShareTargetItemResponse::getUserNo).containsExactly(me);
+        assertThat(service.shareTargets(principal, 50, ownTag, null, "FEED_TAG").getItems())
+            .extracting(DmShareTargetItemResponse::getUserNo).doesNotContain(me);
     }
 
     @Test void mentionPriorityDiffersByModeAndFollowingAlwaysWins() {

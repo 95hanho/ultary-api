@@ -45,6 +45,15 @@ Spring Boot 3.4 / MyBatis / MariaDB 10.1 / 패키지 `me._hanho.ultary` / API pr
 
 - `requests/*.http` — `Nb`가 있으면 앞은 반드시 `Na`
 
+## 작업내용 정리 — `share/BACK.md`
+
+사용자가 **「작업내용 정리해줘」** (또는 같은 뜻)라고 하면:
+
+1. 미커밋 변경·이번 세션 DB/시연 작업을 `share/BACK.md`에 **바로** 정리한다 (경로·폴더 바꾸지 않음)
+2. 공통/FE가 커밋·화면 반영할 수 있게 API·파일 목록·체크리스트 위주로 쓴다
+3. `share/` 수정이므로 ultary-web `share/`에도 동기화한다
+4. **이 레포에서 커밋하지 않는다** — 사용자가 공통 agent로 `BACK.md`를 보고 커밋한 뒤 파일을 지운다
+
 ## Git
 
 - 커밋·푸시는 사용자가 명시할 때만

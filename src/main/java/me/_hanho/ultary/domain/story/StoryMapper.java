@@ -16,9 +16,16 @@ public interface StoryMapper {
 
 	int insert(Story story);
 
+	/** 본인 활성 스토리만. created_at·expires_at은 유지 */
+	int updateOwned(Story story);
+
 	int insertText(StoryText text);
 
 	int insertMention(StoryMentionRow mention);
+
+	int deleteTextsByStoryId(@Param("storyId") Long storyId);
+
+	int deleteMentionsByStoryId(@Param("storyId") Long storyId);
 
 	List<StoryText> findTextsByStoryId(@Param("storyId") Long storyId);
 

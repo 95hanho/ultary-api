@@ -47,6 +47,28 @@
 		)
 	</insert>
 
+	<update id="updateOwned">
+		UPDATE ultary_story
+		SET file_id = #{fileId},
+			media_type = #{mediaType},
+			thumbnail_file_id = #{thumbnailFileId},
+			duration_sec = #{durationSec},
+			caption = #{caption}
+		WHERE story_id = #{storyId}
+		  AND user_no = #{userNo}
+		  AND <include refid="activeStoryCondition"/>
+	</update>
+
+	<delete id="deleteTextsByStoryId">
+		DELETE FROM ultary_story_text
+		WHERE story_id = #{storyId}
+	</delete>
+
+	<delete id="deleteMentionsByStoryId">
+		DELETE FROM ultary_story_mention
+		WHERE story_id = #{storyId}
+	</delete>
+
 	<insert id="insertText" useGeneratedKeys="true" keyProperty="storyTextId" keyColumn="story_text_id">
 		INSERT INTO ultary_story_text (
 			story_id,

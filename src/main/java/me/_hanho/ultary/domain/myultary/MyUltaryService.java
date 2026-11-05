@@ -193,6 +193,11 @@ public class MyUltaryService {
 	}
 
 	@Transactional
+	public StoryResponse updateStory(UserPrincipal principal, Long storyId, CreateStoryRequest request) {
+		return storyService.update(principal, storyId, request);
+	}
+
+	@Transactional
 	public void deleteStory(UserPrincipal principal, Long storyId) {
 		storyService.delete(principal, storyId);
 	}
