@@ -10,7 +10,7 @@ import me._hanho.ultary.domain.feed.dto.request.CreateFeedRequest.MentionItem;
 import lombok.Getter;
 import lombok.Setter;
 
-/** Existing media stay fixed; only content, visibility and their tags may change. */
+/** Media files stay fixed; content, visibility, tags, and media order may change. */
 @Getter
 @Setter
 public class UpdateFeedRequest {
@@ -31,6 +31,13 @@ public class UpdateFeedRequest {
 	@Size(max = 10)
 	@Valid
 	private List<@NotNull MediaTags> mediaTags;
+
+	/**
+	 * null/생략이면 기존 sortOrder 유지.
+	 * 전달 시 이 게시글의 활성 feedMediaId 전체와 집합이 같아야 하며, 배열 인덱스가 새 sortOrder다.
+	 */
+	@Size(max = 10)
+	private List<@NotNull @Positive Long> mediaOrder;
 
 	/** null preserves hashtag links; empty clears them. */
 	@Size(max = 30)

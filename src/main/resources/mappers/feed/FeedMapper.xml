@@ -560,6 +560,13 @@
 		)
 	</insert>
 
+	<update id="updateMediaSortOrder">
+		UPDATE ultary_feed_media
+		SET sort_order = #{sortOrder}
+		WHERE feed_media_id = #{feedMediaId}
+		  AND feed_id = #{feedId}
+	</update>
+
 	<select id="findMediaByFeedId" resultType="me._hanho.ultary.domain.feed.model.FeedMedia">
 		SELECT
 			feed_media_id,

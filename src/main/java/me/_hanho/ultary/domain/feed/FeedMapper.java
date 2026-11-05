@@ -139,6 +139,11 @@ public interface FeedMapper {
 
 	int insertMedia(FeedMedia media);
 
+	int updateMediaSortOrder(
+			@Param("feedMediaId") Long feedMediaId,
+			@Param("feedId") Long feedId,
+			@Param("sortOrder") int sortOrder);
+
 	List<FeedMedia> findMediaByFeedId(@Param("feedId") Long feedId);
 
 	List<FeedMedia> findMediaByFeedIds(@Param("feedIds") Collection<Long> feedIds);

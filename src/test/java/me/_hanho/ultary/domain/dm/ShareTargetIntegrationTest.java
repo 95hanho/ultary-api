@@ -108,35 +108,35 @@ class ShareTargetIntegrationTest {
         return service.shareTargets(principal, limit, query, order).getItems();
     }
 
-    @Test void eachPickerUsesItsOwnFirstPriorityAndTagPickersKeepSelectableOwnPets() {
+    @Test void eachPickerUsesItsOwnFirstPriorityAndTagPickersExcludeSelf() {
         Long dmPeer = user(), storyPeer = user(), feedPeer = user();
-        pet(dmPeer); Long ownPet = pet(me);
+        pet(dmPeer); pet(me);
         dm(dmPeer, now); story(me, storyPeer, now); feed(me, feedPeer, now);
         assertThat(service.shareTargets(principal, 50, null, null, "DM").getItems())
             .extracting(DmShareTargetItemResponse::getUserNo).containsExactly(dmPeer, storyPeer, feedPeer);
-        var storyTargets = service.shareTargets(principal, 50, null, null, "STORY_TAG").getItems();
-        assertThat(storyTargets).extracting(DmShareTargetItemResponse::getUserNo)
-            .containsExactly(storyPeer, dmPeer, feedPeer, me);
-        assertThat(storyTargets.get(3).getPets()).extracting(DmShareTargetItemResponse.PetChoice::petId).containsExactly(ownPet);
+        assertThat(service.shareTargets(principal, 50, null, null, "STORY_TAG").getItems())
+            .extracting(DmShareTargetItemResponse::getUserNo).containsExactly(storyPeer, dmPeer, feedPeer);
         assertThat(service.shareTargets(principal, 50, null, null, "FEED_TAG").getItems())
             .extracting(DmShareTargetItemResponse::getUserNo).containsExactly(feedPeer, dmPeer, storyPeer);
         assertThatThrownBy(() -> service.shareTargets(principal, 50, null, null, "OTHER"))
             .isInstanceOf(BusinessException.class);
     }
 
-    @Test void tagPickersExcludeAccountsWithoutPetsAndDisallowedTagsButAllowOwnTagsOnStoryOnly() {
+    @Test void tagPickersExcludeAccountsWithoutPetsDisallowedTagsAndSelf() {
         Long noPets = user(), closed = user(), active = user();
         follow(me, noPets, now); follow(me, closed, now); follow(me, active, now);
         pet(closed); pet(active); Long ownPet=pet(me);
         jdbc.update("UPDATE ultary_pet SET name=? WHERE pet_id=?", "OwnPet"+me, ownPet);
         jdbc.update("INSERT INTO ultary_user_privacy(user_no,allow_tag) VALUES(?,0),(?,0)", closed, me);
-        var feedResult = service.shareTargets(principal, 50, null, null, "FEED_TAG").getItems();
-        assertThat(feedResult).extracting(DmShareTargetItemResponse::getUserNo).containsExactly(active);
+        assertThat(service.shareTargets(principal, 50, null, null, "FEED_TAG").getItems())
+            .extracting(DmShareTargetItemResponse::getUserNo).containsExactly(active);
+        assertThat(service.shareTargets(principal, 50, null, null, "STORY_TAG").getItems())
+            .extracting(DmShareTargetItemResponse::getUserNo).containsExactly(active);
         assertThat(service.shareTargets(principal, 50, null, null, "DM").getItems())
             .extracting(DmShareTargetItemResponse::getUserNo).contains(noPets, closed, active).doesNotContain(me);
         String ownTag = "OwnPet" + me;
-        assertThat(service.shareTargets(principal, 1, "@" + ownTag.toUpperCase(), null, "STORY_TAG").getItems())
-            .extracting(DmShareTargetItemResponse::getUserNo).containsExactly(me);
+        assertThat(service.shareTargets(principal, 50, "@" + ownTag.toUpperCase(), null, "STORY_TAG").getItems())
+            .extracting(DmShareTargetItemResponse::getUserNo).doesNotContain(me);
         assertThat(service.shareTargets(principal, 50, ownTag, null, "FEED_TAG").getItems())
             .extracting(DmShareTargetItemResponse::getUserNo).doesNotContain(me);
     }

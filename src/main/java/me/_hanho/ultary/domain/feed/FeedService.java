@@ -236,6 +236,9 @@ public class FeedService {
 		if (request.getMediaTags() != null && replacePhotoTags(feedId, principal.getUserNo(), request.getMediaTags())) {
 			notificationService.syncFeedTags(feedId);
 		}
+		if (request.getMediaOrder() != null) {
+			reorderMedia(feedId, request.getMediaOrder());
+		}
 		boolean captionChanged = request.getContent() != null || Boolean.TRUE.equals(request.getClearContent());
 		if (captionChanged || request.getTagIds() != null) {
 			String caption = captionChanged && !Boolean.TRUE.equals(request.getClearContent()) ? request.getContent() : null;
@@ -761,6 +764,31 @@ public class FeedService {
 
 	private String mentionKey(Long petId, java.math.BigDecimal x, java.math.BigDecimal y) {
 		return petId + ":" + x.stripTrailingZeros().toPlainString() + ":" + y.stripTrailingZeros().toPlainString();
+	}
+
+	private void reorderMedia(Long feedId, List<Long> mediaOrder) {
+		List<FeedMedia> media = feedMapper.findMediaByFeedId(feedId);
+		Set<Long> current = new HashSet<>();
+		for (FeedMedia slot : media) {
+			current.add(slot.getFeedMediaId());
+		}
+		if (mediaOrder.size() != current.size()) {
+			throw new BusinessException(ErrorCode.INVALID_INPUT, "mediaOrder는 이 게시글의 미디어 전체와 같아야 합니다.");
+		}
+		Set<Long> seen = new HashSet<>();
+		for (Long feedMediaId : mediaOrder) {
+			if (feedMediaId == null || !current.contains(feedMediaId) || !seen.add(feedMediaId)) {
+				throw new BusinessException(ErrorCode.INVALID_INPUT, "mediaOrder는 이 게시글의 미디어 전체와 같아야 합니다.");
+			}
+		}
+		// UK(feed_id, sort_order) 충돌 방지: 임시 순서로 비운 뒤 최종 0..n-1 부여
+		final int tempOffset = 1000;
+		for (int i = 0; i < mediaOrder.size(); i++) {
+			feedMapper.updateMediaSortOrder(mediaOrder.get(i), feedId, tempOffset + i);
+		}
+		for (int i = 0; i < mediaOrder.size(); i++) {
+			feedMapper.updateMediaSortOrder(mediaOrder.get(i), feedId, i);
+		}
 	}
 
 	private boolean replacePhotoTags(Long feedId, Long userNo, List<UpdateFeedRequest.MediaTags> changes) {

@@ -75,6 +75,32 @@ class FeedEditIntegrationTest {
         assertThat(mapper.findMentionsByFeedMediaId(foreignMedia)).isEmpty();
     }
 
+    @Test void reordersMediaWhenFullPermutationIsSentAndRejectsIncompleteSets() {
+        var omit = new UpdateFeedRequest(); omit.setContent("order untouched");
+        assertThat(feeds.update(principal, feed, omit).getMedia())
+                .extracting(x -> x.getFeedMediaId()).containsExactly(media, secondMedia);
+
+        var reorder = new UpdateFeedRequest();
+        reorder.setMediaOrder(List.of(secondMedia, media));
+        var result = feeds.update(principal, feed, reorder);
+        assertThat(result.getMedia()).extracting(x -> x.getFeedMediaId()).containsExactly(secondMedia, media);
+        assertThat(result.getMedia()).extracting(x -> x.getSortOrder()).containsExactly(0, 1);
+        assertThat(result.getMedia()).allSatisfy(x -> assertThat(x.getFileId()).isEqualTo(file));
+        assertThat(jdbc.queryForObject("SELECT sort_order FROM ultary_feed_media WHERE feed_media_id=?", Integer.class, secondMedia)).isZero();
+        assertThat(jdbc.queryForObject("SELECT sort_order FROM ultary_feed_media WHERE feed_media_id=?", Integer.class, media)).isEqualTo(1);
+
+        var missing = new UpdateFeedRequest(); missing.setMediaOrder(List.of(secondMedia));
+        assertThatThrownBy(() -> feeds.update(principal, feed, missing))
+                .isInstanceOfSatisfying(BusinessException.class, e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_INPUT));
+        var duplicate = new UpdateFeedRequest(); duplicate.setMediaOrder(List.of(secondMedia, secondMedia));
+        assertThatThrownBy(() -> feeds.update(principal, feed, duplicate))
+                .isInstanceOfSatisfying(BusinessException.class, e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_INPUT));
+        var foreign = new UpdateFeedRequest(); foreign.setMediaOrder(List.of(secondMedia, foreignMedia));
+        assertThatThrownBy(() -> feeds.update(principal, feed, foreign))
+                .isInstanceOfSatisfying(BusinessException.class, e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_INPUT));
+        assertThat(mapper.findMediaByFeedId(feed)).extracting(x -> x.getFeedMediaId()).containsExactly(secondMedia, media);
+    }
+
     @Test void preservesTagsWhenOmittedAndValidatesPhotoCoordinates() {
         var request=new UpdateFeedRequest(); request.setContent("caption only");
         feeds.update(principal,feed,request);
