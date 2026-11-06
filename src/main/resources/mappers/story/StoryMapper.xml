@@ -217,6 +217,24 @@
 		  AND is_deleted = 0
 	</update>
 
+	<update id="restoreByAdmin">
+		UPDATE ultary_story
+		SET is_deleted = 0,
+			deleted_at = NULL
+		WHERE story_id = #{storyId}
+		  AND user_no = #{userNo}
+		  AND is_deleted = 1
+	</update>
+
+	<select id="findDeletedByStoryIdAndUserNo" resultType="me._hanho.ultary.domain.story.model.Story">
+		SELECT <include refid="storyColumns"/>
+		FROM ultary_story
+		WHERE story_id = #{storyId}
+		  AND user_no = #{userNo}
+		  AND is_deleted = 1
+		LIMIT 1
+	</select>
+
 	<insert id="insertViewIgnoreDuplicate">
 		INSERT IGNORE INTO ultary_story_view (
 			story_id,

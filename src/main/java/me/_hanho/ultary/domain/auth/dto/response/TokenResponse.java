@@ -15,4 +15,6 @@ public class TokenResponse {
 	private String refreshToken;
 	private String tokenType;
 	private long expiresIn;
+	/** 관리자 로그인·재발급만. SUPER | OPERATOR. 회원 토큰은 null */
+	private String role;
 }

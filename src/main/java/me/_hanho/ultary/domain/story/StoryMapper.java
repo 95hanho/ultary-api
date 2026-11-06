@@ -41,6 +41,15 @@ public interface StoryMapper {
 			@Param("storyId") Long storyId,
 			@Param("userNo") Long userNo);
 
+	/** 관리자 삭제 취소. 소유자 일치·이미 삭제된 행만 */
+	int restoreByAdmin(
+			@Param("storyId") Long storyId,
+			@Param("userNo") Long userNo);
+
+	Story findDeletedByStoryIdAndUserNo(
+			@Param("storyId") Long storyId,
+			@Param("userNo") Long userNo);
+
 	int insertViewIgnoreDuplicate(
 			@Param("storyId") Long storyId,
 			@Param("viewerUserNo") Long viewerUserNo);

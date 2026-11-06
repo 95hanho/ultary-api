@@ -124,6 +124,7 @@ public class AdminAuthService {
 				.refreshToken(refreshToken)
 				.tokenType("Bearer")
 				.expiresIn(jwtTokenProvider.getAccessTokenExpiresInSeconds())
+				.role(admin.getRole())
 				.build();
 	}
 

@@ -32,6 +32,7 @@ import me._hanho.ultary.domain.settings.PrivacyService;
 import me._hanho.ultary.domain.story.StoryService;
 import me._hanho.ultary.domain.story.dto.request.CreateStoryRequest;
 import me._hanho.ultary.domain.story.dto.response.StoryResponse;
+import me._hanho.ultary.domain.user.NicknameLookupService;
 import me._hanho.ultary.domain.user.UserMapper;
 import me._hanho.ultary.domain.user.model.User;
 import me._hanho.ultary.security.principal.UserPrincipal;
@@ -45,6 +46,7 @@ public class MyUltaryService {
 	private static final int MAX_LIMIT = 50;
 
 	private final UserMapper userMapper;
+	private final NicknameLookupService nicknameLookupService;
 	private final NeighborMapper neighborMapper;
 	private final PrivacyService privacyService;
 	private final PetMapper petMapper;
@@ -205,7 +207,8 @@ public class MyUltaryService {
 	/** Guest read model. Never use a member principal or return member-only fields. */
     @Transactional(readOnly = true)
     public PublicUltaryResponse getPublicProfile(String nickname) {
-        User user = userMapper.findActiveByNickname(nickname);
+        // 현재 닉네임이 없으면 변경 후 7일 이내 직전 닉네임으로도 조회 (응답 nickname은 현재 값)
+        User user = nicknameLookupService.findActiveByCurrentOrPrevious(nickname);
         if (user == null || privacyService.isPrivateAccount(user.getUserNo())) {
             throw new BusinessException(ErrorCode.USER_NOT_FOUND);
         }

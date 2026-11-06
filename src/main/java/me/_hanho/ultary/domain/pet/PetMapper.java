@@ -29,6 +29,15 @@ public interface PetMapper {
 			@Param("petId") Long petId,
 			@Param("userNo") Long userNo);
 
+	/** 관리자 삭제 취소. 소유자 일치·이미 삭제된 행만 */
+	int restoreByAdmin(
+			@Param("petId") Long petId,
+			@Param("userNo") Long userNo);
+
+	Pet findDeletedByPetIdAndUserNo(
+			@Param("petId") Long petId,
+			@Param("userNo") Long userNo);
+
 	int countActiveByUserNo(@Param("userNo") Long userNo);
 
 	Integer findMaxPriority(@Param("userNo") Long userNo);

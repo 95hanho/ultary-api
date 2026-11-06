@@ -64,9 +64,12 @@ public class SecurityConfig {
 								"/api/v1/test/**")
 						.permitAll()
 						// 공유 게시글 단건: PUBLIC은 비로그인 허용 (spring-auth-api.md)
-						.requestMatchers(HttpMethod.GET, "/api/v1/feeds/*", "/api/v1/public/ultaries/*", "/api/v1/public/seo/sitemap", "/api/v1/files/*/content", "/api/v1/users/*/ultary-links", "/api/v1/users/*/pet-feeds").permitAll()
+						.requestMatchers(HttpMethod.GET, "/api/v1/feeds/*", "/api/v1/public/ultaries/*", "/api/v1/public/nicknames/*", "/api/v1/public/seo/sitemap", "/api/v1/files/*/content", "/api/v1/users/*/ultary-links", "/api/v1/users/*/pet-feeds").permitAll()
 						// 소켓 핸드셰이크는 티켓 전. 인증은 연결 후 첫 메시지
 						.requestMatchers("/api/v1/ws").permitAll()
+						// 관리자: 조회는 SUPER·OPERATOR, 조작(비-GET)은 SUPER만. auth login/refresh/logout은 위 permitAll
+						.requestMatchers(HttpMethod.GET, "/api/v1/admin/**").authenticated()
+						.requestMatchers("/api/v1/admin/**").hasRole("SUPER")
 						.requestMatchers("/api/v1/**").authenticated()
 						.anyRequest().permitAll())
 				.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)

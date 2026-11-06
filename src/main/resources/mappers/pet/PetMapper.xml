@@ -131,6 +131,24 @@
 		  AND is_deleted = 0
 	</update>
 
+	<update id="restoreByAdmin">
+		UPDATE ultary_pet
+		SET is_deleted = 0,
+			deleted_at = NULL
+		WHERE pet_id = #{petId}
+		  AND user_no = #{userNo}
+		  AND is_deleted = 1
+	</update>
+
+	<select id="findDeletedByPetIdAndUserNo" resultType="me._hanho.ultary.domain.pet.model.Pet">
+		SELECT <include refid="petColumns"/>
+		FROM ultary_pet
+		WHERE pet_id = #{petId}
+		  AND user_no = #{userNo}
+		  AND is_deleted = 1
+		LIMIT 1
+	</select>
+
 <select id="countActiveByUserNo" resultType="int">
 		SELECT COUNT(1)
 		FROM ultary_pet

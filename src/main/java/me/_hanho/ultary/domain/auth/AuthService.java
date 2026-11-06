@@ -43,6 +43,7 @@ import me._hanho.ultary.domain.auth.support.TokenRotationSupport;
 import me._hanho.ultary.domain.auth.support.TokenSessionSupport;
 import me._hanho.ultary.domain.file.FileService;
 import me._hanho.ultary.domain.pet.PetService;
+import me._hanho.ultary.domain.user.NicknameLookupService;
 import me._hanho.ultary.domain.user.UserMapper;
 import me._hanho.ultary.domain.user.UserSocialMapper;
 import me._hanho.ultary.domain.user.model.User;
@@ -69,6 +70,7 @@ public class AuthService {
 	private static final int PROVIDER_EMAIL_MAX = 100;
 
 	private final UserMapper userMapper;
+	private final NicknameLookupService nicknameLookupService;
 	private final UserSocialMapper userSocialMapper;
 	private final TokenMapper tokenMapper;
 	private final TokenRotationSupport tokenRotation;
@@ -363,7 +365,7 @@ public class AuthService {
 				IdentityChangeCooldown.NICKNAME_DAYS,
 				ErrorCode.NICKNAME_CHANGE_COOLDOWN);
 
-		if (userMapper.countByNickname(nickname, user.getUserNo()) > 0) {
+		if (!nicknameLookupService.isNicknameAvailable(nickname, user.getUserNo())) {
 			throw new BusinessException(ErrorCode.NICKNAME_DUPLICATED);
 		}
 
@@ -388,7 +390,7 @@ public class AuthService {
 		Claims claims = jwtTokenProvider.parsePhoneAuthCompleteToken(request.getPhoneAuthCompleteToken());
 		String phone = jwtTokenProvider.getPhone(claims);
 
-		if (userMapper.countByNickname(request.getNickname(), null) > 0) {
+		if (!nicknameLookupService.isNicknameAvailable(request.getNickname(), null)) {
 			throw new BusinessException(ErrorCode.NICKNAME_DUPLICATED);
 		}
 
@@ -409,7 +411,7 @@ public class AuthService {
 
 	@Transactional(readOnly = true)
 	public AvailabilityCheckResponse checkNickname(String nickname) {
-		boolean available = userMapper.countByNickname(nickname, null) == 0;
+		boolean available = nicknameLookupService.isNicknameAvailable(nickname, null);
 		return AvailabilityCheckResponse.builder().available(available).build();
 	}
 
@@ -504,7 +506,9 @@ public class AuthService {
 		}
 
 		boolean hasPassword = StringUtils.hasText(user.getPassword());
-		if (hasPassword) {
+		boolean forceChange = Boolean.TRUE.equals(user.getMustChangePassword());
+		// 관리자 초기화 직후(must_change_password)는 임시 비밀번호로 이미 로그인했으므로 현재 비밀번호 재입력 생략
+		if (hasPassword && !forceChange) {
 			if (!StringUtils.hasText(request.getCurrentPassword())
 					|| !passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
 				throw new BusinessException(ErrorCode.CURRENT_PASSWORD_INVALID);
@@ -560,7 +564,7 @@ public class AuthService {
 			String prefix = provider.nicknamePrefix();
 			int randomLength = Math.max(0, NICKNAME_ENGLISH_MAX - prefix.length());
 			String nickname = prefix + randomCode(randomLength);
-			if (userMapper.countByNickname(nickname, null) == 0) {
+			if (nicknameLookupService.isNicknameAvailable(nickname, null)) {
 				return nickname;
 			}
 		}
@@ -619,6 +623,7 @@ public class AuthService {
 				.nickname(user.getNickname())
 				.defaultNickname(Boolean.TRUE.equals(user.getIsDefaultNickname()))
 				.hasPassword(StringUtils.hasText(user.getPassword()))
+				.mustChangePassword(Boolean.TRUE.equals(user.getMustChangePassword()))
 				.googleLinked(googleLinked)
 				.kakaoLinked(kakaoLinked)
 				.email(user.getEmail())

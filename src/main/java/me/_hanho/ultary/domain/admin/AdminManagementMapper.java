@@ -18,4 +18,17 @@ public interface AdminManagementMapper {
     int countActions(@Param("q") String q, @Param("targetType") String targetType);
     AdminActionLogResponse target(@Param("kind") String kind, @Param("id") Long id, @Param("requestId") Long requestId);
     int insertAction(AdminActionLogResponse entry);
+
+    List<AdminTimelineRow> deletedStories(@Param("userNo") Long userNo, @Param("limit") int limit);
+    List<AdminTimelineRow> deletedFeeds(@Param("userNo") Long userNo, @Param("limit") int limit);
+    List<AdminTimelineRow> deletedPets(@Param("userNo") Long userNo, @Param("limit") int limit);
+    AdminTimelineRow passwordChanged(@Param("userNo") Long userNo);
+    AdminTimelineRow nicknameChanged(@Param("userNo") Long userNo);
+    AdminTimelineRow accountWithdrawn(@Param("userNo") Long userNo);
+
+    List<String> contentPetNames(@Param("type") String type, @Param("id") Long id);
+    List<Long> feedMediaFileIds(@Param("feedId") Long feedId);
+
+    int countOwnedTimelineFile(@Param("userNo") Long userNo, @Param("fileId") Long fileId);
+    Long deletedFeedOwner(@Param("feedId") Long feedId);
 }

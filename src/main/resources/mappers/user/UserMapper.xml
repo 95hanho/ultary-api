@@ -11,12 +11,15 @@
     <select id="findAllByEmailForLogin" resultType="me._hanho.ultary.domain.user.model.User">
         SELECT <include refid="userColumns"/> FROM ultary_user WHERE email=#{email} ORDER BY user_no
     </select>
-    <sql id="userColumns">
+	<sql id="userColumns">
 		user_no,
 		password,
+		password_changed_at,
+		must_change_password,
 		name,
 		nickname,
 		nickname_changed_at,
+		previous_nickname,
 		is_default_nickname,
 		email,
 		phone,
@@ -87,7 +90,13 @@
 	<select id="countByNickname" resultType="int">
 		SELECT COUNT(1)
 		FROM ultary_user
-		WHERE nickname = #{nickname}
+		WHERE (
+			nickname = #{nickname}
+			OR (
+				previous_nickname = #{nickname}
+				AND nickname_changed_at &gt; DATE_SUB(NOW(), INTERVAL #{reserveDays} DAY)
+			)
+		)
 		<if test="excludeUserNo != null">
 			AND user_no != #{excludeUserNo}
 		</if>
@@ -183,7 +192,8 @@
 
 	<update id="updateNickname">
 		UPDATE ultary_user
-		SET nickname = #{nickname},
+		SET previous_nickname = nickname,
+			nickname = #{nickname},
 			is_default_nickname = 0,
 			nickname_changed_at = NOW()
 		WHERE user_no = #{userNo}
@@ -194,14 +204,37 @@
 		UPDATE ultary_user
 		SET nickname_changed_at = #{nicknameChangedAt}
 		WHERE user_no = #{userNo}
-		  AND withdrawal_status = 'ACTIVE'
+		  AND withdrawal_status IN ('ACTIVE','SUSPENDED')
 	</update>
 
 	<update id="updatePassword">
 		UPDATE ultary_user
-		SET password = #{password}
+		SET password = #{password},
+			password_changed_at = NOW(),
+			must_change_password = 0
 		WHERE user_no = #{userNo}
 		  AND withdrawal_status = 'ACTIVE'
+	</update>
+
+	<!-- 관리자 비밀번호 초기화. 정지 회원도 허용.
+	     password_changed_at=NULL → 타임라인 PASSWORD_CHANGED 제거.
+	     must_change_password=1 → 다음 로그인에서 비밀번호 변경 강제 -->
+	<update id="updatePasswordByAdmin">
+		UPDATE ultary_user
+		SET password = #{password},
+			password_changed_at = NULL,
+			must_change_password = 1
+		WHERE user_no = #{userNo}
+		  AND withdrawal_status IN ('ACTIVE','SUSPENDED')
+	</update>
+
+	<update id="reactivateWithdrawn">
+		UPDATE ultary_user
+		SET withdrawal_status = 'ACTIVE',
+			withdrawal_completed_at = NULL,
+			suspended_at = NULL
+		WHERE user_no = #{userNo}
+		  AND withdrawal_status = 'WITHDRAWN'
 	</update>
 
 	<update id="suspend">
@@ -251,4 +284,13 @@
         WHERE nickname = #{nickname} AND withdrawal_status = 'ACTIVE'
         LIMIT 1
     </select>
+
+	<select id="findActiveByPreviousNicknameWithinDays" resultType="me._hanho.ultary.domain.user.model.User">
+		SELECT <include refid="userColumns"/>
+		FROM ultary_user
+		WHERE previous_nickname = #{nickname}
+		  AND withdrawal_status = 'ACTIVE'
+		  AND nickname_changed_at &gt; DATE_SUB(NOW(), INTERVAL #{reserveDays} DAY)
+		LIMIT 1
+	</select>
 </mapper>

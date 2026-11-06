@@ -65,6 +65,18 @@
         ORDER BY r.tag_profile_request_id DESC LIMIT 1
       </when>
       <when test="kind == 'REPORT'">SELECT status AS after_status,CONCAT('신고 #',report_id) AS target_label FROM ultary_report WHERE report_id=#{id}</when>
+      <when test="kind == 'STORY'">
+        SELECT CASE WHEN is_deleted=1 THEN 'DELETED' ELSE 'ACTIVE' END AS after_status,
+          CONCAT('스토리 #',story_id) AS target_label FROM ultary_story WHERE story_id=#{id}
+      </when>
+      <when test="kind == 'FEED'">
+        SELECT CASE WHEN is_deleted=1 THEN 'DELETED' ELSE 'ACTIVE' END AS after_status,
+          CONCAT('게시글 #',feed_id) AS target_label FROM ultary_feed WHERE feed_id=#{id}
+      </when>
+      <when test="kind == 'PET'">
+        SELECT CASE WHEN is_deleted=1 THEN 'DELETED' ELSE 'ACTIVE' END AS after_status,
+          CONCAT(name,' pet') AS target_label FROM ultary_pet WHERE pet_id=#{id}
+      </when>
       <otherwise>
         SELECT j.admin_review_status AS after_status,CONCAT(l.target_type,' #',l.target_id) AS target_label FROM ultary_ai_request_log l
         LEFT JOIN ultary_ai_moderation_job j ON j.job_id=l.moderation_job_id WHERE l.ai_request_id=#{id}
@@ -76,4 +88,90 @@
     SELECT a.admin_no,a.login_id,a.name,#{action},#{targetType},#{targetId},#{requestId},#{targetLabel},#{beforeStatus},#{afterStatus},#{reason}
     FROM ultary_admin a WHERE a.admin_no=#{adminNo}
   </insert>
+
+  <select id="deletedStories" resultType="me._hanho.ultary.domain.admin.dto.response.AdminTimelineRow">
+    SELECT 'STORY_DELETED' AS type, s.story_id AS id, s.deleted_at AS occurred_at,
+      s.file_id AS file_id, s.thumbnail_file_id AS thumbnail_file_id
+    FROM ultary_story s
+    WHERE s.user_no=#{userNo} AND s.is_deleted=1 AND s.deleted_at IS NOT NULL
+    ORDER BY s.deleted_at DESC, s.story_id DESC
+    LIMIT #{limit}
+  </select>
+
+  <select id="deletedFeeds" resultType="me._hanho.ultary.domain.admin.dto.response.AdminTimelineRow">
+    SELECT 'FEED_DELETED' AS type, f.feed_id AS id, f.deleted_at AS occurred_at, f.content AS content
+    FROM ultary_feed f
+    WHERE f.user_no=#{userNo} AND f.is_deleted=1 AND f.deleted_at IS NOT NULL
+      AND EXISTS (SELECT 1 FROM ultary_feed_media m WHERE m.feed_id=f.feed_id)
+    ORDER BY f.deleted_at DESC, f.feed_id DESC
+    LIMIT #{limit}
+  </select>
+
+  <select id="deletedPets" resultType="me._hanho.ultary.domain.admin.dto.response.AdminTimelineRow">
+    SELECT 'PET_DELETED' AS type, p.pet_id AS id, p.deleted_at AS occurred_at, p.name AS pet_name,
+      p.profile_file_id AS file_id
+    FROM ultary_pet p
+    WHERE p.user_no=#{userNo} AND p.is_deleted=1 AND p.deleted_at IS NOT NULL
+    ORDER BY p.deleted_at DESC, p.pet_id DESC
+    LIMIT #{limit}
+  </select>
+
+  <select id="passwordChanged" resultType="me._hanho.ultary.domain.admin.dto.response.AdminTimelineRow">
+    SELECT 'PASSWORD_CHANGED' AS type, u.user_no AS id, u.password_changed_at AS occurred_at,
+      '비밀번호가 변경 되었습니다' AS message
+    FROM ultary_user u
+    WHERE u.user_no=#{userNo} AND u.password_changed_at IS NOT NULL
+    LIMIT 1
+  </select>
+
+  <!-- 쿨다운 진행 중일 때만(조치 가능). 초기화 후(31일 전)에는 목록에서 빠진다 -->
+  <select id="nicknameChanged" resultType="me._hanho.ultary.domain.admin.dto.response.AdminTimelineRow">
+    SELECT 'NICKNAME_CHANGED' AS type, u.user_no AS id, u.nickname_changed_at AS occurred_at,
+      '닉네임 태그가 변경 되었습니다' AS message
+    FROM ultary_user u
+    WHERE u.user_no=#{userNo} AND u.is_default_nickname=0 AND u.nickname_changed_at IS NOT NULL
+      AND u.nickname_changed_at &gt; DATE_SUB(NOW(), INTERVAL 30 DAY)
+    LIMIT 1
+  </select>
+
+  <select id="accountWithdrawn" resultType="me._hanho.ultary.domain.admin.dto.response.AdminTimelineRow">
+    SELECT 'ACCOUNT_WITHDRAWN' AS type, u.user_no AS id, u.withdrawal_completed_at AS occurred_at,
+      '해당 계정이 탈퇴 처리되었습니다' AS message
+    FROM ultary_user u
+    WHERE u.user_no=#{userNo} AND u.withdrawal_status='WITHDRAWN' AND u.withdrawal_completed_at IS NOT NULL
+    LIMIT 1
+  </select>
+
+  <select id="contentPetNames" resultType="string">
+    SELECT p.name FROM ultary_content_pet c
+    JOIN ultary_pet p ON p.pet_id=c.pet_id
+    WHERE c.content_type=#{type} AND c.content_id=#{id}
+    ORDER BY c.sort_order, c.pet_id
+  </select>
+
+  <select id="feedMediaFileIds" resultType="long">
+    SELECT COALESCE(m.thumbnail_file_id, m.file_id)
+    FROM ultary_feed_media m
+    WHERE m.feed_id=#{feedId}
+    ORDER BY m.sort_order ASC, m.feed_media_id ASC
+  </select>
+
+  <!-- 회원 상세 타임라인 썸네일: 펫·스토리·피드 파일 -->
+  <select id="countOwnedTimelineFile" resultType="int">
+    SELECT (
+      SELECT COUNT(*) FROM ultary_pet p
+      WHERE p.user_no=#{userNo} AND p.profile_file_id=#{fileId}
+    ) + (
+      SELECT COUNT(*) FROM ultary_story s
+      WHERE s.user_no=#{userNo} AND (s.file_id=#{fileId} OR s.thumbnail_file_id=#{fileId})
+    ) + (
+      SELECT COUNT(*) FROM ultary_feed f
+      JOIN ultary_feed_media m ON m.feed_id=f.feed_id
+      WHERE f.user_no=#{userNo} AND (m.file_id=#{fileId} OR m.thumbnail_file_id=#{fileId})
+    )
+  </select>
+
+  <select id="deletedFeedOwner" resultType="long">
+    SELECT user_no FROM ultary_feed WHERE feed_id=#{feedId} AND is_deleted=1 LIMIT 1
+  </select>
 </mapper>

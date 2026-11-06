@@ -19,7 +19,7 @@ Spring Boot 3.4 / MyBatis / MariaDB 10.1 / 패키지 `me._hanho.ultary` / API pr
 
 ## 진행 상태 (커밋 메시지와 함께 갱신)
 
-- 스키마: **v43** (게시글별 allow_comment. privacy neighbor_request·allow_comment 제거. v42 utf8mb4, v41 본문 500자, …)
+- 스키마: **v44** (`password_changed_at`·관리자 주요 타임라인. v43 allow_comment, v42 utf8mb4, v41 본문 500자, …)
 - 완료(스모크): auth, file, pet, tag, feed, myultary, story, neighbor(block 포함), **main**(feeds/search/recommended/최근검색), **notification**(목록·읽음, 배지는 소켓 `NOTIFICATION_UNREAD`), **dm**(방·메시지·게시글/스토리 공유. 공유 대상은 `GET /dm/share-targets`. 새 메시지는 `DM_MESSAGE`의 `room.following`·`followedBy`, 읽음은 `DM_READ`, 입력 중은 `DM_TYPING`), **report**(게시글·댓글·답글·유저. 사유 ENUM. 관리자 삭제·정지)
 - 로컬 시드(선택): `share/database/seed/mariadb_10_1/001_dev_sample_data.sql` — 재실행 가능, 운영에서는 제외. user **101~105**, pet 유저당 1~2. HTTP는 user 101 / phone `01011112222` / `Test1234!`. SNS 연동 시드 없음(실제 OAuth만)
 - HTTP: `requests/my-ultary.http`, `requests/story.http`, `requests/neighbor.http`, `requests/main.http`, `requests/notification.http`, `requests/dm.http`, `requests/ws.http` 등
@@ -36,7 +36,7 @@ Spring Boot 3.4 / MyBatis / MariaDB 10.1 / 패키지 `me._hanho.ultary` / API pr
 - 쿨다운: nickname 7일 / mention_id·handle 30일 (`handle_changed_at` NULL이면 handle 최초 설정 자유)
 - 스토리: IMAGE|VIDEO, `expires_at = created_at + 24h`, 조회는 본인 또는 ACCEPTED 팔로우 관계. owners = 내 활성 스토리(맨 앞) + 내가 팔로우한 사람(요청자 ACCEPTED 또는 맞팔) 중 활성 스토리. 링 항목은 `profileFile`만(없으면 null), 스토리 미디어는 단건 조회. 울타리 버튼은 `hasStory`+`hasUnviewed`(조회한 나 기준). `POST /stories/{id}/view`는 본인 스토리도 기록
 - 팔로우: 팔로우=내가 팔로우(요청자 ACCEPTED 또는 `followed_back`), 팔로워=상대가 나를 팔로우(수신자 ACCEPTED 또는 맞팔). 목록 `type=FOLLOW|FOLLOWER`. 카운트 `followCount`·`followerCount`. `pair_key=min:max` 한 쌍 1행. 공개 계정은 신청 즉시 ACCEPTED(한 방향). 비공개 계정은 PENDING, 수락하면 `followed_back=1`로 서로 팔로우. 맞팔 상태값은 없음. 팔로우는 공개·비공개 모두 알림. `message`는 «팔로우했습니다» 또는 «팔로우를 요청했습니다». `following`이 false면 팔로우, true면 취소. 관계가 있으면 그 알림은 유지. 상대만 나를 팔로우한 요청은 맞팔로 바로 ACCEPTED. 맞팔 해제는 호출자 방향만. 유저 API는 `UserController` → `NeighborService`. 비공개 계정은 조회자가 그 계정을 팔로우할 때만 전체공개 글·스토리. 울타리 `privateAccount`. 미팔로우면 게시글·고정·태그 그리드는 빈 배열
-- 관리자: 가입 API 없음. `ultary_admin` 직접 입력. 로그인·재발급·로그아웃은 `/api/v1/admin/auth`. 액세스 JWT는 관리자 비밀키. 회원 Bearer로 `/admin` 호출 불가. 로그아웃은 그 관리자 리프레시만 폐기
+- 관리자: 가입 API 없음. `ultary_admin` 직접 입력. `role` SUPER|OPERATOR. GET은 둘 다, 비-GET 조작은 SUPER만(OPERATOR→403 FORBIDDEN). auth login/refresh/logout은 OPERATOR 허용. 로그인 응답 `role`. 액세스 JWT는 관리자 비밀키(role claim 없음, 요청마다 DB). 회원 Bearer로 `/admin` 불가. 로그아웃은 그 관리자 리프레시만 폐기
 - 파일 경로: `images/…`, `videos/…` (uploadDir 기준 상대경로) 또는 CDN 절대 URL
 - 읽기 응답: `fileId` + **FileSummary**(`file`/`profileFile`/`coverFile`/`authorProfileFile`/`images` … `filePath` 포함) — 피드 스크롤용. 유저로 보이는 `profileFile`/`authorProfileFile`은 대표 펫 사진(없으면 null)
 - 쓰기 요청: 기존처럼 `fileId`만

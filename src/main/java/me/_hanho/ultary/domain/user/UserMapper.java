@@ -21,6 +21,14 @@ public interface UserMapper {
 
 	User findActiveByNickname(@Param("nickname") String nickname);
 
+	/**
+	 * 직전 닉네임태그로 활성 유저 조회.
+	 * {@code nickname_changed_at}이 {@code reserveDays}일 이내일 때만.
+	 */
+	User findActiveByPreviousNicknameWithinDays(
+			@Param("nickname") String nickname,
+			@Param("reserveDays") int reserveDays);
+
 	/** 탈퇴 포함. 로그인에서 탈퇴 계정을 구분할 때 */
 	User findByUserNo(@Param("userNo") Long userNo);
 
@@ -35,9 +43,13 @@ public interface UserMapper {
 
 	User findByEmailForLogin(@Param("email") String email);
 
+	/**
+	 * 현재 닉네임 또는 변경 후 {@code reserveDays}일 이내 직전 닉네임과 중복이면 1 이상.
+	 */
 	int countByNickname(
 			@Param("nickname") String nickname,
-			@Param("excludeUserNo") Long excludeUserNo);
+			@Param("excludeUserNo") Long excludeUserNo,
+			@Param("reserveDays") int reserveDays);
 
 	int countByEmail(
 			@Param("email") String email,
@@ -71,6 +83,11 @@ public interface UserMapper {
 			@Param("userNo") Long userNo,
 			@Param("password") String password);
 
+	/** 관리자 초기화. ACTIVE·SUSPENDED만. password_changed_at=NULL, must_change_password=1 */
+	int updatePasswordByAdmin(
+			@Param("userNo") Long userNo,
+			@Param("password") String password);
+
 	int suspend(@Param("userNo") Long userNo);
 
 	int unsuspend(@Param("userNo") Long userNo);
@@ -78,6 +95,9 @@ public interface UserMapper {
 	int updateWithdrawalStatus(
 			@Param("userNo") Long userNo,
 			@Param("withdrawalStatus") String withdrawalStatus);
+
+	/** 탈퇴 취소. WITHDRAWN → ACTIVE, completed_at·suspended_at 비움 */
+	int reactivateWithdrawn(@Param("userNo") Long userNo);
 
 	int updateBio(
 			@Param("userNo") Long userNo,

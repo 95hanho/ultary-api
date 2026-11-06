@@ -10,6 +10,8 @@ import me._hanho.ultary.common.response.ChangeAvailabilityResponse;
 public final class IdentityChangeCooldown {
 
 	public static final int NICKNAME_DAYS = 30;
+	/** 직전 닉네임태그 선점 방지·구 URL 리다이렉트 유지 기간 */
+	public static final int PREVIOUS_NICKNAME_RESERVE_DAYS = 7;
 	public static final int MENTION_ID_DAYS = 30;
 	public static final int HANDLE_DAYS = 30;
 
