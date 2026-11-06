@@ -178,7 +178,6 @@ public class NeighborService {
 			throw new BusinessException(ErrorCode.NEIGHBOR_SELF);
 		}
 		requireActiveUser(targetUserNo);
-		privacyService.assertNeighborRequestOpen(targetUserNo);
 		assertNotBlockedEitherWay(me, targetUserNo);
 
 		String key = pairKey(me, targetUserNo);

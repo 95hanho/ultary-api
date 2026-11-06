@@ -95,7 +95,6 @@ public enum ErrorCode {
 	NEIGHBOR_PENDING_RECEIVED("NEIGHBOR_PENDING_RECEIVED", "상대가 이미 팔로우 요청을 보냈습니다. 수락해 주세요.", HttpStatus.CONFLICT),
 	NEIGHBOR_SELF("NEIGHBOR_SELF", "자기 자신에게는 요청할 수 없습니다.", HttpStatus.BAD_REQUEST),
 	NEIGHBOR_BLOCKED("NEIGHBOR_BLOCKED", "차단된 사용자와는 팔로우 요청을 할 수 없습니다.", HttpStatus.FORBIDDEN),
-	NEIGHBOR_REQUEST_CLOSED("NEIGHBOR_REQUEST_CLOSED", "팔로우 신청을 받지 않는 계정입니다.", HttpStatus.FORBIDDEN),
 	COMMENT_NOT_ALLOWED("COMMENT_NOT_ALLOWED", "댓글을 허용하지 않는 게시글입니다.", HttpStatus.FORBIDDEN),
 	MENTION_NOT_ALLOWED("MENTION_NOT_ALLOWED", "멘션을 허용하지 않는 계정입니다.", HttpStatus.FORBIDDEN),
 	TAG_NOT_ALLOWED("TAG_NOT_ALLOWED", "태그를 허용하지 않는 계정입니다.", HttpStatus.FORBIDDEN),

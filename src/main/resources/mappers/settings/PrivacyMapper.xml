@@ -11,8 +11,6 @@
 			private_account,
 			feed_visibility,
 			story_visibility,
-			neighbor_request,
-			allow_comment,
 			allow_mention,
 			allow_tag
 		FROM ultary_user_privacy
@@ -25,8 +23,6 @@
 			private_account,
 			feed_visibility,
 			story_visibility,
-			neighbor_request,
-			allow_comment,
 			allow_mention,
 			allow_tag
 		) VALUES (
@@ -34,8 +30,6 @@
 			#{privateAccount},
 			#{feedVisibility},
 			#{storyVisibility},
-			#{neighborRequest},
-			#{allowComment},
 			#{allowMention},
 			#{allowTag}
 		)
@@ -43,8 +37,6 @@
 			private_account = VALUES(private_account),
 			feed_visibility = VALUES(feed_visibility),
 			story_visibility = VALUES(story_visibility),
-			neighbor_request = VALUES(neighbor_request),
-			allow_comment = VALUES(allow_comment),
 			allow_mention = VALUES(allow_mention),
 			allow_tag = VALUES(allow_tag)
 	</insert>

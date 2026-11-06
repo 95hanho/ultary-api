@@ -101,6 +101,7 @@ public class FeedService {
 		feed.setUserNo(principal.getUserNo());
 		feed.setContent(blankToNull(request.getContent()));
 		feed.setVisibility(visibility);
+		feed.setAllowComment(!Boolean.FALSE.equals(request.getAllowComment()));
 		feedMapper.insertFeed(feed);
         contentPetService.replace("FEED", feed.getFeedId(), principal.getUserNo(), request.getSubjectPetIds());
 
@@ -223,6 +224,9 @@ public class FeedService {
 		}
 		if (request.getVisibility() != null) {
 			patch.setVisibility(normalizeVisibility(request.getVisibility()));
+		}
+		if (request.getAllowComment() != null) {
+			patch.setAllowComment(request.getAllowComment());
 		}
 
 		int updated = feedMapper.updateFeed(patch);
@@ -414,7 +418,7 @@ public class FeedService {
 			UserPrincipal principal, Long feedId, CreateCommentRequest request) {
 		moderationQueue.lock("FEED", feedId, feedId);
 		Feed feed = requireVisible(feedId, principal.getUserNo());
-		privacyService.assertCommentAllowed(principal.getUserNo(), feed.getUserNo());
+		assertFeedCommentAllowed(principal.getUserNo(), feed);
 		String content = request.getContent().trim();
 		FeedComment comment = new FeedComment();
 		comment.setFeedId(feedId);
@@ -540,7 +544,7 @@ public class FeedService {
 			UserPrincipal principal, Long feedId, Long commentId, CreateReplyRequest request) {
 		moderationQueue.lock("COMMENT", commentId, feedId);
 		Feed feed = requireVisible(feedId, principal.getUserNo());
-		privacyService.assertCommentAllowed(principal.getUserNo(), feed.getUserNo());
+		assertFeedCommentAllowed(principal.getUserNo(), feed);
 		requireComment(feedId, commentId);
 		String content = request.getContent().trim();
 		FeedReply reply = new FeedReply();
@@ -945,6 +949,16 @@ public class FeedService {
 		return value;
 	}
 
+	/** 게시글 allowComment=false면 작성자 외 댓글·답글 불가 */
+	private void assertFeedCommentAllowed(Long actorUserNo, Feed feed) {
+		if (actorUserNo != null && actorUserNo.equals(feed.getUserNo())) {
+			return;
+		}
+		if (Boolean.FALSE.equals(feed.getAllowComment())) {
+			throw new BusinessException(ErrorCode.COMMENT_NOT_ALLOWED);
+		}
+	}
+
 	private boolean canDelete(Feed feed, Long userNo) {
 		if (feed.getUserNo().equals(userNo)) {
 			return true;
@@ -1135,6 +1149,7 @@ public class FeedService {
 						: files.get(authorProfileFileId.longValue()))
 				.content(feed.getContent())
 				.visibility(feed.getVisibility())
+				.allowComment(!Boolean.FALSE.equals(feed.getAllowComment()))
 				.likeCount(feed.getLikeCount())
 				.commentCount(feed.getCommentCount())
 				.pinCount(feed.getPinCount())

@@ -12,8 +12,6 @@ public class UserPrivacy {
 	private Boolean privateAccount;
 	private String feedVisibility;
 	private String storyVisibility;
-	private Boolean neighborRequest;
-	private Boolean allowComment;
 	private Boolean allowMention;
 	private Boolean allowTag;
 }

@@ -46,12 +46,6 @@ public class PrivacyService {
 		if (request.getStoryVisibility() != null) {
 			current.setStoryVisibility(normalizeVisibility(request.getStoryVisibility()));
 		}
-		if (request.getNeighborRequest() != null) {
-			current.setNeighborRequest(request.getNeighborRequest());
-		}
-		if (request.getAllowComment() != null) {
-			current.setAllowComment(request.getAllowComment());
-		}
 		if (request.getAllowMention() != null) {
 			current.setAllowMention(request.getAllowMention());
 		}
@@ -102,23 +96,6 @@ public class PrivacyService {
 	}
 
 	@Transactional(readOnly = true)
-	public void assertNeighborRequestOpen(Long targetUserNo) {
-		if (!Boolean.TRUE.equals(load(targetUserNo).getNeighborRequest())) {
-			throw new BusinessException(ErrorCode.NEIGHBOR_REQUEST_CLOSED);
-		}
-	}
-
-	@Transactional(readOnly = true)
-	public void assertCommentAllowed(Long actorUserNo, Long ownerUserNo) {
-		if (actorUserNo != null && actorUserNo.equals(ownerUserNo)) {
-			return;
-		}
-		if (!Boolean.TRUE.equals(load(ownerUserNo).getAllowComment())) {
-			throw new BusinessException(ErrorCode.COMMENT_NOT_ALLOWED);
-		}
-	}
-
-	@Transactional(readOnly = true)
 	public void assertMentionAllowed(Long actorUserNo, Long targetUserNo) {
 		if (targetUserNo == null || targetUserNo.equals(actorUserNo)) {
 			return;
@@ -148,8 +125,6 @@ public class PrivacyService {
 		defaults.setPrivateAccount(false);
 		defaults.setFeedVisibility(PUBLIC);
 		defaults.setStoryVisibility(NEIGHBORS);
-		defaults.setNeighborRequest(true);
-		defaults.setAllowComment(true);
 		defaults.setAllowMention(true);
 		defaults.setAllowTag(true);
 		return defaults;
@@ -160,8 +135,6 @@ public class PrivacyService {
 				.privateAccount(Boolean.TRUE.equals(privacy.getPrivateAccount()))
 				.feedVisibility(privacy.getFeedVisibility())
 				.storyVisibility(privacy.getStoryVisibility())
-				.neighborRequest(!Boolean.FALSE.equals(privacy.getNeighborRequest()))
-				.allowComment(!Boolean.FALSE.equals(privacy.getAllowComment()))
 				.allowMention(!Boolean.FALSE.equals(privacy.getAllowMention()))
 				.allowTag(!Boolean.FALSE.equals(privacy.getAllowTag()))
 				.build();

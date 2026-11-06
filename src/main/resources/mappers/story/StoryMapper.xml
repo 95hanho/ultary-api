@@ -26,6 +26,41 @@
 		-->
 	</sql>
 
+	<!-- 펫선택(content_pet)이 전부 삭제면 스토리 @가 살아 있어도 제외.
+	     펫선택이 없고 @만 있으면 그 전부가 삭제일 때 제외. 펫 연결 없으면 유지. -->
+	<sql id="storyNotOnlyDeletedPets">
+		NOT (
+			(
+				EXISTS (
+					SELECT 1 FROM ultary_content_pet cp
+					WHERE cp.content_type = 'STORY' AND cp.content_id = s.story_id
+				)
+				AND NOT EXISTS (
+					SELECT 1
+					FROM ultary_content_pet cp
+					INNER JOIN ultary_pet p ON p.pet_id = cp.pet_id AND p.is_deleted = 0
+					WHERE cp.content_type = 'STORY' AND cp.content_id = s.story_id
+				)
+			)
+			OR
+			(
+				NOT EXISTS (
+					SELECT 1 FROM ultary_content_pet cp
+					WHERE cp.content_type = 'STORY' AND cp.content_id = s.story_id
+				)
+				AND EXISTS (
+					SELECT 1 FROM ultary_story_mention sm WHERE sm.story_id = s.story_id
+				)
+				AND NOT EXISTS (
+					SELECT 1
+					FROM ultary_story_mention sm
+					INNER JOIN ultary_pet p ON p.pet_id = sm.pet_id AND p.is_deleted = 0
+					WHERE sm.story_id = s.story_id
+				)
+			)
+		)
+	</sql>
+
 	<insert id="insert" useGeneratedKeys="true" keyProperty="storyId" keyColumn="story_id">
 		INSERT INTO ultary_story (
 			user_no,
@@ -143,31 +178,34 @@
 			sm.sort_order,
 			sm.added_by_user_no
 		FROM ultary_story_mention sm
-		LEFT JOIN ultary_pet p ON p.pet_id = sm.pet_id
+		INNER JOIN ultary_pet p ON p.pet_id = sm.pet_id AND p.is_deleted = 0
 		WHERE sm.story_id = #{storyId}
 		ORDER BY sm.sort_order ASC, sm.story_mention_id ASC
 	</select>
 
 	<select id="findActiveByStoryId" resultType="me._hanho.ultary.domain.story.model.Story">
 		SELECT <include refid="storyColumns"/>
-		FROM ultary_story
-		WHERE story_id = #{storyId}
-		  AND <include refid="activeStoryCondition"/>
+		FROM ultary_story s
+		WHERE s.story_id = #{storyId}
+		  AND s.<include refid="activeStoryCondition"/>
+		  AND <include refid="storyNotOnlyDeletedPets"/>
 	</select>
 
 	<select id="findActiveByUserNo" resultType="me._hanho.ultary.domain.story.model.Story">
 		SELECT <include refid="storyColumns"/>
-		FROM ultary_story
-		WHERE user_no = #{userNo}
-		  AND <include refid="activeStoryCondition"/>
-		ORDER BY created_at ASC, story_id ASC
+		FROM ultary_story s
+		WHERE s.user_no = #{userNo}
+		  AND s.<include refid="activeStoryCondition"/>
+		  AND <include refid="storyNotOnlyDeletedPets"/>
+		ORDER BY s.created_at ASC, s.story_id ASC
 	</select>
 
 	<select id="countActiveByUserNo" resultType="int">
 		SELECT COUNT(1)
-		FROM ultary_story
-		WHERE user_no = #{userNo}
-		  AND <include refid="activeStoryCondition"/>
+		FROM ultary_story s
+		WHERE s.user_no = #{userNo}
+		  AND s.<include refid="activeStoryCondition"/>
+		  AND <include refid="storyNotOnlyDeletedPets"/>
 	</select>
 
 	<update id="softDelete">
@@ -223,6 +261,7 @@
 			)
 		INNER JOIN ultary_story s ON s.user_no = u.user_no
 			AND s.is_deleted = 0
+			AND <include refid="storyNotOnlyDeletedPets"/>
 			<!-- TEST: 24h 만료 비활성
 			AND s.expires_at &gt; NOW()
 			-->
@@ -254,6 +293,7 @@
 		FROM ultary_user u
 		INNER JOIN ultary_story s ON s.user_no = u.user_no
 			AND s.is_deleted = 0
+			AND <include refid="storyNotOnlyDeletedPets"/>
 			<!-- TEST: 24h 만료 비활성
 			AND s.expires_at &gt; NOW()
 			-->
@@ -267,6 +307,7 @@
 		FROM ultary_story s
 		WHERE s.user_no = #{ownerUserNo}
 		  AND s.is_deleted = 0
+		  AND <include refid="storyNotOnlyDeletedPets"/>
 		  <!-- TEST: 24h 만료 비활성
 		  AND s.expires_at &gt; NOW()
 		  -->

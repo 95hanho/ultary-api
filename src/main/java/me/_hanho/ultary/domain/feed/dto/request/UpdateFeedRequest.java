@@ -24,6 +24,9 @@ public class UpdateFeedRequest {
 	@Pattern(regexp = "PUBLIC|NEIGHBORS|PRIVATE", message = "visibility는 PUBLIC, NEIGHBORS, PRIVATE만 가능합니다.")
 	private String visibility;
 
+	/** 생략 시 기존 값 유지. false면 작성자만 댓글·답글 가능 */
+	private Boolean allowComment;
+
 	/** true면 content를 NULL로 클리어 */
 	private Boolean clearContent;
 

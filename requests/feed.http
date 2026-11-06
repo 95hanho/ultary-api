@@ -45,6 +45,7 @@ Content-Type: application/json
 {
   "content": "초코랑 산책 #산책",
   "visibility": "PUBLIC",
+  "allowComment": true,
   "media": [
     {
       "fileId": 120,
@@ -73,10 +74,10 @@ GET {{baseUrl}}/api/v1/feeds/{{feedId}}
 X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
 
-### 3. 게시글 수정 (content·visibility, 선택 mediaTags·mediaOrder·tagIds)
+### 3. 게시글 수정 (content·visibility·allowComment, 선택 mediaTags·mediaOrder·tagIds)
 # 사진 태그는 GET 상세의 media[].feedMediaId를 사용. mediaTags 생략은 유지, 항목의 mentions=[]는 해당 사진 태그 삭제.
 # mediaOrder는 활성 feedMediaId 전체 순열. 생략은 기존 순서 유지. 인덱스 = 새 sortOrder.
-# content 변경 시에도 모더레이션. clearContent / visibility만이면 검사 생략
+# allowComment 생략 시 기존 유지. content 변경 시에도 모더레이션. clearContent / visibility / allowComment만이면 검사 생략
 PATCH {{baseUrl}}/api/v1/feeds/{{feedId}}
 X-BFF-Key: {{bffKey}}
 Authorization: Bearer {{accessToken}}
@@ -85,6 +86,7 @@ Content-Type: application/json
 {
   "content": "초코랑 산책 (수정)",
   "visibility": "PUBLIC",
+  "allowComment": true,
   "mediaOrder": [502, 501]
 }
 

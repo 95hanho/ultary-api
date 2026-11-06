@@ -25,6 +25,9 @@ public class CreateFeedRequest {
 	@Pattern(regexp = "PUBLIC|NEIGHBORS|PRIVATE", message = "visibility는 PUBLIC, NEIGHBORS, PRIVATE만 가능합니다.")
 	private String visibility;
 
+	/** 생략 시 true. false면 작성자만 댓글·답글 가능 */
+	private Boolean allowComment;
+
 	@NotEmpty(message = "미디어는 1개 이상 필요합니다.")
 	@Size(max = 10, message = "미디어는 최대 10개입니다.")
 	@Valid

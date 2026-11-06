@@ -12,8 +12,6 @@ public class PrivacyResponse {
 	private String feedVisibility;
 	/** PUBLIC | NEIGHBORS | PRIVATE */
 	private String storyVisibility;
-	private boolean neighborRequest;
-	private boolean allowComment;
 	private boolean allowMention;
 	private boolean allowTag;
 }

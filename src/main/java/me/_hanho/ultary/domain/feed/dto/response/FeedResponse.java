@@ -24,6 +24,8 @@ public class FeedResponse {
 	private FileSummaryResponse authorProfileFile;
 	private String content;
 	private String visibility;
+	/** false면 작성자만 댓글·답글 가능. 레거시·미설정은 true */
+	private boolean allowComment;
 	private Integer likeCount;
 	private Integer commentCount;
 	private Integer pinCount;

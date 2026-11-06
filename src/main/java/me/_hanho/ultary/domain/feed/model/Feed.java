@@ -15,6 +15,8 @@ public class Feed {
 	private String content;
 	/** PUBLIC | NEIGHBORS | PRIVATE */
 	private String visibility;
+	/** null이면 DB 기본 true. false면 작성자만 댓글·답글 가능 */
+	private Boolean allowComment;
 	private Integer likeCount;
 	private Integer commentCount;
 	private Integer pinCount;
